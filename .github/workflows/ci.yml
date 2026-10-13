@@ -29,7 +29,7 @@ jobs:
       - run: npm ci
       - name: Typecheck
         run: npm run typecheck
-      - name: mcp-server tests (builds dist/ and the widget first)
+      - name: Tests (console; mcp-server builds dist/ and the widget first)
         run: npm test
       - name: Console build
         run: npm run build:console

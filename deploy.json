@@ -5,7 +5,9 @@
       "project": "graffiticode-app",
       "region": "us-central1",
       "buildServiceAccount": "deploy-build@graffiticode-app.iam.gserviceaccount.com",
-      "exclude": ["docs"]
+      "exclude": [
+        "docs"
+      ]
     }
   },
   "services": {
@@ -16,12 +18,43 @@
       "access": "public",
       "runtimeServiceAccount": "console-run@graffiticode-app.iam.gserviceaccount.com",
       "steps": [
-        { "name": "node:22.23.3@sha256:363e1587494626837fa7f9a23bdb453d13b0ff3c67c705c2805cfc69c2d2fad7", "entrypoint": "npm", "args": ["ci", "-w", "packages/console"] },
-        { "name": "node:22.23.3@sha256:363e1587494626837fa7f9a23bdb453d13b0ff3c67c705c2805cfc69c2d2fad7", "entrypoint": "npm", "args": ["run", "typecheck", "-w", "packages/console"] }
+        {
+          "name": "node:22.23.3@sha256:363e1587494626837fa7f9a23bdb453d13b0ff3c67c705c2805cfc69c2d2fad7",
+          "entrypoint": "npm",
+          "args": [
+            "ci",
+            "-w",
+            "packages/console"
+          ]
+        },
+        {
+          "name": "node:22.23.3@sha256:363e1587494626837fa7f9a23bdb453d13b0ff3c67c705c2805cfc69c2d2fad7",
+          "entrypoint": "npm",
+          "args": [
+            "run",
+            "typecheck",
+            "-w",
+            "packages/console"
+          ]
+        },
+        {
+          "name": "node:22.23.3@sha256:363e1587494626837fa7f9a23bdb453d13b0ff3c67c705c2805cfc69c2d2fad7",
+          "entrypoint": "npm",
+          "args": [
+            "test",
+            "-w",
+            "packages/console"
+          ]
+        }
       ],
       "env": {},
       "secrets": {},
-      "smoke": [{ "path": "/", "status": 200 }]
+      "smoke": [
+        {
+          "path": "/",
+          "status": 200
+        }
+      ]
     },
     "mcp": {
       "service": "mcp-service",
@@ -31,14 +64,36 @@
       "access": "public",
       "runtimeServiceAccount": "mcp-run@graffiticode-app.iam.gserviceaccount.com",
       "steps": [
-        { "name": "node:22.23.3@sha256:363e1587494626837fa7f9a23bdb453d13b0ff3c67c705c2805cfc69c2d2fad7", "entrypoint": "npm", "args": ["ci", "-w", "packages/mcp-server"] },
-        { "name": "node:22.23.3@sha256:363e1587494626837fa7f9a23bdb453d13b0ff3c67c705c2805cfc69c2d2fad7", "entrypoint": "npm", "args": ["test"] }
+        {
+          "name": "node:22.23.3@sha256:363e1587494626837fa7f9a23bdb453d13b0ff3c67c705c2805cfc69c2d2fad7",
+          "entrypoint": "npm",
+          "args": [
+            "ci",
+            "-w",
+            "packages/mcp-server"
+          ]
+        },
+        {
+          "name": "node:22.23.3@sha256:363e1587494626837fa7f9a23bdb453d13b0ff3c67c705c2805cfc69c2d2fad7",
+          "entrypoint": "npm",
+          "args": [
+            "test",
+            "-w",
+            "packages/mcp-server"
+          ]
+        }
       ],
       "env": {},
       "secrets": {},
       "smoke": [
-        { "path": "/health", "status": 200 },
-        { "path": "/widget/lang/L0180.mjs", "status": 200 }
+        {
+          "path": "/health",
+          "status": 200
+        },
+        {
+          "path": "/widget/lang/L0180.mjs",
+          "status": 200
+        }
       ]
     }
   }
