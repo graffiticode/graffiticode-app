@@ -1,0 +1,20 @@
+{
+  "name": "graffiticode-app",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/console",
+    "packages/mcp-server"
+  ],
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "build": "npm run build:mcp && npm run build:console",
+    "build:console": "npm run build -w packages/console",
+    "build:mcp": "npm run build -w packages/mcp-server",
+    "lint": "npm run lint -w packages/console",
+    "typecheck": "npm run typecheck -w packages/console && npm run typecheck -w packages/mcp-server",
+    "test": "npm test -w packages/mcp-server"
+  }
+}

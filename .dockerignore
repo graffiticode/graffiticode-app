@@ -1,0 +1,21 @@
+**/node_modules/
+**/npm-debug.log
+
+**/.git
+**/README.md
+
+**/.vscode
+**/.env
+**/.editorconfig
+
+**/.gc-deploy
+**/.env*
+**/*.key
+**/*.pem
+
+# tsc output is built inside each image (multi-stage) and copied in
+# explicitly; never ship a local or Cloud Build workspace build.
+**/dist
+**/*.tsbuildinfo
+**/.compiled-test
+**/.next

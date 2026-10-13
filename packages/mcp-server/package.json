@@ -1,5 +1,5 @@
 {
-  "name": "graffiticode-mcp-server",
+  "name": "@graffiticode-app/mcp-server",
   "version": "1.0.0",
   "description": "MCP server for Graffiticode - multi-language DSL platform",
   "type": "module",
@@ -64,5 +64,6 @@
     "forms"
   ],
   "author": "Artcompiler",
-  "license": "MIT"
+  "license": "MIT",
+  "private": true
 }
