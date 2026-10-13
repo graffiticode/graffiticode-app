@@ -1,0 +1,73 @@
+# Build and test every workspace package on push and pull request, and build
+# each service image the way gc-deploy will, then start it with its real CMD.
+# Validation only: no deploys and no secrets (see deploy.json for releases).
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: mcp-server tests (builds dist/ and the widget first)
+        run: npm test
+      - name: Console build
+        run: npm run build:console
+
+  # Each image is built from the repo root with the same Dockerfile gc-deploy
+  # uses, then started with its real CMD; every path in its deploy.json smoke
+  # list must answer 200 (functional assets, not just a health route).
+  images:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: console
+            port: 8080
+            paths: /
+          - service: mcp
+            port: 3001
+            paths: /health /widget/lang/L0180.mjs /favicon.ico
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - name: Build ${{ matrix.service }} image
+        run: docker build -f configs/Dockerfile.${{ matrix.service }}.yaml -t gc-${{ matrix.service }} .
+      - name: Start ${{ matrix.service }} and check its paths
+        run: |
+          docker run -d --name svc -e PORT=${{ matrix.port }} -p ${{ matrix.port }}:${{ matrix.port }} gc-${{ matrix.service }}
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:${{ matrix.port }}/ || true)
+            [ "$code" != 000 ] && break
+            sleep 1
+          done
+          status=0
+          for p in ${{ matrix.paths }}; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:${{ matrix.port }}$p || true)
+            echo "$p -> $code"
+            [ "$code" = 200 ] || status=1
+          done
+          [ $status = 0 ] || docker logs svc
+          docker rm -f svc
+          exit $status

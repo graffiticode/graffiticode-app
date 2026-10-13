@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "environments": {
+    "production": {
+      "project": "graffiticode-app",
+      "region": "us-central1",
+      "buildServiceAccount": "deploy-build@graffiticode-app.iam.gserviceaccount.com",
+      "exclude": ["docs"]
+    }
+  },
+  "services": {
+    "console": {
+      "image": "us-central1-docker.pkg.dev/graffiticode-app/services/console",
+      "dockerfile": "configs/Dockerfile.console.yaml",
+      "port": 8080,
+      "access": "public",
+      "runtimeServiceAccount": "console-run@graffiticode-app.iam.gserviceaccount.com",
+      "steps": [
+        { "name": "node:22.23.3@sha256:363e1587494626837fa7f9a23bdb453d13b0ff3c67c705c2805cfc69c2d2fad7", "entrypoint": "npm", "args": ["ci", "-w", "packages/console"] },
+        { "name": "node:22.23.3@sha256:363e1587494626837fa7f9a23bdb453d13b0ff3c67c705c2805cfc69c2d2fad7", "entrypoint": "npm", "args": ["run", "typecheck", "-w", "packages/console"] }
+      ],
+      "env": {},
+      "secrets": {},
+      "smoke": [{ "path": "/", "status": 200 }]
+    },
+    "mcp": {
+      "service": "mcp-service",
+      "image": "us-central1-docker.pkg.dev/graffiticode-app/services/mcp",
+      "dockerfile": "configs/Dockerfile.mcp.yaml",
+      "port": 3001,
+      "access": "public",
+      "runtimeServiceAccount": "mcp-run@graffiticode-app.iam.gserviceaccount.com",
+      "steps": [
+        { "name": "node:22.23.3@sha256:363e1587494626837fa7f9a23bdb453d13b0ff3c67c705c2805cfc69c2d2fad7", "entrypoint": "npm", "args": ["ci", "-w", "packages/mcp-server"] },
+        { "name": "node:22.23.3@sha256:363e1587494626837fa7f9a23bdb453d13b0ff3c67c705c2805cfc69c2d2fad7", "entrypoint": "npm", "args": ["test"] }
+      ],
+      "env": {},
+      "secrets": {},
+      "smoke": [
+        { "path": "/health", "status": 200 },
+        { "path": "/widget/lang/L0180.mjs", "status": 200 }
+      ]
+    }
+  }
+}

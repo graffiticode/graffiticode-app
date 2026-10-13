@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 // CSP policy used in report-only mode so we surface violations without
 // breaking existing third parties (Firebase, Stripe, Google fonts, etc.).
 // Privy origins are listed here so the email magic-link flow works once
@@ -18,6 +20,10 @@ const cspDirectives = [
 /** @type {import("next").NextConfig} */
 const nextConfig = {
   output: "standalone",
+  // Trace from the monorepo root: dependencies are hoisted to the root
+  // node_modules, so tracing from this package alone would leave them out of
+  // .next/standalone. The server then lands at standalone/packages/console/.
+  outputFileTracingRoot: fileURLToPath(new URL("../..", import.meta.url)),
   reactStrictMode: true,
   // @graffiticode/auth-react ships raw TS (main → src/index.ts), so Next must
   // transpile it like first-party code.
