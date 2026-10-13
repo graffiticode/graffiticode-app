@@ -42,7 +42,7 @@
     "@graffiticode/l0182-view": "^0.1.0",
     "@graffiticode/l0183-view": "^0.3.0",
     "@graffiticode/l0184-view": "^0.2.1",
-    "@graffiticode/l0186-view": "^0.1.1",
+    "@graffiticode/l0186-view": "^0.2.0",
     "@types/node": "^20.10.0",
     "esbuild": "^0.25.12",
     "jsdom": "^29.1.1",
