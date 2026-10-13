@@ -1,0 +1,16 @@
+{
+  "mcp_endpoint": "https://mcp.graffiticode.org/mcp",
+  "site": "https://app.graffiticode.org",
+  "description": "app.graffiticode.org is the Graffiticode artifact viewer — it renders the items and tasks created through the Graffiticode MCP server. A rendered artifact lives at /form/<id> (the view_url returned by the MCP tools).",
+  "tools": [
+    "create_item",
+    "update_item",
+    "get_item",
+    "list_languages",
+    "get_language_info"
+  ],
+  "product_url": "https://graffiticode.org",
+  "console_url": "https://console.graffiticode.org",
+  "forum_url": "https://forum.graffiticode.org",
+  "github_url": "https://github.com/graffiticode"
+}
