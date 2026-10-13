@@ -1,0 +1,12 @@
+node_modules
+dist
+.git
+.gitignore
+.gcloudignore
+.claude
+.mcp.json
+*.md
+skills
+*.log
+.DS_Store
+.env

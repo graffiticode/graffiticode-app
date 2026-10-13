@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" fill="none"/>
+  <circle cx="256" cy="256" r="230" fill="#C47A5A"/>
+  <circle cx="256" cy="256" r="210" fill="#FFFFFF"/>
+  <circle cx="256" cy="256" r="195" fill="#C47A5A"/>
+  <!-- Wedge segments radiating from center -->
+  <!-- 16 wedges, alternating colors -->
+  <g>
+    <!-- Wedge 1 - dark red -->
+    <path d="M256,256 L256,61 A195,195 0 0,1 329.5,72.5 Z" fill="#9B3B3B"/>
+    <!-- Wedge 2 - salmon -->
+    <path d="M256,256 L329.5,72.5 A195,195 0 0,1 394.5,112.5 Z" fill="#D4876A"/>
+    <!-- Wedge 3 - terracotta -->
+    <path d="M256,256 L394.5,112.5 A195,195 0 0,1 438.5,174 Z" fill="#B85C3E"/>
+    <!-- Wedge 4 - light salmon -->
+    <path d="M256,256 L438.5,174 A195,195 0 0,1 451,256 Z" fill="#D49A82"/>
+    <!-- Wedge 5 - dark red -->
+    <path d="M256,256 L451,256 A195,195 0 0,1 438.5,338 Z" fill="#9B3B3B"/>
+    <!-- Wedge 6 - salmon -->
+    <path d="M256,256 L438.5,338 A195,195 0 0,1 394.5,399.5 Z" fill="#C47A5A"/>
+    <!-- Wedge 7 - terracotta -->
+    <path d="M256,256 L394.5,399.5 A195,195 0 0,1 329.5,439.5 Z" fill="#B85C3E"/>
+    <!-- Wedge 8 - light salmon -->
+    <path d="M256,256 L329.5,439.5 A195,195 0 0,1 256,451 Z" fill="#D49A82"/>
+    <!-- Wedge 9 - dark red -->
+    <path d="M256,256 L256,451 A195,195 0 0,1 182.5,439.5 Z" fill="#9B3B3B"/>
+    <!-- Wedge 10 - salmon -->
+    <path d="M256,256 L182.5,439.5 A195,195 0 0,1 117.5,399.5 Z" fill="#D4876A"/>
+    <!-- Wedge 11 - terracotta -->
+    <path d="M256,256 L117.5,399.5 A195,195 0 0,1 73.5,338 Z" fill="#B85C3E"/>
+    <!-- Wedge 12 - light salmon -->
+    <path d="M256,256 L73.5,338 A195,195 0 0,1 61,256 Z" fill="#D49A82"/>
+    <!-- Wedge 13 - dark red -->
+    <path d="M256,256 L61,256 A195,195 0 0,1 73.5,174 Z" fill="#9B3B3B"/>
+    <!-- Wedge 14 - salmon -->
+    <path d="M256,256 L73.5,174 A195,195 0 0,1 117.5,112.5 Z" fill="#C47A5A"/>
+    <!-- Wedge 15 - terracotta -->
+    <path d="M256,256 L117.5,112.5 A195,195 0 0,1 182.5,72.5 Z" fill="#B85C3E"/>
+    <!-- Wedge 16 - light salmon -->
+    <path d="M256,256 L182.5,72.5 A195,195 0 0,1 256,61 Z" fill="#D49A82"/>
+  </g>
+  <!-- White gaps between wedges -->
+  <g stroke="#FFFFFF" stroke-width="4" fill="none">
+    <line x1="256" y1="256" x2="256" y2="61"/>
+    <line x1="256" y1="256" x2="329.5" y2="72.5"/>
+    <line x1="256" y1="256" x2="394.5" y2="112.5"/>
+    <line x1="256" y1="256" x2="438.5" y2="174"/>
+    <line x1="256" y1="256" x2="451" y2="256"/>
+    <line x1="256" y1="256" x2="438.5" y2="338"/>
+    <line x1="256" y1="256" x2="394.5" y2="399.5"/>
+    <line x1="256" y1="256" x2="329.5" y2="439.5"/>
+    <line x1="256" y1="256" x2="256" y2="451"/>
+    <line x1="256" y1="256" x2="182.5" y2="439.5"/>
+    <line x1="256" y1="256" x2="117.5" y2="399.5"/>
+    <line x1="256" y1="256" x2="73.5" y2="338"/>
+    <line x1="256" y1="256" x2="61" y2="256"/>
+    <line x1="256" y1="256" x2="73.5" y2="174"/>
+    <line x1="256" y1="256" x2="117.5" y2="112.5"/>
+    <line x1="256" y1="256" x2="182.5" y2="72.5"/>
+  </g>
+  <!-- Center circle -->
+  <circle cx="256" cy="256" r="35" fill="#D49A82"/>
+  <circle cx="256" cy="256" r="35" stroke="#FFFFFF" stroke-width="4" fill="none"/>
+</svg>
