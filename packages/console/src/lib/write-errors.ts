@@ -67,9 +67,6 @@ export function describeWriteProblem(write: LastWriteLike): WriteProblem | null 
   if (has(message, "language-override-refused")) {
     return failed("You have a language-server override set for this language, and saves through a connection can't use one. Remove the override, then retry.", true);
   }
-  if (has(message, "fn-not-enabled")) {
-    return failed("This item uses a Learnosity feature (Author) that isn't available.", false);
-  }
   if (has(message, "revision-not-approved")) {
     return failed("This language's server version isn't approved for saving through a connection. Try again later; if it persists, contact support.", true);
   }

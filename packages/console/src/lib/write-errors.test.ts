@@ -13,7 +13,6 @@ const W4 = {
   "plan-mismatch": "Error: permission denied (plan-mismatch)",
   "stage-not-pinnable": "Error: permission denied (stage-not-pinnable)",
   "language-override-refused": "Error: a language override (L0176) can't run through a connection; remove it to run this (language-override-refused)",
-  "fn-not-enabled": "Error: permission denied (fn-not-enabled)",
   "revision-not-approved": "Error: permission denied (revision-not-approved)",
   "preflight-unavailable": "Error: preflight of s0 failed (503) (preflight-unavailable)",
   "token-expiring": "Error: /v1/execute failed (409) (token-expiring)",
@@ -32,7 +31,7 @@ test("a pre-cutover run explains itself and points to Recompile, not Retry (it w
 test("every W4 refusal gets a plain explanation and the right retry decision", () => {
   const retryable: Record<string, boolean> = {
     "invocation-incompatible": false, "pinned-revision-unavailable": false, "plan-mismatch": false,
-    "stage-not-pinnable": false, "language-override-refused": true, "fn-not-enabled": false,
+    "stage-not-pinnable": false, "language-override-refused": true,
     "revision-not-approved": true, "preflight-unavailable": true, "token-expiring": true,
   };
   for (const [code, message] of Object.entries(W4)) {

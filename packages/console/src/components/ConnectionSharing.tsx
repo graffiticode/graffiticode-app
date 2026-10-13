@@ -16,7 +16,6 @@ import {
 const FUNCTION_LABELS: Record<string, string> = {
   "init": "Render items (previews)",
   "save-to-itembank": "Write items to your item bank",
-  "author": "Open items in the Author Site",
 };
 
 interface Permission { lang: string; fn: string }
