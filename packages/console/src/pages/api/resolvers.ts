@@ -862,8 +862,14 @@ type LastWrite = {
 // A stored message is display text, not a log: keep the item doc small.
 const LAST_WRITE_MESSAGE_LIMIT = 1000;
 
+// Keep each error's reason code (FAIL-01) beside its message, so
+// lib/write-errors.ts can explain refusals whose wording doesn't name it.
 const errorMessages = (errors: unknown[]) =>
-  errors.map((e: any) => (typeof e === "string" ? e : e?.message ?? JSON.stringify(e))).join("; ");
+  errors.map((e: any) => {
+    if (typeof e === "string") return e;
+    const message = e?.message ?? JSON.stringify(e);
+    return typeof e?.code === "string" && e.code && !message.includes(e.code) ? `${message} (${e.code})` : message;
+  }).join("; ");
 
 /**
  * Every save writes. A new program version of a connectable item runs through

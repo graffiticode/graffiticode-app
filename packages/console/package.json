@@ -34,7 +34,8 @@
     "corpus-sweep": "npx tsx scripts/corpus-sweep.ts",
     "corpus-rebaseline": "npx tsx scripts/corpus-rebaseline.ts",
     "backfill-provenance": "npx tsx scripts/backfill-corpus-provenance.ts",
-    "check-min-instances": "npx tsx scripts/check-min-instances.ts"
+    "check-min-instances": "npx tsx scripts/check-min-instances.ts",
+    "test": "tsx --test src/lib/*.test.ts"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.18.6",
