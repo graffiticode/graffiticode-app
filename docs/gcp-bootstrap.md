@@ -34,6 +34,26 @@ gcloud run services update mcp-service --project $P --region $R \
 #   check /health, /widget/lang/L0180.mjs, MCP initialize + list_languages on the tag URL
 gcloud run services update-traffic mcp-service --project $P --region $R --to-revisions <rev>=100
 gcloud run services update-traffic mcp-service --project $P --region $R --remove-tags sa-swap
+
+# Cloud Build's regional logs bucket. gc-deploy builds use
+# REGIONAL_USER_OWNED_BUCKET logging; the first build failed until the bucket
+# existed and the build SA could write to it (same grant as the backend's).
+gcloud storage buckets create gs://290218862769-us-central1-cloudbuild-logs \
+  --project $P --location $R --uniform-bucket-level-access
+gcloud storage buckets add-iam-policy-binding gs://290218862769-us-central1-cloudbuild-logs \
+  --member serviceAccount:$BUILD_SA --role roles/storage.admin
+
+# Runtime SA for app (app.graffiticode.org): Firestore in the default
+# database (users/{uid}, users/{uid}/items) and its two mounted secrets.
+gcloud iam service-accounts create app-run --project $P --display-name "Cloud Run runtime: app"
+gcloud projects add-iam-policy-binding $P --member serviceAccount:app-run@$P.iam.gserviceaccount.com \
+  --role roles/datastore.user \
+  --condition='expression=resource.name=="projects/graffiticode-app/databases/(default)",title=default-db-only'
+for s in INTERNAL_API_KEY PRIVY_APP_SECRET; do
+  gcloud secrets add-iam-policy-binding $s --project $P \
+    --member serviceAccount:app-run@$P.iam.gserviceaccount.com \
+    --role roles/secretmanager.secretAccessor --condition=None; done
+# Then the same no-traffic tag swap as mcp-service, for service app.
 ```
 
 `console` already runs as `console-run@graffiticode-app`.
@@ -48,12 +68,10 @@ the deployer grants from the backend runbook, scoped to `deploy-build@`,
 |---|---|---|---|
 | console | 1 / 10 | 1Gi | 900s |
 | mcp-service | 1 / – | 512Mi | 300s |
+| app | – / – | 1Gi | 300s |
 
 ## Open items
 
-- [UNVERIFIED] gc-deploy's `REGIONAL_USER_OWNED_BUCKET` build logging may need
-  write on that bucket for `deploy-build@`. Confirm on the first build rather
-  than granting broader roles up front.
 - TODO: existing secret mounts use `:latest`, which gc-deploy rejects. Pin them
   to numbered versions in `deploy.json` before managing secrets through it.
 - TODO: several console secrets are plain env vars rather than Secret Manager
