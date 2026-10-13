@@ -1,0 +1,852 @@
+[
+  {
+    "id": "activity-edit-full",
+    "model": "claude-haiku-4-5-20251001",
+    "code": "author-embed domain \"build.district.k12.us\"\n  user-id \"author-99\"\n  reference \"unit-3-quiz\"\n  organisation-id 42\n  activity-edit [\n    item {}\n  ] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "activity-edit-full",
+    "model": "claude-sonnet-5",
+    "code": "author-embed domain \"build.district.k12.us\"\n  user-id \"author-99\"\n  reference \"unit-3-quiz\"\n  organisation-id 42\n  activity-edit [\n    item {}\n  ] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "activity-edit-full",
+    "model": "gpt-5.6-luna",
+    "code": "author-embed domain \"build.district.k12.us\"\n  user-id \"author-99\"\n  reference \"unit-3-quiz\"\n  organisation-id 42\n  activity-edit [\n    item {}\n  ] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "activity-edit-full",
+    "model": "gpt-5.6-terra",
+    "code": "author-embed domain \"build.district.k12.us\"\n  user-id \"author-99\"\n  reference \"unit-3-quiz\"\n  organisation-id 42\n  activity-edit [\n    item {}\n  ] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "activity-list-browse",
+    "model": "claude-haiku-4-5-20251001",
+    "code": "author-embed domain \"portal.example.edu\"\n  user-id \"t-5501\"\n  organisation-id 315\n  activity-list [\n    {}\n  ] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "activity-list-browse",
+    "model": "claude-sonnet-5",
+    "code": "author-embed domain \"portal.example.edu\"\n  user-id \"t-5501\"\n  organisation-id 315\n  activity-list [\n    {}\n  ] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "activity-list-browse",
+    "model": "gpt-5.6-luna",
+    "code": "author-embed domain \"portal.example.edu\"\n  user-id \"t-5501\"\n  organisation-id 315\n  activity-list [\n    {}\n  ] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "activity-list-browse",
+    "model": "gpt-5.6-terra",
+    "code": "author-embed domain \"portal.example.edu\"\n  user-id \"t-5501\"\n  organisation-id 315\n  activity-list [\n    {}\n  ] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "container-and-settings",
+    "model": "claude-sonnet-5",
+    "code": "author-embed domain \"content.example.org\"\n  user-id \"editor7\"\n  reference \"speaking-task-2\"\n  container height 900\n    fixed-footer-height 60\n    scroll-into-view-selector \"#editor-wrap\" {}\n  item-edit [\n    item shared-passage true {}\n    settings show true\n      full-height true {}\n  ] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "container-and-settings",
+    "model": "gpt-5.6-luna",
+    "code": "author-embed domain \"content.example.org\"\n  user-id \"editor7\"\n  reference \"speaking-task-2\"\n  container height 900\n    fixed-footer-height 60\n    scroll-into-view-selector \"#editor-wrap\" {}\n  item-edit [\n    item shared-passage true {}\n    settings show true\n      full-height true {}\n  ] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "container-and-settings",
+    "model": "gpt-5.6-terra",
+    "code": "author-embed domain \"content.example.org\"\n  user-id \"editor7\"\n  reference \"speaking-task-2\"\n  container height 900\n    fixed-footer-height 60\n    scroll-into-view-selector \"#editor-wrap\" {}\n  item-edit [\n    item shared-passage true {}\n    settings show true\n      full-height true {}\n  ] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "groups-math-templates",
+    "model": "claude-haiku-4-5-20251001",
+    "code": "author-embed domain \"math-studio.acme.edu\"\n  user-id \"m-88\"\n  reference \"calc-limit-2\"\n  organisation-id 12\n  question-type-groups [\n    MATH\n    GRAPH\n  ] widget-templates back true\n  save true\n  require-validation true {}\n  global disable-onbeforeunload true {}\n  item-edit [\n    item back true {}\n  ] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "groups-math-templates",
+    "model": "claude-sonnet-5",
+    "code": "author-embed domain \"math-studio.acme.edu\"\n  user-id \"m-88\"\n  reference \"calc-limit-2\"\n  organisation-id 12\n  question-type-groups [\n    MATH\n    GRAPH\n  ] widget-templates back true\n  save true\n  require-validation true {}\n  global disable-onbeforeunload true {}\n  item-edit [\n    item {}\n  ] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "groups-math-templates",
+    "model": "gpt-5.6-luna",
+    "code": "author-embed domain \"math-studio.acme.edu\"\n  user-id \"m-88\"\n  reference \"calc-limit-2\"\n  organisation-id 12\n  question-type-groups [\n    MATH\n    GRAPH\n  ] widget-templates back true\n  save true\n  require-validation true {}\n  global disable-onbeforeunload true {}\n  item-edit [\n    item {}\n  ] {}\n{}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "groups-math-templates",
+    "model": "gpt-5.6-terra",
+    "code": "author-embed domain \"math-studio.acme.edu\"\n  user-id \"m-88\"\n  reference \"calc-limit-2\"\n  organisation-id 12\n  question-type-groups [\n    MATH\n    GRAPH\n  ] widget-templates back true\n  save true\n  require-validation true {}\n  global disable-onbeforeunload true {}\n  item-edit [\n    item {}\n  ] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "hole-no-author",
+    "model": "claude-haiku-4-5-20251001",
+    "code": "author-embed domain \"authoring.pearsonlab.net\"\n  user-id \"u123\"\n  reference \"stats-cloze-9\"\n  organisation-id 315\n  item-edit [\n    item scoring true {}\n    widget delete false {}\n  ] {}..",
+    "overall": 2,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "hole-no-author",
+    "model": "claude-sonnet-5",
+    "code": "author-embed domain \"authoring.pearsonlab.net\"\n  reference \"stats-cloze-9\"\n  organisation-id 315\n  item-edit [\n    item scoring true {}\n    widget delete false {}\n  ] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "hole-no-author",
+    "model": "gpt-5.6-luna",
+    "code": "author-embed domain \"authoring.pearsonlab.net\"\n  user-id \"author\"\n  reference \"stats-cloze-9\"\n  organisation-id 315\n  item-edit [\n    item scoring true {}\n    widget delete false {}\n  ] {}..",
+    "overall": 2,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "hole-no-author",
+    "model": "gpt-5.6-terra",
+    "code": "author-embed domain \"authoring.pearsonlab.net\"\n  reference \"stats-cloze-9\"\n  organisation-id 315\n  item-edit [\n    item scoring true {}\n    widget delete false {}\n  ] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "hole-no-domain",
+    "model": "claude-haiku-4-5-20251001",
+    "code": "author-embed domain \"lms.acme.edu\"\n  user-id \"u77\"\n  reference \"bio-cell-4\"\n  question-type-groups [\n    MCQ\n  ] allow-widgets [\n  MCQ\n] item-edit [\n  item {}\n  widget delete false {}\n] {}..",
+    "overall": 2,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "hole-no-domain",
+    "model": "claude-sonnet-5",
+    "code": "author-embed user-id \"u77\"\n  reference \"bio-cell-4\"\n  question-type-groups [\n    MCQ\n  ] allow-widgets [\n  MCQ\n] item-edit [\n  item {}\n  widget delete false {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "hole-no-domain",
+    "model": "gpt-5.6-luna",
+    "code": "author-embed user-id \"u77\"\n  reference \"bio-cell-4\"\n  question-type-groups [\n    MCQ\n  ] item-edit [\n  item {}\n  widget delete false {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "hole-no-domain",
+    "model": "gpt-5.6-terra",
+    "code": "author-embed user-id \"u77\"\n  reference \"bio-cell-4\"\n  question-type-groups [\n    MCQ\n  ] allow-widgets [\n  MCQ\n] item-edit [\n  item {}\n  widget delete false {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "hole-no-reference",
+    "model": "claude-haiku-4-5-20251001",
+    "code": "author-embed domain \"items.acme.edu\"\n  user-id \"u123\"\n  question-type-groups [\n    CLOZE\n    MATH\n  ] allow-widgets [\n  CLOZE-TEXT\n  CLOZE-ASSOCIATION\n  CLOZE-DROPDOWN\n  CLOZE-FORMULA\n  CLOZE-INLINE-TEXT\n  FORMULA\n  GRAPH-PLOTTING\n] item-edit [\n  item {}\n  tags-on-create [] {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 2,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "hole-no-reference",
+    "model": "claude-sonnet-5",
+    "code": "author-embed domain \"items.acme.edu\"\n  user-id \"u123\"\n  question-type-groups [\n    CLOZE\n    MATH\n  ] item-edit [\n  item tags-show true\n    tags-edit false {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "hole-no-reference",
+    "model": "gpt-5.6-luna",
+    "code": "author-embed domain \"items.acme.edu\"\n  user-id \"u123\"\n  question-type-groups [\n    CLOZE\n    MATH\n  ] allow-widgets [\n  CLOZE-TEXT\n  FORMULA\n] item-edit [\n  item tags-show true\n    tags-edit false {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "hole-no-reference",
+    "model": "gpt-5.6-terra",
+    "code": "author-embed domain \"items.acme.edu\"\n  user-id \"u123\"\n  question-type-groups [\n    CLOZE\n    MATH\n  ] allow-widgets [\n  CLOZE-TEXT\n  FORMULA\n] item-edit [\n  item tags-show true\n    tags-edit false {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "hole-no-view-stated",
+    "model": "claude-haiku-4-5-20251001",
+    "code": "author-embed domain \"authoring.example.org\"\n  user-id \"a-1001\"\n  question-type-groups [\n    MCQ\n  ] allow-widgets [\n  MCQ\n] item-edit [\n  item {}\n  widget delete false {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "hole-no-view-stated",
+    "model": "claude-sonnet-5",
+    "code": "author-embed domain \"authoring.example.org\"\n  user-id \"a-1001\"\n  question-type-groups [\n    MCQ\n  ] allow-widgets [\n  MCQ\n] item-edit [\n  item {}\n  widget edit true\n    delete false {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "hole-no-view-stated",
+    "model": "gpt-5.6-luna",
+    "code": "author-embed domain \"authoring.example.org\"\n  user-id \"a-1001\"\n  question-type-groups [\n    MCQ\n  ] allow-widgets [\n  MCQ\n] item-edit [\n  item {}\n  widget delete false {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "hole-no-view-stated",
+    "model": "gpt-5.6-terra",
+    "code": "author-embed domain \"authoring.example.org\"\n  user-id \"a-1001\"\n  question-type-groups [\n    MCQ\n  ] allow-widgets [\n  MCQ\n] item-edit [\n  widget delete false {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "item-edit-full",
+    "model": "claude-haiku-4-5-20251001",
+    "code": "author-embed domain \"lms.acme.edu\"\n  user-id \"u123\"\n  reference \"algebra-item-1\"\n  organisation-id 100\n  question-type-groups [\n    MCQ\n    CLOZE\n  ] allow-widgets [\n  MCQ\n  CLOZE-TEXT\n] item-edit [\n  item back true\n    scoring true\n    reference-prefix \"LEAR_\" {}\n  widget edit true\n    delete false {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "item-edit-full",
+    "model": "claude-sonnet-5",
+    "code": "author-embed domain \"lms.acme.edu\"\n  user-id \"u123\"\n  reference \"algebra-item-1\"\n  organisation-id 100\n  question-type-groups [\n    MCQ\n    CLOZE\n  ] allow-widgets [\n  MCQ\n  CLOZE-TEXT\n] item-edit [\n  item back true\n    scoring true\n    reference-prefix \"LEAR_\" {}\n  widget edit true\n    delete false {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "item-edit-full",
+    "model": "gpt-5.6-luna",
+    "code": "author-embed domain \"lms.acme.edu\"\n  user-id \"u123\"\n  reference \"algebra-item-1\"\n  organisation-id 100\n  question-type-groups [\n    MCQ\n    CLOZE\n  ] allow-widgets [\n  MCQ\n  CLOZE-TEXT\n] item-edit [\n  item back true\n    scoring true\n    reference-prefix \"LEAR_\" {}\n  widget edit true\n    delete false {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "item-edit-full",
+    "model": "gpt-5.6-terra",
+    "code": "author-embed domain \"lms.acme.edu\"\n  user-id \"u123\"\n  reference \"algebra-item-1\"\n  organisation-id 100\n  question-type-groups [\n    MCQ\n    CLOZE\n  ] allow-widgets [\n  MCQ\n  CLOZE-TEXT\n] item-edit [\n  item back true\n    scoring true\n    reference-prefix \"LEAR_\" {}\n  widget edit true\n    delete false {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "item-list-browse",
+    "model": "claude-haiku-4-5-20251001",
+    "code": "author-embed domain \"studio.learnco.io\"\n  user-id \"u-4412\"\n  organisation-id 7\n  item-list [\n    item enable-selection true {}\n  ] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "item-list-browse",
+    "model": "claude-sonnet-5",
+    "code": "author-embed domain \"studio.learnco.io\"\n  user-id \"u-4412\"\n  organisation-id 7\n  item-list [\n    item enable-selection true {}\n  ] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "item-list-browse",
+    "model": "gpt-5.6-luna",
+    "code": "author-embed domain \"studio.learnco.io\"\n  user-id \"u-4412\"\n  organisation-id 7\n  item-list [\n    item enable-selection true {}\n  ] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "item-list-browse",
+    "model": "gpt-5.6-terra",
+    "code": "author-embed domain \"studio.learnco.io\"\n  user-id \"u-4412\"\n  organisation-id 7\n  item-list [\n    item enable-selection true {}\n  ] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "update-add-restriction",
+    "model": "claude-haiku-4-5-20251001",
+    "code": "author-embed domain \"lms.acme.edu\"\n  user-id \"u123\"\n  reference \"algebra-item-1\"\n  organisation-id 100\n  question-type-groups [\n    MCQ\n    CLOZE\n  ] item-edit [\n  item back true\n    scoring true {}\n  widget edit true\n    delete false {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "update-add-restriction",
+    "model": "claude-sonnet-5",
+    "code": "author-embed domain \"lms.acme.edu\"\n  user-id \"u123\"\n  reference \"algebra-item-1\"\n  organisation-id 100\n  question-type-groups [\n    MCQ\n    CLOZE\n  ] item-edit [\n  item back true\n    scoring true {}\n  widget edit true\n    delete false {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "update-add-restriction",
+    "model": "gpt-5.6-luna",
+    "code": "author-embed domain \"lms.acme.edu\"\n  user-id \"u123\"\n  reference \"algebra-item-1\"\n  organisation-id 100\n  question-type-groups [\n    MCQ\n    CLOZE\n  ] item-edit [\n  item back true\n    scoring true {}\n  widget edit true\n    delete false {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "update-add-restriction",
+    "model": "gpt-5.6-terra",
+    "code": "author-embed domain \"lms.acme.edu\"\n  user-id \"u123\"\n  reference \"algebra-item-1\"\n  organisation-id 100\n  question-type-groups [\n    MCQ\n    CLOZE\n  ] item-edit [\n  item back true\n    scoring true {}\n  widget edit true\n    delete false {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "update-fill-holes",
+    "model": "claude-haiku-4-5-20251001",
+    "code": "author-embed domain \"authoring.district.k12.us\"\n  user-id \"author-99\"\n  reference \"geo-proof-3\"\n  organisation-id 42\n  item-edit [\n    item scoring true\n      tabs true {}\n  ] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "update-fill-holes",
+    "model": "claude-sonnet-5",
+    "code": "author-embed domain \"authoring.district.k12.us\"\n  user-id \"author-99\"\n  reference \"geo-proof-3\"\n  organisation-id 42\n  item-edit [\n    item scoring true\n      tabs true {}\n  ] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "update-fill-holes",
+    "model": "gpt-5.6-luna",
+    "code": "author-embed domain \"authoring.district.k12.us\"\n  user-id \"author-99\"\n  reference \"geo-proof-3\"\n  organisation-id 42\n  item-edit [\n    item scoring true\n      tabs true {}\n  ] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "update-fill-holes",
+    "model": "gpt-5.6-terra",
+    "code": "author-embed domain \"authoring.district.k12.us\"\n  user-id \"author-99\"\n  reference \"geo-proof-3\"\n  organisation-id 42\n  item-edit [\n    item scoring true\n      tabs true {}\n  ] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "update-switch-view",
+    "model": "claude-sonnet-5",
+    "code": "author-embed domain \"studio.learnco.io\"\n  user-id \"u-4412\"\n  organisation-id 7\n  question-type-groups [\n    MCQ\n    HIGHLIGHT\n  ] item-list [\n  item enable-selection true {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "update-switch-view",
+    "model": "gpt-5.6-luna",
+    "code": "author-embed domain \"studio.learnco.io\"\n  user-id \"u-4412\"\n  organisation-id 7\n  question-type-groups [\n    MCQ\n    HIGHLIGHT\n  ] item-list [\n  item enable-selection true {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "update-switch-view",
+    "model": "gpt-5.6-terra",
+    "code": "author-embed domain \"studio.learnco.io\"\n  user-id \"u-4412\"\n  organisation-id 7\n  question-type-groups [\n    MCQ\n    HIGHLIGHT\n  ] item-list [] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "85e9d979bdf5",
+      "bytes": 30623
+    },
+    "anchorVersion": 2
+  }
+]

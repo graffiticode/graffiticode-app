@@ -1,0 +1,66 @@
+[
+  {
+    "id": "display-grid-bold-header-sum-column",
+    "prompt": "Build a spreadsheet for a bike shop parts order with header row Part, Quantity, Unit Cost, Extended Cost in A1:D1 and three data rows: Brake Cable / 12 / 3.50, Chain Link / 40 / 0.75, Handlebar Grip / 8 / 6.25. Column D should hold =B2*C2, =B3*C3, =B4*C4, and D5 should hold =SUM(D2:D4) with the label Order Total in C5. Bold the header row."
+  },
+  {
+    "id": "column-widths-alignment-fonts",
+    "prompt": "Make a display spreadsheet of national park entrance fees: A1 Park, B1 Vehicle Fee, C1 Season. Rows for Zion / 35 / All year, Acadia / 30 / May-Oct, Big Bend / 30 / All year. Set column A to 200 pixels wide and left aligned, column B to 90 pixels wide and right aligned in a monospace font, and column C centered."
+  },
+  {
+    "id": "region-borders-background-color",
+    "prompt": "Create a spreadsheet showing a soil test log with headers Sample ID, Nitrogen ppm, Phosphorus ppm in row 1 and four sample rows (S-01/42/18, S-02/37/22, S-03/55/15, S-04/29/31). Give the header row a dark blue background with white bold text, and put a thin black border around the whole region A1:C5."
+  },
+  {
+    "id": "average-and-round-formulas",
+    "prompt": "Build a worksheet of weekly rehearsal hours for a choir. A1 through A6 hold the labels Week 1 through Week 6, and B1 through B6 hold 4.5, 6, 5.25, 7, 3.75, 6.5. Put the label Average Hours in A7 and the formula =ROUND(AVERAGE(B1:B6),2) in B7, right aligned."
+  },
+  {
+    "id": "if-formula-status-column",
+    "prompt": "Create a worksheet tracking freezer temperature checks. Headers in row 1: Time, Temp C, Result. Data rows: 06:00 / -19, 12:00 / -15, 18:00 / -21, 00:00 / -17. In column C use an IF formula that displays Safe when the temperature is at or below -18 and Check Unit otherwise."
+  },
+  {
+    "id": "single-cell-display",
+    "prompt": "Make a single-cell spreadsheet whose only cell A1 reads \"Kiln firing schedule: cone 6, 8 hour ramp\" in bold 16 point text, centered, with a light gray background and a column width of 320 pixels."
+  },
+  {
+    "id": "assessed-value-cells-grid",
+    "prompt": "Create an assessment spreadsheet for metric conversions. A1:A4 hold 1 kilometer, 1 meter, 1 centimeter, 1 millimeter and B1 is the header-free answer column: assess B1 through B4 by value expecting 1000, 1, 0.01, 0.001 respectively, top to bottom."
+  },
+  {
+    "id": "assessed-formula-cell-sum",
+    "prompt": "Put the monthly water usage readings 3200, 2875, and 3410 in cells B1, B2, and B3, with labels June, July, August in A1:A3. Make B4 an assessed cell expecting the learner to type the formula =SUM(B1:B3), checked by formula equivalence."
+  },
+  {
+    "id": "assessed-cells-custom-points",
+    "prompt": "Build an assessed invoice sheet with headers Service, Hours, Rate, Subtotal in row 1 and three rows: Wiring inspection / 3 / 85, Panel upgrade / 6 / 110, Outlet install / 2 / 65. Leave column D blank for rows 2 through 4 and assess each by value against the computed subtotal, worth 3 points per cell."
+  },
+  {
+    "id": "assessed-mixed-value-and-formula",
+    "prompt": "Create an assessment spreadsheet for a lemonade stand ledger. A1:A3 hold Cups Sold, Price Per Cup, Revenue; B1 holds 240 and B2 holds 1.75. Assess B3 by formula equivalence expecting =B1*B2, and assess B4 by value expecting the text Profitable, with B4 labeled Verdict in A4."
+  },
+  {
+    "id": "parameterized-range-assessed-total",
+    "prompt": "Create a parameterized spreadsheet for a delivery mileage log. Cell B1 draws from a parameter ranging 20 to 60 step 5 and B2 draws from a parameter ranging 15 to 45 step 5, with labels Morning Route and Afternoon Route in A1 and A2. Label A3 Total Miles and assess B3 expecting the formula =B1+B2."
+  },
+  {
+    "id": "parameterized-choice-list-round",
+    "prompt": "Build a parameterized spreadsheet for currency exchange practice. A1 holds the label Amount USD and B1 draws from a parameter with the choices 50, 125, 300, 480. A2 holds Rate and B2 draws from a parameter with the choices 0.92, 1.27, 1.34. Label A3 Converted and assess B3 expecting the formula =ROUND(B1*B2,2), worth 2 points."
+  },
+  {
+    "id": "long-invoice-line-items-grand-total",
+    "prompt": "Create a polished, editable invoice spreadsheet. Include a clear title 'INVOICE' and simple invoice details near the top: invoice number INV-001, invoice date August 29, 2026, due date September 12, 2026, bill-from placeholder 'Your Company', and bill-to placeholder 'Customer Name'. Add a line-items table with columns Description, Quantity, Unit Price, and Line Total. Include five editable sample rows: Consulting Services (10, $125.00), Design Work (6, $95.00), Development (12, $150.00), Testing & QA (5, $85.00), and Project Management (4, $110.00). Every Line Total cell must use a formula multiplying Quantity by Unit Price. Add a Grand Total row that uses a SUM formula over all line totals. Format money cells as USD currency, use a bold colored header row, emphasize the grand total, add borders and sensible column widths, and keep the overall appearance clean and professional. This is a practical invoice, not an assessment or quiz."
+  },
+  {
+    "id": "long-budget-editable-formulas",
+    "prompt": "Create a clean, interactive monthly budget spreadsheet titled 'Monthly Budget'. Use exactly four columns: Category, Budgeted, Actual, and Difference. Add exactly three category rows: Rent, Groceries, and Utilities. Populate editable sample amounts: Rent budgeted $1,500 and actual $1,500; Groceries budgeted $600 and actual $550; Utilities budgeted $250 and actual $230. In each category row, make Difference a formula equal to Budgeted minus Actual. Add a final Totals row that uses SUM formulas to total the Budgeted, Actual, and Difference columns. Format all numeric cells as USD currency, use a bold contrasting header, emphasize the Totals row, add borders and sensible widths, and use conditional formatting so negative differences stand out in red. This is a practical editable budget spreadsheet, not a quiz or graded assessment."
+  },
+  {
+    "id": "long-planets-readonly-comparison",
+    "prompt": "Create a polished, read-only comparison table titled 'The Eight Planets'. Use four columns: Planet, Diameter (km), Number of Moons, and Distance from the Sun (AU). Use these eight rows in order from the Sun: Mercury — 4,880 km, 0 moons, 0.4 AU; Venus — 12,104 km, 0 moons, 0.7 AU; Earth — 12,756 km, 1 moon, 1.0 AU; Mars — 6,792 km, 2 moons, 1.5 AU; Jupiter — 142,984 km, 95 moons, 5.2 AU; Saturn — 120,536 km, 274 moons, 9.5 AU; Uranus — 51,118 km, 28 moons, 19.0 AU; Neptune — 49,528 km, 16 moons, 30.0 AU. Treat diameter as equatorial diameter and distance as average distance from the Sun, rounded to the displayed precision. Add a small source note: 'Sources: NASA Science and NASA/JPL Solar System Dynamics; moon counts verified August 29, 2026.' Format the header with a dark space-blue background and high-contrast text, alternate row shading, right-align numeric columns, use thousands separators for diameter, and keep the table clean and classroom-friendly. This is an informational comparison table, not a quiz or graded assessment."
+  },
+  {
+    "id": "long-home-budget-full-layout-spec",
+    "prompt": "Create an editable, non-assessed spreadsheet named “Simple Home Budget” for one household’s monthly planning. Use a single sheet titled “Monthly Budget” and a clean, calm blue-and-green theme. Build this exact layout:\n\nMerge A1:D1 for the title “Simple Home Budget — Monthly Plan”, with dark navy fill, white bold text, centered, larger font. In A2:D2 merge the cells and add the instruction “Replace the yellow cells with your own monthly amounts; totals and differences update automatically.” in smaller italic dark-gray text.\n\nIncome section: A4:D4 contains headers Category, Budgeted, Actual, Difference with medium-blue fill, white bold text, centered, and borders. Rows 5–7 contain Salary, Side Income, and Other Income. Put sample amounts in Budgeted column B: 5000, 500, 100; and Actual column C: 5000, 450, 75. Format B5:C7 as currency, right aligned, with pale-yellow fill to indicate editable inputs. In D5:D7 use formulas =C5-B5, =C6-B6, =C7-B7. Row 8 is Total Income: bold A8, formulas =SUM(B5:B7), =SUM(C5:C7), and =C8-B8 in B8:D8. Give row 8 a pale-blue fill and top border; format amounts as currency.\n\nExpense section: A10:D10 repeats the same headers and styling. Rows 11–20 contain Housing, Utilities, Groceries, Transportation, Insurance, Healthcare, Debt Payments, Savings, Entertainment, and Personal / Misc. Put these sample Budgeted values in B11:B20: 1800, 250, 600, 400, 300, 200, 350, 500, 250, 200. Put these sample Actual values in C11:C20: 1800, 275, 650, 360, 300, 180, 350, 500, 220, 240. Format B11:C20 as currency, right aligned, and pale yellow for editable inputs. In D11:D20 use formulas =B11-C11 through =B20-C20, so positive means under budget. Row 21 is Total Expenses: bold A21, formulas =SUM(B11:B20), =SUM(C11:C20), and =B21-C21 in B21:D21. Give row 21 a pale-blue fill and top border; format amounts as currency.\n\nSummary section: A23:D23 contains headers Summary, Budgeted, Actual, Difference with dark-green fill, white bold text, centered. A24 is Monthly Surplus / Shortfall. B24 formula =B8-B21, C24 formula =C8-C21, and D24 formula =C24-B24. Format B24:D24 as currency, bold, with pale-green fill and a thick top border. A25 is Expense Rate. B25 formula =B21/B8 and C25 formula =C21/C8, formatted as percent with one decimal; D25 formula =C25-B25, also formatted as percent with one decimal. Add borders around the summary table.\n\nSet column widths approximately: A 24 characters, B 15, C 15, D 15. Wrap text where needed. Use consistent thin light-gray borders for the data tables. Make formula cells in column D pale green, except the styled total and summary rows. Freeze the top two rows if supported. Ensure all formulas refer only to cells on this sheet and the spreadsheet is immediately usable."
+  }
+]

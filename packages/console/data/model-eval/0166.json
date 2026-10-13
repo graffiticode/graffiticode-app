@@ -1,0 +1,26 @@
+[
+  {
+    "id": "invoice-tax-discount",
+    "prompt": "Build an invoice: line-item rows with quantity and unit price, an extended-amount column (qty × unit price), a subtotal, a 10% volume discount applied only when the subtotal exceeds 500, an 8.25% sales tax on the discounted subtotal, and a grand total. Bold the totals and format currency columns."
+  },
+  {
+    "id": "commission-tiers",
+    "prompt": "Create a sales-commission sheet where each rep's commission rate depends on their monthly sales: 3% up to 10,000, 5% from 10,000 to 25,000, and 8% above 25,000, applied as marginal tiers (not a flat rate on the whole amount). Show sales, commission, and take-home per rep, and a team total row."
+  },
+  {
+    "id": "inventory-reorder",
+    "prompt": "Make an inventory sheet with columns for SKU, on-hand, reorder point, and reorder quantity, plus a 'status' column that shows 'REORDER' when on-hand is at or below the reorder point and 'OK' otherwise, and a count of how many SKUs currently need reordering."
+  },
+  {
+    "id": "loan-amortization-full",
+    "prompt": "Build a 12-month loan amortization schedule: inputs for principal, annual interest rate, and term in months; a computed fixed monthly payment; and per-month rows showing payment number, beginning balance, interest, principal, and ending balance, with the final ending balance reaching zero."
+  },
+  {
+    "id": "gradebook-weighted",
+    "prompt": "Create a gradebook for one student across 4 categories (homework 20%, quizzes 20%, midterm 25%, final 35%). Each category has 2-3 raw scores that average into a category score; compute the weighted course percentage and map it to a letter grade (A >= 90, B >= 80, C >= 70, D >= 60, else F)."
+  },
+  {
+    "id": "timesheet-overtime",
+    "prompt": "Build a weekly timesheet: daily hours for Mon-Fri, total regular hours capped at 40, overtime hours beyond 40 paid at 1.5x, an hourly rate input, and computed regular pay, overtime pay, and gross pay."
+  }
+]

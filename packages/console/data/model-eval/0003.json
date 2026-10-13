@@ -1,0 +1,14 @@
+[
+  { "id": "hello-name", "prompt": "Show a hello greeting for Ravi." },
+  { "id": "hello-light-theme", "prompt": "Greet the Saturday book club with a hello message, shown in the light theme." },
+  { "id": "image-dark-theme", "prompt": "Display the picture at https://images.example.org/lighthouse.png on a dark background." },
+  { "id": "hello-computed-name", "prompt": "Given the team list [\"Lena\" \"Omar\" \"Kit\"], show a hello greeting for whoever is last on the list." },
+  { "id": "hello-id", "prompt": "Show a hello greeting for the night shift and give the element the id banner." },
+  { "id": "theme-mode-word", "prompt": "I want dark mode: say hello to everyone at Fernwood." },
+  { "id": "ticket-revenue", "prompt": "A concert sold 340 tickets at 25 and 120 VIP tickets at 60. What was the total ticket revenue?" },
+  { "id": "odd-squares-under-50", "prompt": "Square the odd numbers from 1 to 9 and keep only the results under 50." },
+  { "id": "season-tags", "prompt": "Make tags for the seasons winter, spring, summer and autumn, and for the list spring, winter, autumn return the average temperature in Celsius for each: winter 2, spring 12, summer 24, autumn 13." },
+  { "id": "word-lengths", "prompt": "Return the length of each word in [\"graffiti\" \"code\" \"compiler\" \"tag\"] and the length of the longest one." },
+  { "id": "recipe-scaling", "prompt": "A pancake recipe uses flour 200, milk 300 and eggs 2 for 4 people. Scale each quantity for 10 people and return a record keyed by ingredient." },
+  { "id": "edit-switch-theme", "prompt": "Switch it to the dark theme and greet Priya instead.", "currentCode": "theme LIGHT hello \"Ravi\".." }
+]

@@ -1,0 +1,9 @@
+CATEGORY,AMOUNT,DETAILS
+Income,"4000",Total monthly income
+Rent,,35% of your total income
+Utilities,200,Fixed expense
+Food,,15% of your total income
+Transportation,,10% of your total income
+Entertainment,150,Fixed expense
+Savings,,20% of your total income
+Miscellaneous,,Remaining income after all other expenses

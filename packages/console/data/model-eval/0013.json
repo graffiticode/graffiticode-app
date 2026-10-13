@@ -1,0 +1,15 @@
+[
+  { "id": "basic-trimmed", "prompt": "Take a screenshot of item pQ7vR2kLm9 trimmed down to its content." },
+  { "id": "tall-slice-bounded", "prompt": "I need a tall 1:4 strip of item Hx83Tn0bWe for a sidebar, no more than 600 pixels high." },
+  { "id": "square-centered-dense", "prompt": "Make a square thumbnail of item c4Yz9MaQ1d tightly centered on the pie chart, not the whole page." },
+  { "id": "square-all-content", "prompt": "Square thumbnail of item c4Yz9MaQ1d that still shows everything on the form." },
+  { "id": "half-zoom-slice", "prompt": "A 16:9 card image of item L0wQe5rT2u, zoomed halfway between showing all the content and the busiest part." },
+  { "id": "mobile-viewport", "prompt": "Screenshot item Vb6Nm3Xa8s as it looks on a phone: lay it out in a 390 by 844 window first." },
+  { "id": "wide-desktop-banner", "prompt": "Render item Gt5Rk1Zp7y in a 1440x900 window and give me a 3:1 banner of the densest part, 1200 pixels wide." },
+  { "id": "explicit-crop", "prompt": "Grab exactly the region of item Jm2Wq8Ce4o starting 100 pixels from the left and 50 from the top, 640 wide by 360 tall." },
+  { "id": "bounding-box", "prompt": "Thumbnail of item Rf9Ds4Ku6h that fits inside a 320 by 180 box." },
+  { "id": "height-only", "prompt": "Capture item Yp1Ax7Bn3c, at most 200 pixels tall." },
+  { "id": "crop-with-width", "prompt": "Clip item Nw4Ec8Tz5v to its top-left 1024 by 400 and scale the result down to 512 wide." },
+  { "id": "og-image", "prompt": "Social preview image for item Ks3Ld9Fq0m: a 1.91:1 slice of the content, 1200 wide and no more than 630 tall." },
+  { "id": "narrow-viewport-tall", "prompt": "Lay item Uo6Ji2Mh8g out in an 800 by 1200 window, then take a 2:3 portrait slice framing all the content." }
+]

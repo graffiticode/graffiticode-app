@@ -1,0 +1,21 @@
+# Validation only: lint on every push. Nothing here deploys — deploys are always manual (CLAUDE.md).
+name: Node.js CI
+
+on: [push]
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # Match the Dockerfile (node:20-alpine), so CI lints what production builds.
+          node-version: 20
+          cache: npm
+      # `npm ci` installs exactly the lockfile; `npm install` re-resolved against the live
+      # registry on every run.
+      - run: npm ci
+      - run: npm run lint
+        env:
+          CI: true

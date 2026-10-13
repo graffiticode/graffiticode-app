@@ -1,0 +1,11 @@
+[
+  {
+    "id": "invoice-tax-discount",
+    "prompt": "(optional) overrides the prompt from data/model-eval/0166.json when set",
+    "code": "PASTE a real generated program here (e.g. from a model-eval.json run's runs[].code)",
+    "overall": null,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null
+  }
+]

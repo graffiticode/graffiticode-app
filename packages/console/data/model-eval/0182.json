@@ -1,0 +1,99 @@
+[
+  {
+    "id": "create-retro-answered",
+    "prompt": "Answer the team-retro survey for me. My picks, most important first: \"retire the two services nobody owns\", then \"keep a written decision log\". My own idea: delete any feature flag older than a quarter."
+  },
+  {
+    "id": "create-pinned-version",
+    "prompt": "Pull up version 2 of the workplace-pulse survey specifically, not a random one. I'll answer it later."
+  },
+  {
+    "id": "create-usability-answered",
+    "prompt": "Fill in app-usability for me, on its 1 to 7 lines: \"Finding my way around\" 6, \"Getting a task done\" 3, \"The look of the screens\" 7, \"How it responds when I make a mistake\" 2, \"Learning something new in it\" 5, \"How it makes me feel\" 4."
+  },
+  {
+    "id": "retro-three-ranked",
+    "prompt": "Record my ranking: \"pair more often, especially on unfamiliar code\" first, \"rotate the on-call fairly\" second, \"timebox standup to ten minutes\" third. No idea of my own this time.",
+    "currentCode": "survey [\n  id \"team-retro\"\n  session-id get-val-public \"itemId\"\n].."
+  },
+  {
+    "id": "budget-two-plus-writein",
+    "prompt": "My answer: fund \"restore the creek trail\" first and \"add lighting to the park after dark\" second, and add my own idea — a free tool library at the community centre.",
+    "currentCode": "survey [\n  id \"city-budget\"\n  session-id get-val-public \"itemId\"\n].."
+  },
+  {
+    "id": "budget-writein-only",
+    "prompt": "I don't want any of the listed projects. Just record my own suggestion: a public toilet next to the playground.",
+    "currentCode": "survey [\n  id \"city-budget\"\n  session-id get-val-public \"itemId\"\n].."
+  },
+  {
+    "id": "school-max-plus-writein",
+    "prompt": "Answer it for me in this order: \"more counsellors\", \"later start times for high school\", \"after-school tutoring that is actually free\". And my own idea: a school nurse in every building.",
+    "currentCode": "survey [\n  id \"school\"\n  session-id get-val-public \"itemId\"\n].."
+  },
+  {
+    "id": "school-writein-duplicates-option",
+    "prompt": "Put \"music, art and shop back on the timetable\" first. Then add my own idea: more counsellors.",
+    "currentCode": "survey [\n  id \"school\"\n  session-id get-val-public \"itemId\"\n].."
+  },
+  {
+    "id": "features-four-ranked",
+    "prompt": "My top four, in order: \"single sign-on for teams\", \"an audit log of who changed what\", \"share a read-only link without an account\", \"keyboard shortcuts for every common action\".",
+    "currentCode": "survey [\n  id \"product-features\"\n  session-id get-val-public \"itemId\"\n].."
+  },
+  {
+    "id": "features-two-plus-writein",
+    "prompt": "I'll take \"search across everything, not just the current page\" and then \"keyboard shortcuts for every common action\" — and what I'd really like that isn't listed is a public API with webhooks.",
+    "currentCode": "survey [\n  id \"product-features\"\n  session-id get-val-public \"itemId\"\n].."
+  },
+  {
+    "id": "civic-pinned-version",
+    "prompt": "Rank \"clean air and water\" first, \"common sense immigration reform\" second and \"enhance Social Security\" third, and add my own: fund high-speed rail between major cities.",
+    "currentCode": "survey [\n  id \"civic-priorities-9\"\n  session-id get-val-public \"itemId\"\n].."
+  },
+  {
+    "id": "course-numbers-are-values",
+    "prompt": "Here are my answers out of 5: goals 5, pace 4, materials 3, feedback 2. I never went to the labs. The portal was a 6 out of 7, and I'd give a 7 for recommending it. Comment: the reading list was out of date.",
+    "currentCode": "survey [\n  id \"course-feedback\"\n  session-id get-val-public \"itemId\"\n].."
+  },
+  {
+    "id": "course-labels-mixed",
+    "prompt": "Strongly agree that it met its goals, agree the materials were clear, disagree about the pace, neither agree nor disagree on feedback, strongly agree the labs helped. The portal was a 3. I'd only give it a 2 for recommending it to a colleague.",
+    "currentCode": "survey [\n  id \"course-feedback\"\n  session-id get-val-public \"itemId\"\n].."
+  },
+  {
+    "id": "store-dictated",
+    "prompt": "Very satisfied with the range of products, satisfied with how easy things were to find, very dissatisfied with the staff, neutral on the wait to pay, satisfied with the price. Two stars for the visit, and a 4 for recommending you.",
+    "currentCode": "survey [\n  id \"customer-satisfaction\"\n  session-id get-val-public \"itemId\"\n].."
+  },
+  {
+    "id": "store-comment-not-offered",
+    "prompt": "Satisfied with everything except the price, which I was dissatisfied with. Five stars overall and a 9 for recommending. Also add a comment that the fitting rooms were closed.",
+    "currentCode": "survey [\n  id \"customer-satisfaction\"\n  session-id get-val-public \"itemId\"\n].."
+  },
+  {
+    "id": "usability-end-words",
+    "prompt": "Put the app at the clean end for \"The look of the screens\", the fast end for \"Getting a task done\", and the frustrated end for \"How it makes me feel\". \"Finding my way around\", \"How it responds when I make a mistake\" and \"Learning something new in it\" are each a 4.",
+    "currentCode": "survey [\n  id \"app-usability\"\n  session-id get-val-public \"itemId\"\n].."
+  },
+  {
+    "id": "pulse-effect-optout",
+    "prompt": "Meetings that ran over time: very much. Interruptions from chat and email: quite a bit. Waiting on decisions from others: a little. Unclear priorities: I'd prefer not to say. Working across time zones: not at all.",
+    "currentCode": "survey [\n  id \"workplace-pulse-3\"\n  session-id get-val-public \"itemId\"\n].."
+  },
+  {
+    "id": "pulse-frequency-comment",
+    "prompt": "My answers: \"I had the tools and information I needed to do my job\" — always; \"I knew what was expected of me\" — often; \"Someone recognised good work I had done\" — rarely; \"I felt able to raise a concern without worrying about the consequences\" — sometimes; \"My workload felt manageable\" — never. Comment: we need another person on the team.",
+    "currentCode": "survey [\n  id \"workplace-pulse-1\"\n  session-id get-val-public \"itemId\"\n].."
+  },
+  {
+    "id": "pulse-importance-numbers",
+    "prompt": "On its 1 to 5 importance scale: \"Flexible working hours\" 5, \"Time set aside for learning\" 3, \"Clear paths to promotion\" 4, \"A quieter place to concentrate\" 2, \"Regular one-to-one time with my manager\" 1. For what else to focus on: fewer all-hands meetings.",
+    "currentCode": "survey [\n  id \"workplace-pulse-2\"\n  session-id get-val-public \"itemId\"\n].."
+  },
+  {
+    "id": "change-existing-answer",
+    "prompt": "Swap my first two choices, and drop the idea of my own.",
+    "currentCode": "survey [\n  id \"team-retro\"\n  session-id get-val-public \"itemId\"\n  response [\n    choices [\"cut the build time in half\" \"write smaller pull requests\" \"keep a written decision log\"]\n    write-in \"run a blameless review after every incident\"\n  ]\n].."
+  }
+]

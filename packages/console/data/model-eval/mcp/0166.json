@@ -1,0 +1,50 @@
+[
+  {
+    "id": "display-grid-formulas-and-sum",
+    "prompt": "Build a four-column spreadsheet tracking greenhouse seedling trays: header row A1:D1 reading Tray, Seeds Sown, Germinated, Germination Rate, then three data rows (Basil 200/184, Thyme 150/117, Oregano 180/153). Column D computes =C2/B2 down each data row, and D5 holds =AVERAGE(D2:D4). Bold row 1 and right-align columns B, C, and D."
+  },
+  {
+    "id": "label-value-currency-format",
+    "prompt": "Make a two-column monthly studio budget: column A has bold labels Rent, Kiln Electricity, Clay Supplies, Insurance, Total; column B has 1450, 310, 620, 95 and a =SUM(B1:B4) in B5. Set column A width to 180 and column B width to 120, right-align column B, and display column B values as currency with two decimals."
+  },
+  {
+    "id": "striped-rows-with-borders",
+    "prompt": "Create a six-row roster spreadsheet with headers Diver, Depth (m), Bottom Time (min) in row 1 and five data rows: Okoye 18/42, Larsen 30/22, Petrov 12/55, Diallo 24/33, Kimura 21/38. Bold row 1 with a light-gray background, give row 1 a 1px solid #333 bottom-style border, center column B and column C, and apply alternating row colors to the five data rows."
+  },
+  {
+    "id": "if-formula-worksheet",
+    "prompt": "Build a worksheet spreadsheet listing water samples: row 1 headers Sample ID, pH, Status; rows 2-5 hold S-01/6.4, S-02/7.2, S-03/8.9, S-04/7.0. In column C for each data row use =IF(B2>=6.5,\"Pass\",\"Fail\") pattern against that row's pH. Italicize column C and center it."
+  },
+  {
+    "id": "round-formula-display",
+    "prompt": "Create a three-column spreadsheet converting furlongs to meters: headers Distance (fur), Meters, Rounded in A1:C1, with 3, 7.5, and 12 in A2:A4. Column B uses =A2*201.168 style arithmetic per row, and column C uses =ROUND(B2,1) per row. Right-align columns B and C and set each column's width to 110."
+  },
+  {
+    "id": "assessed-value-cells-grid",
+    "prompt": "Create an assessment spreadsheet for metric prefix values: column A holds bold labels kilo, hecto, deca, deci, centi, milli in A1:A6, and column B is a blank assessed input cell on each of those rows. Grade by value match, expecting 1000, 100, 10, 0.1, 0.01, and 0.001 top to bottom, one point each."
+  },
+  {
+    "id": "assessed-formula-average",
+    "prompt": "Put the lap times 62, 59, 65, 58 in cells B1 through B4 and the label Average Lap in A5. Assess cell B5 expecting the student to enter the formula =AVERAGE(B1:B4), using formula-equivalence matching."
+  },
+  {
+    "id": "assessed-partial-credit-multi-cell",
+    "prompt": "Build an assessment spreadsheet titled \"Payroll Check\" with headers Employee, Hours, Rate, Gross Pay in row 1 and three rows: Nakamura 38/22, Ruiz 41/19, Bell 35/26. Column D is blank and assessed by value, expecting 836, 779, and 910 top to bottom, worth 2 points per cell with partial credit so each correct cell scores independently."
+  },
+  {
+    "id": "quiz-title-instructions-protected",
+    "prompt": "Create an assessed quiz spreadsheet with the title \"Unit Conversions\" and instructions \"Type your answer in the shaded cell on each row. Do not change the prompts.\" Column A holds the protected read-only prompts 4 quarts to pints, 3 miles to feet, 2 tons to pounds; column B is an assessed input cell on each row expecting 8, 15840, and 4000 by value match. Hide the formula bar."
+  },
+  {
+    "id": "parameterized-two-operands-assessed",
+    "prompt": "Create a parameterized spreadsheet where A1 and A2 are filled from params holding two rainfall readings in millimeters, with bold labels \"Gauge 1\" and \"Gauge 2\" in B1 and B2. Cell A3 is an assessed cell expecting the formula-valued total =A1+A2 evaluated against the current param values at scoring time."
+  },
+  {
+    "id": "parameterized-display-invoice",
+    "prompt": "Create a parameterized spreadsheet for a shipping receipt: A1 shows the carrier name from a param, A2 shows the parcel weight in kilograms from a param, and A3 shows the rate per kilogram from a param. Column A labels are in bold in column B (Carrier, Weight kg, Rate per kg), and A4 displays =A2*A3 as the shipping cost, formatted with two decimals and right-aligned."
+  },
+  {
+    "id": "single-cell-styled",
+    "prompt": "Create a single-cell spreadsheet where A1 contains the text \"Kiln Log — Cone 6 Oxidation\", set to 18px bold italic dark-blue text on a pale-orange background, center-aligned, with a 2px solid #444 border and a column A width of 320."
+  }
+]

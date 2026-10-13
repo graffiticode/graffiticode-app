@@ -1,0 +1,14 @@
+[
+  {
+    "id": "budget-sheet",
+    "prompt": "Create a monthly budget spreadsheet with columns for category, planned, actual, and difference. Include rows for rent, groceries, utilities, and transportation, and a totals row that sums each column."
+  },
+  {
+    "id": "loan-amortization",
+    "prompt": "Build a loan amortization table: inputs for principal, annual interest rate, and term in months; columns for payment number, payment, interest, principal, and remaining balance."
+  },
+  {
+    "id": "grade-tracker",
+    "prompt": "Make a grade tracker where a student enters scores for 5 assignments and the sheet computes the weighted average and a letter grade."
+  }
+]

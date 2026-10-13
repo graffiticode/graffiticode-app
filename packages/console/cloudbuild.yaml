@@ -1,0 +1,76 @@
+steps:
+  # Build Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/graffiticode-app/console:$_TAG'
+      - '-t'
+      - 'gcr.io/graffiticode-app/console:latest'
+      - '.'
+
+  # Push image to Container Registry
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - '--all-tags'
+      - 'gcr.io/graffiticode-app/console'
+    id: Push
+
+  # Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    args:
+      - run
+      - deploy
+      - console
+      - '--platform=managed'
+      - '--image=gcr.io/graffiticode-app/console:$_TAG'
+      - '--region=$_DEPLOY_REGION'
+      - '--quiet'
+      - '--allow-unauthenticated'
+      - '--memory=1Gi'
+      - '--cpu=1'
+      # Pinned warm, and pinned HERE because this line is what decides it.
+      #
+      # Cloud Run cold-starts the first request after idle and after every deploy,
+      # which retires all warm instances. Measured 2026-09-09: a create_item that
+      # takes 0.8s warm took 33.7s, with `✓ Ready in 13.2s` in the log — a user was
+      # waiting through it. console is on the shared path (GraphQL API + the
+      # generate-job worker), so the boot is charged to every language, not one.
+      #
+      # This was set to 0, which is why setting it by hand never held: a
+      # `gcloud run services update --min-instances=1` survives a deploy only when
+      # the deploy does not name the flag, and this one names it. The value has to
+      # live here or it is reverted on the next build. Check it with
+      # `npm run check-min-instances`.
+      - '--min-instances=1'
+      - '--max-instances=10'
+      - '--port=8080'
+      # Cross-app SSO: scope the shared refresh-token cookie to the parent domain
+      # so console.graffiticode.org and app.graffiticode.org share one sign-in.
+      # Use --update-env-vars (additive); --set-env-vars would wipe everything
+      # else (ANTHROPIC/OPENAI/Stripe/DSPY/OTEL/... set out-of-band on the service).
+      # Append async-generation config (Cloud Tasks → /api/generate-job).
+      # INTERNAL_JOB_SECRET is mounted out-of-band via Secret Manager (like the
+      # FREE_PLAN_* secrets), so it isn't listed here.
+      - '--update-env-vars=SSO_COOKIE_DOMAIN=.graffiticode.org,GENERATION_QUEUE_NAME=generation-jobs,GENERATION_QUEUE_LOCATION=us-central1,CONSOLE_URL=https://console.graffiticode.org'
+      # The legacy get-val-private key (mounted out-of-band) is retired: the
+      # console no longer encrypts (capability spec SECRET-01), so every deploy
+      # removes the mount. Other out-of-band secrets are untouched.
+      - '--remove-secrets=GRAFFITICODE_SECRET_KEY'
+    id: Deploy
+    entrypoint: gcloud
+
+images:
+  - 'gcr.io/graffiticode-app/console:$_TAG'
+  - 'gcr.io/graffiticode-app/console:latest'
+
+options:
+  substitutionOption: ALLOW_LOOSE
+
+substitutions:
+  _DEPLOY_REGION: us-central1
+  _TAG: latest
+
+tags:
+  - console

@@ -1,0 +1,95 @@
+{
+  "lang": "0166",
+  "authoredBy": "claude-opus-5",
+  "source": {
+    "endpoint": "https://console.graffiticode.org/api",
+    "query": "GetLanguageInfo (graffiticode-mcp-server/src/api.ts)",
+    "itemTypes": [
+      "spreadsheet",
+      "assessment_spreadsheet",
+      "parameterized_spreadsheet"
+    ],
+    "examplePromptCount": 6,
+    "authoringGuideChars": 2115,
+    "usageGuideChars": 7690
+  },
+  "corpusAccess": "none — this script imports no Firestore client and never reads training_examples",
+  "mode": "create-only (no currentCode on any case)",
+  "usage": {
+    "input_tokens": 5757,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 2106,
+    "output_tokens_details": {
+      "thinking_tokens": 0
+    },
+    "service_tier": "standard",
+    "inference_geo": "global"
+  },
+  "cases": [
+    {
+      "id": "display-grid-formulas-and-sum",
+      "targets": "spreadsheet with arithmetic and AVERAGE formulas",
+      "maxOverlapWithExamplePrompts": 0.556
+    },
+    {
+      "id": "label-value-currency-format",
+      "targets": "spreadsheet with column widths and number format",
+      "maxOverlapWithExamplePrompts": 0.278
+    },
+    {
+      "id": "striped-rows-with-borders",
+      "targets": "spreadsheet with row styling, borders, striped rows",
+      "maxOverlapWithExamplePrompts": 0.389
+    },
+    {
+      "id": "if-formula-worksheet",
+      "targets": "spreadsheet with IF formula",
+      "maxOverlapWithExamplePrompts": 0.222
+    },
+    {
+      "id": "round-formula-display",
+      "targets": "spreadsheet with ROUND and arithmetic",
+      "maxOverlapWithExamplePrompts": 0.278
+    },
+    {
+      "id": "assessed-value-cells-grid",
+      "targets": "assessment_spreadsheet value-match cells",
+      "maxOverlapWithExamplePrompts": 0.444
+    },
+    {
+      "id": "assessed-formula-average",
+      "targets": "assessment_spreadsheet formula-method",
+      "maxOverlapWithExamplePrompts": 0.857
+    },
+    {
+      "id": "assessed-partial-credit-multi-cell",
+      "targets": "assessment_spreadsheet with points and partial credit",
+      "maxOverlapWithExamplePrompts": 0.4
+    },
+    {
+      "id": "quiz-title-instructions-protected",
+      "targets": "assessment_spreadsheet with title, instructions, protected cells, hidden formula bar",
+      "maxOverlapWithExamplePrompts": 0.5
+    },
+    {
+      "id": "parameterized-two-operands-assessed",
+      "targets": "parameterized_spreadsheet with param-driven assessment",
+      "maxOverlapWithExamplePrompts": 1
+    },
+    {
+      "id": "parameterized-display-invoice",
+      "targets": "parameterized_spreadsheet display mode",
+      "maxOverlapWithExamplePrompts": 0.333
+    },
+    {
+      "id": "single-cell-styled",
+      "targets": "single-cell spreadsheet with cell-level formatting",
+      "maxOverlapWithExamplePrompts": 0.3
+    }
+  ]
+}

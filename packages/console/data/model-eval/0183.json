@@ -1,0 +1,88 @@
+[
+  {
+    "id": "study-volcano-types",
+    "prompt": "Concept web with \"Volcanoes\" in the centre and Shield volcano, Stratovolcano, Cinder cone and Lava dome around it, titled \"Types of Volcano\" and in dark mode."
+  },
+  {
+    "id": "study-labelled-spokes",
+    "prompt": "A study web of a bicycle: \"Bicycle\" in the middle, with Frame, Wheels, Chain and Brakes around it. Label the lines \"holds it together\", \"roll it along\", \"drives the back wheel\" and \"slow it down\" respectively."
+  },
+  {
+    "id": "study-instructions",
+    "prompt": "Mind map of the branches of mathematics — Algebra, Geometry, Statistics, Calculus and Number theory around \"Mathematics\" — with the instruction \"Pick one branch and explain it to a partner.\""
+  },
+  {
+    "id": "blanks-distractors-tray-right",
+    "prompt": "Insects web for my class: \"Insects\" in the centre, and students drag Ant, Beetle and Butterfly onto three blank nodes. Put Spider and Centipede in the word bank as wrong answers — Spider should cost a point. Word bank on the right."
+  },
+  {
+    "id": "blank-hub-distractor",
+    "prompt": "Music vocabulary: Allegro, Andante, Largo and Presto around the centre, which students fill with \"Tempo\". Add \"Dynamics\" as a wrong option."
+  },
+  {
+    "id": "relation-labels-distractor",
+    "prompt": "A web around \"The Moon\" with Tides, Earth and Sunlight around it. Students drag labels onto the arrows from the Moon: \"causes\" to Tides, \"orbits\" to Earth, \"reflects\" to Sunlight. Include \"absorbs\" as a wrong label."
+  },
+  {
+    "id": "both-trays-sentence",
+    "prompt": "Grammar web: \"Sentence\" in the centre with Subject, Verb and Object around it. Students place Verb and Object themselves, and also fill the line labels: \"who or what it is about\" to Subject, \"the action\" to Verb, \"receives the action\" to Object. Put \"Adjective\" in the node bank as a decoy, and the node bank at the bottom."
+  },
+  {
+    "id": "node-to-node-food-web",
+    "prompt": "Ocean food web around \"Southern Ocean\": Phytoplankton, Krill, Penguin and Blue whale. Arrows go from Phytoplankton to Krill, from Krill to Penguin, and from Krill to Blue whale, each labelled \"eaten by\". Only Phytoplankton connects to the centre."
+  },
+  {
+    "id": "dashed-and-solid",
+    "prompt": "Web around \"Climate\" with Latitude, Altitude, Distance from the sea and Prevailing winds. Solid lines to Latitude and Altitude, dashed lines to the other two."
+  },
+  {
+    "id": "points-and-penalties",
+    "prompt": "Fill-in web around \"Good sources of vitamin C\": Orange, Kiwi and Red pepper are blanks, with Red pepper worth 2 points because it surprises people. Bread and Milk are decoys that each cost a point if dropped on a blank."
+  },
+  {
+    "id": "interchangeable-blanks",
+    "prompt": "Primary colours of light around \"Light\": three blank spokes for Red, Green and Blue, in any order. Yellow goes in the bank as a trap."
+  },
+  {
+    "id": "colours-shapes-sizes",
+    "prompt": "Feelings web for young children: a large purple circle saying \"Feelings\" in the middle, and Joy in yellow, Sadness in blue, Anger in red and Fear in indigo, all as pill shapes."
+  },
+  {
+    "id": "math-latex-backslashes",
+    "prompt": "A web around $F = ma$ with $F$, $m$ and $a$ around it. Students drag the line labels: \"force in newtons\" to $F$, \"mass in kilograms\" to $m$, \"acceleration in m/s²\" to $a$. Add \"velocity in m/s\" as a wrong label."
+  },
+  {
+    "id": "math-log-rules",
+    "prompt": "Study web around $\\log_b$ showing three rules: $\\log_b(xy) = \\log_b x + \\log_b y$, $\\log_b\\left(\\frac{x}{y}\\right) = \\log_b x - \\log_b y$ and $\\log_b(x^n) = n\\log_b x$, with the lines labelled \"product\", \"quotient\" and \"power\"."
+  },
+  {
+    "id": "images-supplied-urls",
+    "prompt": "Rock-and-mineral web around \"Minerals\" using my photos as the nodes: https://assets.oakridge-science.net/minerals/quartz.png, https://assets.oakridge-science.net/minerals/feldspar.png and https://assets.oakridge-science.net/minerals/mica.png. Students drag the mica photo onto its blank; the other two are shown."
+  },
+  {
+    "id": "images-no-urls",
+    "prompt": "A web of orchestra instruments around \"Strings\" using pictures of a violin, viola, cello and double bass. I haven't got image links yet."
+  },
+  {
+    "id": "instant-feedback-practice",
+    "prompt": "Practice web for Spanish greetings: \"Saludos\" in the centre with blanks for Hola, Buenos días and Buenas noches, \"Adiós\" as a decoy, and show right or wrong as soon as each word is dropped."
+  },
+  {
+    "id": "duplicate-node-text",
+    "prompt": "Web around \"Words with two meanings\" with two nodes that both say \"Bat\": the line to one is labelled \"flying mammal\" and the line to the other \"used in cricket\"."
+  },
+  {
+    "id": "label-some-lines",
+    "prompt": "Great Lakes web around \"Great Lakes\": Superior, Michigan, Huron, Erie and Ontario. Label the line to Superior \"largest\" and the line to Ontario \"smallest\"; the other lines stay plain."
+  },
+  {
+    "id": "edit-add-decoys-move-tray",
+    "prompt": "Add Neptune and Pluto as wrong answers, with Pluto costing a point, and put the word bank on the left.",
+    "currentCode": "concept-web [\n  hub text \"Gas giants\" {}\n  nodes [\n    node text \"Jupiter\" assess [expected] {}\n    node text \"Saturn\" assess [expected] {}\n  ] {}\n] title \"Gas Giants\" {}.."
+  },
+  {
+    "id": "edit-study-to-assessment",
+    "prompt": "Turn this into an activity: make Hydrogen and Oxygen blanks the students fill in, keep Covalent bond shown, and add the instruction \"Drag each element into place.\"",
+    "currentCode": "concept-web [\n  hub text \"Water molecule\" {}\n  nodes [\n    node text \"Hydrogen\" {}\n    node text \"Oxygen\" {}\n    node text \"Covalent bond\" {}\n  ] {}\n] title \"What makes water\" {}.."
+  }
+]

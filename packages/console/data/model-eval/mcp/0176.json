@@ -1,0 +1,66 @@
+[
+  {
+    "id": "mcq-single-answer-with-rationale-and-standards",
+    "prompt": "In our Learnosity item bank, create a 4-option multiple choice question with the stem 'Which layer of Earth is liquid?' Options: inner core, outer core, mantle, crust — outer core is correct. Add a one-line rationale for each distractor explaining the misconception, and tag it CCSS-aligned custom tag 'Earth Systems', difficulty medium, DOK 2."
+  },
+  {
+    "id": "mcq-multiselect-partial-credit",
+    "prompt": "Build a multi-select Learnosity MCQ: 'Select all the noble gases.' Options: helium, nitrogen, argon, chlorine, neon. Correct: helium, argon, neon. Give partial credit for each correct selection and shuffle the options."
+  },
+  {
+    "id": "shorttext-exact-match-alternate",
+    "prompt": "Write a Learnosity short-text item asking 'What is the name of the process by which a liquid turns into a gas at its surface?' Exact match on 'evaporation', and also accept 'vaporization' as an alternate."
+  },
+  {
+    "id": "longtext-rubric-manual-scoring",
+    "prompt": "Create a Learnosity long-text essay item with rich-text formatting. Stem: 'Explain how the invention of the printing press changed the spread of information in 15th-century Europe. Use at least two specific examples.' Score it manually with a rubric worth 6 points: 2 points for a clear thesis, 2 points for two supporting examples, 2 points for organization and mechanics."
+  },
+  {
+    "id": "plaintext-open-response",
+    "prompt": "Add a Learnosity plain-text open-ended response item (no formatting toolbar) with the stem: 'Describe one trade-off an engineer must consider when choosing between aluminum and steel for a bicycle frame.' Manually scored on a 3-point rubric: 1 point for naming a property, 1 for naming the trade-off, 1 for a justified recommendation."
+  },
+  {
+    "id": "clozetext-two-blanks-long-answer",
+    "prompt": "Make a Learnosity cloze text item with two typed blanks: 'In a market, when price rises above equilibrium there is a {{response}}, and when price falls below equilibrium there is a {{response}}.' Answers: 'surplus' and 'shortage'. Also accept 'excess supply' and 'excess demand' as an alternate answer set, and raise the character limit since those run past 15 characters."
+  },
+  {
+    "id": "clozedropdown-three-blanks",
+    "prompt": "Author a Learnosity cloze item with three dropdowns about the rock cycle: 'Molten rock cools to form {{blank}} rock, which weathers into sediment that compacts into {{blank}} rock, which heat and pressure change into {{blank}} rock.' Each dropdown offers igneous, sedimentary, metamorphic; correct in that order. Score with partial credit per blank."
+  },
+  {
+    "id": "clozeassociation-drag-into-blanks",
+    "prompt": "Create a Learnosity cloze association item where students drag terms into the gaps: 'The {{blank}} carries oxygen-rich blood away from the heart, while the {{blank}} returns oxygen-poor blood to it.' Drag bank: aorta, vena cava, trachea, ureter. Correct: aorta then vena cava."
+  },
+  {
+    "id": "clozeformula-symbolic-equivalence",
+    "prompt": "Learnosity math fill-in: 'Solve for r: C = 2\\u03c0r.' Show the stem and accept any expression equivalent to C/(2\\u03c0)."
+  },
+  {
+    "id": "clozeformula-syntax-plus-value",
+    "prompt": "Learnosity math fill-in asking for the wavelength of a 500 nm light wave expressed in meters. The answer must be 5\\u00d710^-7 and it must be written in scientific notation, not just be the right number."
+  },
+  {
+    "id": "clozeformula-tolerance",
+    "prompt": "Learnosity math fill-in: 'A pendulum of length 1.2 m has a period of what, in seconds? Use g = 9.8 m/s\\u00b2.' Accept anything within 0.02 of 2.20."
+  },
+  {
+    "id": "choicematrix-true-false-grid",
+    "prompt": "Build a Learnosity choice matrix with columns True and False. Rows: 'The Senate has 100 members', 'A presidential veto can be overridden by a two-thirds vote in both chambers', 'Supreme Court justices serve six-year terms', 'Only the House can initiate revenue bills'. Correct: True, True, False, True. Award partial credit per row."
+  },
+  {
+    "id": "orderlist-pairwise-scoring",
+    "prompt": "Learnosity order list item: put these steps of a bill becoming federal law in the correct sequence — introduced in a chamber, referred to committee, floor vote in both chambers, conference committee reconciles versions, president signs. Score each position against its neighbours rather than all-or-nothing."
+  },
+  {
+    "id": "classification-three-buckets",
+    "prompt": "Create a Learnosity classification item: sort these instruments into 'Strings', 'Woodwinds', and 'Percussion' — cello, oboe, timpani, viola, bassoon, snare drum. Give credit per correctly placed item and save it to the item bank."
+  },
+  {
+    "id": "bowtie-ngn-hypoglycemia",
+    "prompt": "Create a Learnosity NGN bow-tie item. Scenario: a 34-year-old with type 1 diabetes is confused, diaphoretic, and has a fingerstick glucose of 42 mg/dL. Actions: administer 15 g oral glucose, administer regular insulin, recheck glucose in 15 minutes, restrict oral fluids. Conditions: hypoglycemia, diabetic ketoacidosis, hyperosmolar hyperglycemic state. Parameters to monitor: blood glucose, level of consciousness, urine ketones, serum potassium. Correct actions: administer 15 g oral glucose and recheck glucose in 15 minutes. Correct condition: hypoglycemia. Correct monitors: blood glucose and level of consciousness."
+  },
+  {
+    "id": "token-highlight-word-level-max-selection",
+    "prompt": "Learnosity token highlight item: 'Highlight the two prepositions.' Passage: 'The heron waited beside the pond until the fish drifted near.' Correct tokens: beside, until. Also make 'heron', 'waited', and 'drifted' clickable distractors, let students pick at most two, and add a check answer button."
+  }
+]

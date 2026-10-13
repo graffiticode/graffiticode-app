@@ -1,0 +1,30 @@
+[
+  { "id": "vocab-dutch-kitchen", "prompt": "Flashcards for Dutch kitchen words with the English on the back: lepel/spoon, vork/fork, mes/knife, bord/plate, kopje/cup, pan/pan." },
+  { "id": "vocab-swahili-titled", "prompt": "A deck called \"Swahili Basics\" with jambo/hello, asante/thank you, rafiki/friend, chakula/food, maji/water, and nyumba/house." },
+  { "id": "terms-plate-tectonics", "prompt": "Earth science flashcards: subduction, rift valley, transform fault, mantle convection, each with its definition on the back. Subduction is one plate sliding beneath another into the mantle; a rift valley is a lowland formed where plates pull apart; a transform fault is where plates slide past each other sideways; mantle convection is the slow circulation of hot rock that drives plate motion." },
+  { "id": "terms-networking-instructions", "prompt": "Networking terms for my IT certification: router, switch, firewall, DNS, DHCP. Back of each card: forwards packets between networks; connects devices within one network; filters traffic by rules; translates domain names to IP addresses; hands out IP addresses automatically. Add the instruction \"Define each term in your own words before flipping.\"" },
+  { "id": "math-integrals-latex", "prompt": "Flashcards for basic antiderivatives, rendered as math: the integral of x^n dx is x^(n+1)/(n+1) + C, the integral of 1/x dx is ln|x| + C, the integral of e^x dx is e^x + C, the integral of cos x dx is sin x + C." },
+  { "id": "math-exponent-rules-dark", "prompt": "Dark deck titled \"Exponent Laws\": a^m · a^n = a^(m+n), a^m / a^n = a^(m−n), (a^m)^n = a^(mn), a^0 = 1, a^(−n) = 1/a^n. Put the left side on the front and the simplified form on the back, as math." },
+  { "id": "math-mixed-prose-latex", "prompt": "Physics constants deck: speed of light / $c \\approx 3.00 \\times 10^8$ m/s; gravitational acceleration at Earth's surface / $g \\approx 9.81$ m/s²; Planck's constant / $h \\approx 6.63 \\times 10^{-34}$ J·s; Avogadro's number / $N_A \\approx 6.02 \\times 10^{23}$ per mole." },
+  { "id": "people-inventors", "prompt": "Flashcards pairing inventions with their inventors: telephone/Alexander Graham Bell, phonograph/Thomas Edison, World Wide Web/Tim Berners-Lee, printing press/Johannes Gutenberg, polio vaccine/Jonas Salk." },
+  { "id": "dates-space-race", "prompt": "Space race dates — the event on the front, the year on the back: Sputnik 1 launched (1957), Yuri Gagarin orbits Earth (1961), first spacewalk (1965), Apollo 11 Moon landing (1969), Apollo–Soyuz docking (1975)." },
+  { "id": "flags-fresh-countries", "prompt": "Flag flashcards titled \"Flags of the World\": the flag on the front and the country on the back, for Kenya, India, Mexico, Norway and South Korea." },
+  { "id": "images-supplied-unfamiliar-host", "prompt": "Bird identification deck, photo on the front and the species on the back: https://cdn.harbourbirdclub.org/cards/robin-320.jpg is a European robin, https://cdn.harbourbirdclub.org/cards/wren-320.jpg is a wren, and https://cdn.harbourbirdclub.org/cards/blue-tit-320.jpg is a blue tit." },
+  { "id": "images-no-urls", "prompt": "Make a deck of knot pictures with the knot's name on the back — bowline, clove hitch, reef knot, figure-eight. I don't have the photos yet." },
+  { "id": "images-mixed-sides", "prompt": "Molecule flashcards with the name on the front and the structure image on the back: water is https://upload.wikimedia.org/wikipedia/commons/thumb/1/1c/Water_molecule_3D.svg/330px-Water_molecule_3D.svg.png and methane is https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Methane-CRC-MW-3D-balls.png/330px-Methane-CRC-MW-3D-balls.png." },
+  { "id": "light-theme-instructions", "prompt": "Light-themed deck titled \"Cooking Terms\" with the instruction \"Picture the technique, then flip.\": braise / brown then cook slowly in a little liquid; blanch / boil briefly then plunge into ice water; deglaze / loosen browned bits from a pan with liquid; julienne / cut into thin matchsticks." },
+  { "id": "asymmetric-questions", "prompt": "Study cards for my driving theory test, a question on the front and the full answer on the back: What should you do at a flashing amber light? — Give way to pedestrians still crossing, then proceed if the way is clear. When must you use dipped headlights during the day? — When visibility is seriously reduced, generally under 100 metres. What is the stopping distance at 30 mph? — About 23 metres, six car lengths." },
+  { "id": "drill-twelve-squares-roots", "prompt": "Square roots drill: the front shows √1 through √144 for the perfect squares 1, 4, 9, 16, 25, 36, 49, 64, 81, 100, 121, 144, and the back shows the root." },
+  { "id": "term-definition-orientation", "prompt": "I've written these as definition then word — please make flashcards: \"a word that sounds like another but has a different meaning\" — homophone; \"a word with the opposite meaning\" — antonym; \"a word formed from the first letters of other words\" — acronym; \"a word that imitates a sound\" — onomatopoeia." },
+  { "id": "single-card", "prompt": "Just one flashcard: front \"Pythagorean theorem\", back \"$a^2 + b^2 = c^2$\"." },
+  {
+    "id": "edit-add-cards-and-title",
+    "prompt": "Add two more cards — Ottawa for Canada and Canberra for Australia — and title the deck \"Capitals\".",
+    "currentCode": "cards [\n  [\"Peru\" \"Lima\"]\n  [\"Kenya\" \"Nairobi\"]\n  [\"Norway\" \"Oslo\"]\n] {}.."
+  },
+  {
+    "id": "edit-dark-and-fix-card",
+    "prompt": "Switch this deck to dark mode, and the back of the \"tachycardia\" card is wrong — it should say \"a resting heart rate above 100 beats per minute\".",
+    "currentCode": "cards [\n  [\"bradycardia\" \"a resting heart rate below 60 beats per minute\"]\n  [\"tachycardia\" \"a resting heart rate below 50 beats per minute\"]\n  [\"arrhythmia\" \"an irregular heartbeat\"]\n] title \"Cardiology Terms\" {}.."
+  }
+]

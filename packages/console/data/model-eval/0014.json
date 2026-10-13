@@ -1,0 +1,30 @@
+[
+  { "id": "spoken-arithmetic", "prompt": "Write a rule set that turns LaTeX arithmetic into words a screen reader can speak: a-b becomes \"a minus b\", a\\cdot b becomes \"a times b\", a\\div b becomes \"a divided by b\", and anything else passes through unchanged. Test it on 7-2, 3\\cdot 4 and 9\\div 3." },
+  { "id": "inequality-spacing", "prompt": "Normalize inequalities so there is exactly one space on each side of the operator for \\le, \\ge, \\ne and \\nless. Tests: x\\le3 should give x \\le 3, y\\ge-1 should give y \\ge -1, a\\ne b should give a \\ne b, and 2\\nless1 should give 2 \\nless 1." },
+  { "id": "greek-to-plain-names", "prompt": "I need a words table that rewrites Greek letter commands to plain ASCII names for a search index: \\theta to theta, \\nu to nu, \\tau to tau, \\rho to rho and \\omega to omega. Keep a pass-through catch-all rule and add one test per letter." },
+  { "id": "asciimath-target", "prompt": "Translate LaTeX into calculator syntax: \\frac{a}{b} becomes (a)/(b), a^{b} becomes a^(b), \\sqrt{x} becomes sqrt(x), and a\\times b becomes a*b. Include tests for \\frac{1}{2}, x^{3}, \\sqrt{16} and 4\\times5." },
+  { "id": "negative-operand-parens", "prompt": "Subtracting or multiplying by a negative number should put the negative in parentheses: 5-{-3} becomes 5-\\left(-3\\right) and 2*{-4} becomes 2\\times\\left(-4\\right), while plain 5-3 stays 5-3 and 2*4 becomes 2\\times 4. Write the rules and a test for each of those four inputs." },
+  { "id": "nested-sum-subscript", "prompt": "Inside the subscript of a summation, rewrite = as \\coloneqq, so \\sum_{i=1}^{n} i becomes \\sum_{i \\coloneqq 1}^{n}{i}. Outside a sum, = must be left as an ordinary equals sign with spaces, so x=1 becomes x = 1. Test both." },
+  { "id": "types-signed-number", "prompt": "Define a type called signedNumber that matches a number or a minus sign followed by a number, then use it in a rule so two juxtaposed signed numbers like {-2}{3} are written as (-2)(3). Add a catch-all and test {-2}{3} and {4}{-5}." },
+  { "id": "thousands-separator", "prompt": "Our item bank writes large numbers with comma thousands separators. Make a rule set that allows thousands separators and passes numbers and addition through, with tests for 1,250,000 and 12,500+3." },
+  { "id": "european-decimals", "prompt": "Configure the rule set for European number formatting: comma as the decimal separator and period as the thousands separator. Pass expressions through unchanged, and test 3,14 and 1.000,5+2." },
+  { "id": "intervals-allowed", "prompt": "Turn on interval parsing so half-open and closed intervals survive translation. Rules should reproduce \\left(?\\right], \\left[?\\right) and \\left[?\\right] as written. Test (0,1], [2,5) and [-1,1]." },
+  { "id": "ignore-units-text", "prompt": "Answers sometimes include units like 5\\text{ cm}+3\\text{ cm}. Set the option that ignores \\text so the units drop out, keep addition as %1+%2, and test that input plus 12\\text{ kg}." },
+  { "id": "ignore-coefficient-one", "prompt": "A rule set where a coefficient of one is ignored, so 1x+2 is treated like x+2. Rules for addition and juxtaposition plus a catch-all; tests for 1x+2 and 1y." },
+  { "id": "baseline-roots", "prompt": "Write rules for square roots and nth roots that keep them in LaTeX form. I don't know the exact expected output yet, so add tests for \\sqrt{2}, \\sqrt[3]{8} and \\sqrt{x+1} that just capture what the rule set produces today." },
+  { "id": "factorial-percent-degree", "prompt": "Wrap the operand of postfix operators in braces: n! becomes {n}!, 40% becomes {40}%, and 90\\degree becomes {90}\\degree. Add a test for each." },
+  { "id": "set-ops-spoken", "prompt": "Speak set notation: A\\cup B reads \"A union B\", A\\cap B reads \"A intersect B\", and A\\backslash B reads \"A minus B\". Tests for all three." },
+  { "id": "matrix-rows-repeat", "prompt": "Translate a bmatrix into a nested list: each row becomes [a, b] and the whole matrix becomes [[...], [...]], using %* to repeat over rows and over the entries within a row. Test \\begin{bmatrix}1&2\\\\3&4\\end{bmatrix}." },
+  { "id": "integral-spacing", "prompt": "Definite and indefinite integrals should come out with braces on the bounds and a space before the differential: \\int_0^1 x dx becomes \\int_{0}^{1} x dx and \\int x^2 dx becomes \\int {x}^{2} dx. Put the definite rule before the indefinite one and test both." },
+  { "id": "words-and-rules-together", "prompt": "Words table: map \\leq to \\le and \\geq to \\ge so both spellings normalize. Rules: ?\\le? to %1\\le %2, ?\\ge? to %1\\ge %2, and a catch-all. Tests: a\\leq b and c\\geq d." },
+  {
+    "id": "edit-add-division",
+    "prompt": "Add division with \\div, spaced like the other operators, and add a test for 8\\div2.",
+    "currentCode": "rules {\n  \"?+?\": \"%1 + %2\",\n  \"?-?\": \"%1 - %2\",\n  \"?\": \"%1\"\n}\ntests [\n  [\"1+2\", \"1 + 2\"],\n  [\"5-3\", \"5 - 3\"]\n]\n.."
+  },
+  {
+    "id": "edit-bless-baseline",
+    "prompt": "The two tests have empty expectations. Fill them in with what each one should produce under these rules, and add a test for x^{2}+1.",
+    "currentCode": "rules {\n  \"?^?\": \"{%1}^{%2}\",\n  \"?+?\": \"%1+%2\",\n  \"?\": \"%1\"\n}\ntests [\n  [\"a+b\", \"\"],\n  [\"y^{3}\", \"\"]\n]\n.."
+  }
+]

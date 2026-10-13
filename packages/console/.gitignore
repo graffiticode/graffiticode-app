@@ -1,0 +1,97 @@
+*#
+.#*
+.env
+*~
+
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+tsconfig.tsbuildinfo
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# local env files
+.env*.local
+# Backups of the above hold real secrets; `.env*.local` does not match them.
+.env*.bak
+
+# vercel
+.vercel
+
+
+/src/components/l0152
+/src/components/l0155
+
+# firebase
+
+.firebase*
+firestore-debug.log
+firestore.indexes.json
+firestore.rulescloudrun-env-vars.txt
+cloudrun-env-vars.yaml
+
+# generated reports
+rag-analytics-report*.html
+# Local data dumps stay out — EXCEPT the eval evidence. A MODEL_PRIORITY ordering in
+# src/lib/model-priority.ts cites an eval run; if the cases and human labels behind it
+# are local-only, nobody else can reproduce or challenge that ordering.
+#
+# Written as a directory walk, not `/data` + `!` exceptions: git cannot re-include a
+# file whose parent directory is excluded, so the obvious `/data` then
+# `!/data/model-eval/*.json` silently keeps ignoring everything.
+/data/*
+!/data/model-eval/
+/data/model-eval/*
+!/data/model-eval/*.json
+!/data/model-eval/labels/
+/data/model-eval/labels/*
+!/data/model-eval/labels/*.json
+!/data/model-eval/mcp/
+/data/model-eval/mcp/*
+!/data/model-eval/mcp/*.json
+!/data/model-eval/cross/
+/data/model-eval/cross/*
+!/data/model-eval/cross/*.json
+revenue-vs-cost.html
+user-report.html
+funnel-report.html
+mcp-funnel.html
+cost-per-item*.html
+
+# generated training data
+*-training-examples.md
+*-embeddings.json
+*-embeddings.md
+
+# claude code
+# `.claude/*` not `.claude/` — git won't descend into an excluded directory,
+# so the skills negation below only works if the parent isn't pruned.
+.claude/*
+!.claude/skills/
+# model-eval harness results
+model-eval.json
+# Timestamped run outputs (the default since runs must not clobber each other).
+model-eval-*.json
+# Append-as-you-go checkpoints written beside each run output, so an interrupted
+# sweep can be rebuilt with --from-checkpoint.
+*.partial.jsonl

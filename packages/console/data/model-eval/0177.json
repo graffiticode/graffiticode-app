@@ -1,0 +1,126 @@
+[
+  {
+    "id": "item-edit-full",
+    "prompt": "We're adding item authoring to our LMS at lms.acme.edu. Embed the Learnosity item editor so author u123 can edit item algebra-item-1 out of item bank 100. Authors should only be offered multiple-choice and cloze question types, they can edit widgets but must not delete them, and the editor should show the back control and the scoring pane and prefix item references with LEAR_.",
+    "design": {
+      "view": "item-edit",
+      "supplies": ["domain", "user-id", "reference"],
+      "expectHoles": []
+    }
+  },
+  {
+    "id": "item-list-browse",
+    "prompt": "Embed the Learnosity item browser in our authoring console at studio.learnco.io so our authors, signed in as u-4412, can search item bank 7 and open an existing item.",
+    "design": {
+      "view": "item-list",
+      "supplies": ["domain", "user-id"],
+      "expectHoles": []
+    }
+  },
+  {
+    "id": "activity-edit-full",
+    "prompt": "Our curriculum designers need to assemble activities from our Learnosity item bank. Embed the activity editor at build.district.k12.us for designer author-99, editing activity unit-3-quiz in bank 42.",
+    "design": {
+      "view": "activity-edit",
+      "supplies": ["domain", "user-id", "reference"],
+      "expectHoles": []
+    }
+  },
+  {
+    "id": "activity-list-browse",
+    "prompt": "Show a browsable list of our Learnosity activities inside the teacher portal at portal.example.edu for user t-5501, reading from item bank 315.",
+    "design": {
+      "view": "activity-list",
+      "supplies": ["domain", "user-id"],
+      "expectHoles": []
+    }
+  },
+  {
+    "id": "hole-no-domain",
+    "prompt": "Embed the Learnosity item editor so author u77 can edit item bio-cell-4. Restrict the picker to multiple-choice only, and don't let authors delete widgets.",
+    "design": {
+      "view": "item-edit",
+      "supplies": ["user-id", "reference"],
+      "expectHoles": ["domain"]
+    }
+  },
+  {
+    "id": "hole-no-author",
+    "prompt": "Embed the Learnosity item editor on authoring.pearsonlab.net for editing item stats-cloze-9 out of bank 315, with the scoring pane visible and widget deletion turned off.",
+    "design": {
+      "view": "item-edit",
+      "supplies": ["domain", "reference"],
+      "expectHoles": ["user-id"]
+    }
+  },
+  {
+    "id": "hole-no-reference",
+    "prompt": "Put the Learnosity item editor on items.acme.edu for author u123 so our team can work on items. Cloze and math question types should be available, and the tags panel visible but not editable.",
+    "design": {
+      "view": "item-edit",
+      "supplies": ["domain", "user-id"],
+      "expectHoles": ["reference"]
+    }
+  },
+  {
+    "id": "hole-no-view-stated",
+    "prompt": "Set up Learnosity authoring for our staff at authoring.example.org, user a-1001. They should only be able to add multiple-choice questions, and they shouldn't be able to delete widgets.",
+    "design": {
+      "view": null,
+      "supplies": ["domain", "user-id"],
+      "expectHoles": ["view", "reference"],
+      "note": "The prompt names no authoring experience, and TWO outcomes are correct. (a) Leave the view unstated, yielding a `view` hole. (b) Map 'authoring… add questions… delete widgets' to item-edit, which then requires a `reference` the prompt never gave, yielding a `reference` hole. All four models measured on 2026-08-12 took (b); the dialect's own instruction is to map the request to the right view, and asking for a concrete reference is better steering than asking which of four views was meant. Either hole passes. What fails is a guessed view accompanied by an INVENTED reference — a design that reports complete, which is the one outcome this case exists to catch."
+    }
+  },
+  {
+    "id": "container-and-settings",
+    "prompt": "Embed the Learnosity item editor at content.example.org for editor7, working on item speaking-task-2. The editor sits in a fixed 900px-tall panel with a 60px footer and should scroll #editor-wrap into view when it opens. Show the settings pane at full height, and make shared passages available.",
+    "design": {
+      "view": "item-edit",
+      "supplies": ["domain", "user-id", "reference"],
+      "expectHoles": []
+    }
+  },
+  {
+    "id": "groups-math-templates",
+    "prompt": "Our math authors at math-studio.acme.edu (author m-88) edit item calc-limit-2 from bank 12. Limit them to the math and graph question groups, give the widget template picker its back and save buttons and require validation before saving, and suppress the browser's are-you-sure-you-want-to-leave dialog.",
+    "design": {
+      "view": "item-edit",
+      "supplies": ["domain", "user-id", "reference"],
+      "expectHoles": []
+    }
+  },
+  {
+    "id": "update-fill-holes",
+    "prompt": "The editor will be served from authoring.district.k12.us, and the author signing in is author-99.",
+    "currentCode": "author-embed\n  reference \"geo-proof-3\"\n  organisation-id 42\n  item-edit [\n    item scoring true tabs true {}\n  ]\n  {}..",
+    "design": {
+      "view": "item-edit",
+      "supplies": ["domain", "user-id", "reference"],
+      "expectHoles": [],
+      "note": "Starts with holes domain + user-id (verified against the compiler); the prompt supplies exactly those two. This is the dialect's native regime — hole, refine, repeat — and the only case where a hole warning is legitimately fixable from the prompt alone."
+    }
+  },
+  {
+    "id": "update-add-restriction",
+    "prompt": "Also restrict the question picker to just the multiple-choice and cloze groups, and stop authors from deleting widgets.",
+    "currentCode": "author-embed\n  domain \"lms.acme.edu\"\n  user-id \"u123\"\n  reference \"algebra-item-1\"\n  organisation-id 100\n  item-edit [\n    item back true scoring true {}\n    widget edit true {}\n  ]\n  {}..",
+    "design": {
+      "view": "item-edit",
+      "supplies": ["domain", "user-id", "reference"],
+      "expectHoles": [],
+      "note": "Starts complete but carries the `No question-type-groups` specificity advisory, so this measures acting on an advisory rather than filling a hole. Must preserve every property already set."
+    }
+  },
+  {
+    "id": "update-switch-view",
+    "prompt": "We actually want the item browser here, not the single-item editor — authors should pick an existing item out of the bank.",
+    "currentCode": "author-embed\n  domain \"studio.learnco.io\"\n  user-id \"u-4412\"\n  reference \"sci-hotspot-1\"\n  organisation-id 7\n  question-type-groups [MCQ HIGHLIGHT]\n  item-edit [\n    item answers true columns true {}\n    widget edit true delete false {}\n    settings show true {}\n  ]\n  {}..",
+    "design": {
+      "view": "item-list",
+      "supplies": ["domain", "user-id"],
+      "expectHoles": [],
+      "note": "Starts complete and warning-free. Switching to item-list makes `reference` unnecessary and makes the `widget` and `settings` members invalid for the view — a browser has no widgets to edit. Carrying them over earns member-dropped warnings, which is the defect this case exists to catch."
+    }
+  }
+]

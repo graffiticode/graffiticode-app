@@ -1,0 +1,5 @@
+{
+  "purpose": "L0166 MCP-derived cases, run against L0179 for a like-for-like style comparison",
+  "source": "data/model-eval/mcp/0166.json (unchanged)",
+  "compareAgainst": "the L0166 sweep of the same cases, 2026-08-25"
+}

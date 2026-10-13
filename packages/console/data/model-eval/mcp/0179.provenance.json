@@ -1,0 +1,117 @@
+{
+ "lang": "0179",
+ "authoredBy": "claude-opus-5",
+ "source": {
+  "endpoint": "https://console.graffiticode.org/api",
+  "query": "GetLanguageInfo (graffiticode-mcp-server/src/api.ts)",
+  "itemTypes": [
+   "spreadsheet",
+   "assessment_spreadsheet",
+   "parameterized_spreadsheet"
+  ],
+  "examplePromptCount": 7,
+  "authoringGuideChars": 2046,
+  "usageGuideChars": 2991
+ },
+ "corpusAccess": "none — this script imports no Firestore client and never reads training_examples",
+ "mode": "create-only (no currentCode on any case)",
+ "usage": {
+  "input_tokens": 4029,
+  "cache_creation_input_tokens": 0,
+  "cache_read_input_tokens": 0,
+  "cache_creation": {
+   "ephemeral_5m_input_tokens": 0,
+   "ephemeral_1h_input_tokens": 0
+  },
+  "output_tokens": 2173,
+  "output_tokens_details": {
+   "thinking_tokens": 0
+  },
+  "service_tier": "standard",
+  "inference_geo": "global"
+ },
+ "cases": [
+  {
+   "id": "display-grid-bold-header-sum-column",
+   "targets": "spreadsheet with arithmetic and SUM formulas",
+   "maxOverlapWithExamplePrompts": 0.571
+  },
+  {
+   "id": "column-widths-alignment-fonts",
+   "targets": "column width, alignment, and font styling",
+   "maxOverlapWithExamplePrompts": 0.267
+  },
+  {
+   "id": "region-borders-background-color",
+   "targets": "region styling — borders, background color, text color",
+   "maxOverlapWithExamplePrompts": 0.357
+  },
+  {
+   "id": "average-and-round-formulas",
+   "targets": "AVERAGE and ROUND formulas",
+   "maxOverlapWithExamplePrompts": 0.286
+  },
+  {
+   "id": "if-formula-status-column",
+   "targets": "IF formula in a display worksheet",
+   "maxOverlapWithExamplePrompts": 0.333
+  },
+  {
+   "id": "single-cell-display",
+   "targets": "single-cell spreadsheet with cell formatting",
+   "maxOverlapWithExamplePrompts": 0.267
+  },
+  {
+   "id": "assessed-value-cells-grid",
+   "targets": "assessment_spreadsheet with value-equivalence cells",
+   "maxOverlapWithExamplePrompts": 0.429
+  },
+  {
+   "id": "assessed-formula-cell-sum",
+   "targets": "assessment_spreadsheet with formula-equivalence expectation",
+   "maxOverlapWithExamplePrompts": 0.429
+  },
+  {
+   "id": "assessed-cells-custom-points",
+   "targets": "assessment_spreadsheet with per-cell points",
+   "maxOverlapWithExamplePrompts": 0.7
+  },
+  {
+   "id": "assessed-mixed-value-and-formula",
+   "targets": "assessment_spreadsheet mixing formula and literal value expectations",
+   "maxOverlapWithExamplePrompts": 0.429
+  },
+  {
+   "id": "parameterized-range-assessed-total",
+   "targets": "parameterized_spreadsheet with numeric range parameters",
+   "maxOverlapWithExamplePrompts": 0.571
+  },
+  {
+   "id": "parameterized-choice-list-round",
+   "targets": "parameterized_spreadsheet with choice-list parameters and ROUND",
+   "maxOverlapWithExamplePrompts": 0.429
+  }
+ ],
+ "addendum_2026_09_01": {
+  "cases": [
+   "long-invoice-line-items-grand-total",
+   "long-budget-editable-formulas",
+   "long-planets-readonly-comparison",
+   "long-home-budget-full-layout-spec"
+  ],
+  "authoredBy": "not authored — recovered verbatim from production MCP traffic",
+  "source": {
+   "what": "the `help` history of free-plan items created through the MCP server",
+   "who": "ChatGPT/Codex sessions on 2026-08-29 (an OpenAI app-directory review) and 2026-08-31",
+   "itemIds": [
+    "rjBsv2zqxFnHrbl0HUni",
+    "MBSm0VGSmHcha57tTNaF",
+    "FPXLDsrFgGwYlY1BNuVp",
+    "B5bGP1QD0Z8elgKJ0lfR"
+   ]
+  },
+  "why": "The 12 authored cases run 195-341 chars. Real ChatGPT traffic does not look like that: the agent expands a short user ask into an explicit layout spec, 800-2800 chars, naming cells, colours and merges. The corpus therefore never exercised the regime where generation latency actually lives — a 2751-char case logged output=14568 tokens and 134s, against a mean of 490 tokens and 7.5s across the authored cases. An effort sweep run only on the short cases showed almost no difference and would have been read as 'effort does not matter'.",
+  "corpusAccess": "none — recovered from item help history, not from training_examples; holdout gate re-run after adding",
+  "containsPersonalData": "no — spreadsheet specifications (budgets, planets, water cycle); no names, addresses or account data"
+ }
+}

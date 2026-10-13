@@ -1,0 +1,22 @@
+[
+  { "id": "atomic-short-text", "prompt": "A Learnosity short-answer question asking students to name the largest planet in the solar system." },
+  { "id": "atomic-classification", "prompt": "A Learnosity classification item where students sort mammals, reptiles and birds: dolphin, gecko, owl, bat, tortoise, penguin." },
+  { "id": "atomic-order-list", "prompt": "An order-list question asking students to put the stages of mitosis in order." },
+  { "id": "atomic-formula", "prompt": "A Learnosity formula question: solve 3x + 7 = 22 for x." },
+  { "id": "atomic-choice-matrix", "prompt": "A choice matrix asking whether each of five statements about the French Revolution is true or false." },
+  { "id": "atomic-spreadsheet", "prompt": "A gradebook spreadsheet with columns for three quiz scores and a final average per student." },
+  { "id": "atomic-flashcards", "prompt": "A deck of flashcards for the chemical symbols of the first twenty elements." },
+  { "id": "atomic-concept-web", "prompt": "A concept map linking the causes of World War I." },
+  { "id": "atomic-chart-inline", "prompt": "Pie chart of how I spend my day: sleep 8 hours, work 9, commute 1, leisure 4, chores 2." },
+  { "id": "compose-spreadsheet-question", "prompt": "A Learnosity item where students fill in a loan amortization table and compute the remaining balance." },
+  { "id": "compose-flashcards-in-learnosity", "prompt": "Put a flashcard activity on capital cities into a Learnosity item." },
+  { "id": "compose-concept-web-in-learnosity", "prompt": "An assessment item in Learnosity where students complete a concept web of the nitrogen cycle." },
+  { "id": "compose-chart-fetch", "prompt": "A line chart of monthly CO2 readings, pulling the latest series from the public NOAA Mauna Loa dataset." },
+  { "id": "compose-chart-top-n", "prompt": "Bar chart of the five most populous countries, using public population data." },
+  { "id": "data-only-transform", "prompt": "Load the JSON at https://example.org/orders.json, keep orders over 100, and group them by region." },
+  { "id": "compose-spreadsheet-fetch", "prompt": "A spreadsheet of today's currency exchange rates pulled from a public rates API." },
+  { "id": "compose-flashcards-fetch", "prompt": "Flashcards for the 15 tallest mountains, built from a public dataset of peaks." },
+  { "id": "three-stage-question", "prompt": "A Learnosity spreadsheet question where students analyse a table of the latest unemployment rates fetched from a public statistics source." },
+  { "id": "inline-chart-sorted", "prompt": "Horizontal bar chart of these test scores sorted highest first: Ana 72, Ben 91, Cy 85, Dee 64." },
+  { "id": "spreadsheet-no-assessment", "prompt": "I just need a plain household chores rota spreadsheet, not a quiz." }
+]

@@ -1,0 +1,152 @@
+### 23 SEP 2022
+
+[ ] Add more chart types
+[ ] Add stripe payments with usage based pricing
+[ ] Editor / Console
+
+### 02 SEP 2022
+
+[x] Create firestore db
+[x] Add next-auth sign-in
+[x] Add gallery view
+
+### 01 SEP 2022
+
+TODO
+
+[X] Create graffiticode-app from graffiticode-app-template
+
+
+### 31 AUG 2022
+
+TODO
+
+[X] GraphQL query to compile an L0 item that display the current count into a
+    message. E.g. "hello, 3!"
+
+
+DATA TASK
+
+```
+mutation postData ($json: String) {
+  postData(data: $json) {
+    id,
+  }
+}
+```
+```
+{
+  "json": ""
+}
+```
+
+### 30 AUG 2022
+
+TODO
+
+[x] GraphQL mutation to create a data task
+
+
+
+
+### 29 AUG 2022
+
+LAYOUT
+
+An app is a network of pages that share a redux store. A page contains one or
+more components. A component contains zero or more forms. Forms and their
+containing components dispatch redux actions when those actions affect other
+forms, or results in persistent state.
+
+App
+-- Page
+---- Component
+------ Form
+---- Component
+------ Form
+------ Form
+
+REDUX + GRAPHQL
+
+State that is persistent or is compiled is sent to the graphql server. The
+graphql resolver defines how the query (or mutation) is handled before any
+state is stored.
+
+redux dispatch -->
+  redux thunk -->
+    query -->
+      compile? -->
+        store?
+        response -->
+          redux dispatch -->
+            react render
+
+Generally, the values sent to the graphql server are actions. We can reused the
+redux types and graphql typedefs to validate arguments passed and returned from
+mutations and queries.
+
+
+
+### 19 AUG 2022
+
+GRAFFITICODE STACK
+
+-- NextJS
+-- NextAuth
+-- React
+-- Redux (redux, react-redux, @reduxjs/toolkit)
+-- GraphQL (graphql-request, graphql-helix)
+-- Firestore
+-- Graffiticode
+
+
+MANAGING STATE IN NEXTJS
+
+-- How to sync redux store and firebase through graphql
+-- How to render pages server side from firebase data
+
+https://redux.js.org/tutorials/essentials/part-5-async-logic
+
+
+GRAFFITICODE STAGES
+
+Process all the way down. Process generates product.
+
+-- Figure out what Artcomiler does (apr - jul)
+-- Create MVPs, manual valuable processes (aug - ...)
+
+In the current stage we are creating a series of SaaS businesses to develop a
+playbook (process) and blocks (tech stack) for building similar SaaS businesses.
+
+
+### 10 AUG 2022
+
+FIRESTORE DASHBOARD
+
+https://console.firebase.google.com/u/5/project/graffiticode-dashboard/overview
+
+
+CONNECTING TO FIRESTORE
+
+> Project Overview
+> Project settings
+> Service accounts
+> Generate new private key
+> save to serviceAcccountKey.json
+
+```
+import admin from 'firebase-admin';
+import serviceAccount from './serviceAccountKey.json';
+
+if (!admin.apps.length) {
+  try {
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+    });
+  } catch (error) {
+    console.log('Firebase admin initialization error', error.stack);
+  }
+}
+export default admin.firestore();
+```
+

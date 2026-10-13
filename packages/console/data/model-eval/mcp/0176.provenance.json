@@ -1,0 +1,126 @@
+{
+  "lang": "0176",
+  "authoredBy": "claude-opus-5",
+  "source": {
+    "endpoint": "https://console.graffiticode.org/api",
+    "query": "GetLanguageInfo (graffiticode-mcp-server/src/api.ts)",
+    "itemTypes": [
+      "mcq",
+      "shorttext",
+      "longtext",
+      "plaintext",
+      "clozetext",
+      "clozeassociation",
+      "clozedropdown",
+      "clozeformula",
+      "choicematrix",
+      "orderlist",
+      "classification",
+      "bowtie",
+      "token-highlight",
+      "custom"
+    ],
+    "examplePromptCount": 18,
+    "authoringGuideChars": 2173,
+    "usageGuideChars": 18058
+  },
+  "corpusAccess": "none — this script imports no Firestore client and never reads training_examples",
+  "mode": "create-only (no currentCode on any case)",
+  "usage": {
+    "input_tokens": 11870,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 2469,
+    "output_tokens_details": {
+      "thinking_tokens": 0
+    },
+    "service_tier": "standard",
+    "inference_geo": "global"
+  },
+  "cases": [
+    {
+      "id": "mcq-single-answer-with-rationale-and-standards",
+      "targets": "mcq with item-level and question-level metadata",
+      "maxOverlapWithExamplePrompts": 0.438
+    },
+    {
+      "id": "mcq-multiselect-partial-credit",
+      "targets": "multi-select mcq, partialMatch, shuffle",
+      "maxOverlapWithExamplePrompts": 0.75
+    },
+    {
+      "id": "shorttext-exact-match-alternate",
+      "targets": "shorttext with alt-responses",
+      "maxOverlapWithExamplePrompts": 0.5
+    },
+    {
+      "id": "longtext-rubric-manual-scoring",
+      "targets": "longtext with manual rubric scoring",
+      "maxOverlapWithExamplePrompts": 0.2
+    },
+    {
+      "id": "plaintext-open-response",
+      "targets": "plaintext with rubric",
+      "maxOverlapWithExamplePrompts": 0.2
+    },
+    {
+      "id": "clozetext-two-blanks-long-answer",
+      "targets": "clozetext, alt-responses, character limit",
+      "maxOverlapWithExamplePrompts": 0.462
+    },
+    {
+      "id": "clozedropdown-three-blanks",
+      "targets": "clozedropdown with partial credit",
+      "maxOverlapWithExamplePrompts": 0.375
+    },
+    {
+      "id": "clozeassociation-drag-into-blanks",
+      "targets": "clozeassociation",
+      "maxOverlapWithExamplePrompts": 0.167
+    },
+    {
+      "id": "clozeformula-symbolic-equivalence",
+      "targets": "clozeformula equivSymbolic",
+      "maxOverlapWithExamplePrompts": 1
+    },
+    {
+      "id": "clozeformula-syntax-plus-value",
+      "targets": "clozeformula equivSyntax + value rule",
+      "maxOverlapWithExamplePrompts": 0.818
+    },
+    {
+      "id": "clozeformula-tolerance",
+      "targets": "clozeformula equivValue with tolerance",
+      "maxOverlapWithExamplePrompts": 0.625
+    },
+    {
+      "id": "choicematrix-true-false-grid",
+      "targets": "choicematrix with partial credit",
+      "maxOverlapWithExamplePrompts": 0.25
+    },
+    {
+      "id": "orderlist-pairwise-scoring",
+      "targets": "orderlist with partialMatchPairwise",
+      "maxOverlapWithExamplePrompts": 0.125
+    },
+    {
+      "id": "classification-three-buckets",
+      "targets": "classification, per-element scoring, save-to-itembank",
+      "maxOverlapWithExamplePrompts": 0.286
+    },
+    {
+      "id": "bowtie-ngn-hypoglycemia",
+      "targets": "bowtie 2-1-2",
+      "maxOverlapWithExamplePrompts": 0.259
+    },
+    {
+      "id": "token-highlight-word-level-max-selection",
+      "targets": "token-highlight with max-selection and instant feedback",
+      "maxOverlapWithExamplePrompts": 0.643
+    }
+  ]
+}

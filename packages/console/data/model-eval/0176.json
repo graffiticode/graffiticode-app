@@ -1,0 +1,30 @@
+[
+  {
+    "id": "mcq-rationale-standards",
+    "prompt": "Create a Learnosity multiple-choice item asking which organelle is the site of aerobic respiration, with four options where \"mitochondrion\" is correct. Give each of the three wrong options its own distractor rationale explaining the specific misconception it represents. Tag the item with the CCSS standard HS-LS1-7, depth of knowledge 2, and difficulty medium."
+  },
+  {
+    "id": "cloze-dropdown-three-blanks",
+    "prompt": "Create a Learnosity cloze dropdown item for the sentence \"Water freezes at {{response}} degrees Celsius and boils at {{response}} degrees Celsius at {{response}} atmospheric pressure.\" Each blank needs its own dropdown list: the first offers -10, 0, 10; the second offers 90, 100, 110; the third offers low, standard, high. The correct answers are 0, 100, and standard respectively."
+  },
+  {
+    "id": "bowtie-sepsis",
+    "prompt": "Create a Learnosity NGN bow-tie item for this stem: a 68-year-old post-operative patient has a temperature of 38.9C, heart rate 118, blood pressure 88/52, and rising lactate. The nurse must select the two priority actions, the one condition the patient is most likely experiencing, and the two parameters to monitor. Actions should include obtaining blood cultures and administering the prescribed fluid bolus; the condition is sepsis; the parameters to monitor are serum lactate and mean arterial pressure. Include plausible incorrect choices in each column."
+  },
+  {
+    "id": "clozeformula-equivalence",
+    "prompt": "Create a Learnosity math fill-in item asking the student to simplify the expression 4/8 to lowest terms. Score it on mathematical equivalence so that 1/2, 0.5, and 2/4 reduced are all accepted as correct, but 4/8 left unsimplified is not."
+  },
+  {
+    "id": "hot-text-distractors",
+    "prompt": "Create a Learnosity token-highlight item over this passage: \"The quick brown fox jumps over the lazy dog while the tired cat sleeps soundly.\" Ask the student to highlight every adjective. The correct tokens are quick, brown, lazy, and tired. Also make the words fox, jumps, and soundly clickable so students can select them and be marked wrong, but leave the remaining words unselectable."
+  },
+  {
+    "id": "itembank-save-credentials",
+    "prompt": "Create a Learnosity short-text item asking for the chemical symbol of potassium, with K as the correct answer, and save it to the Learnosity item bank so it persists rather than being a preview. Use the caller's stored Learnosity credentials to sign the request."
+  },
+  {
+    "id": "choicematrix-partial-credit",
+    "prompt": "Create a Learnosity choice matrix item asking students to classify four statements about photosynthesis as True, False, or Cannot Be Determined. The statements are: \"Photosynthesis produces oxygen\" (True), \"Photosynthesis occurs only at night\" (False), \"All plants photosynthesize at the same rate\" (Cannot Be Determined), and \"Chlorophyll absorbs light energy\" (True). Award partial credit so each correctly classified row earns points independently."
+  }
+]

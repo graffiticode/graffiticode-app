@@ -1,0 +1,478 @@
+[
+  {
+    "id": "bowtie-sepsis",
+    "model": "claude-haiku-4-5-20251001",
+    "code": "set-var \"lrn-id\" get-val-public \"itemId\"\nlearnosity items [\n  item questions [\n    bowtie stimulus \"A 68-year-old post-operative patient presents with a temperature of 38.9°C, heart rate 118, blood pressure 88/52, and rising lactate. What are the priority interventions and monitoring parameters?\"\n      column-titles [\n        \"Actions to Take\"\n        \"Condition Most Likely\"\n        \"Parameters to Monitor\"\n      ] possible-responses [\n      [\n        \"Obtain blood cultures\"\n        \"Administer prescribed fluid bolus\"\n        \"Initiate broad-spectrum antibiotics\"\n        \"Apply warming blanket\"\n        \"Insert central venous catheter\"\n      ]\n      [\n        \"Sepsis\"\n        \"Hypovolemic shock\"\n        \"Anaphylaxis\"\n        \"Acute coronary syndrome\"\n      ]\n      [\n        \"Serum lactate\"\n        \"Mean arterial pressure\"\n        \"Urine output\"\n        \"Core body temperature\"\n        \"Hemoglobin level\"\n      ]\n    ] valid-response [\n      [\n        \"Obtain blood cultures\"\n        \"Administer prescribed fluid bolus\"\n      ]\n      [\n        \"Sepsis\"\n      ]\n      [\n        \"Serum lactate\"\n        \"Mean arterial pressure\"\n      ]\n    ] {}\n  ] {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "2bf6bf310261",
+      "bytes": 37039
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "bowtie-sepsis",
+    "model": "claude-sonnet-5",
+    "code": "set-var \"lrn-id\" get-val-public \"itemId\"\nlearnosity items [\n  item questions [\n    bowtie stimulus \"A 68-year-old post-operative patient has a temperature of 38.9C, heart rate 118, blood pressure 88/52, and rising lactate. Select the priority actions, the most likely condition, and the parameters to monitor.\"\n      column-titles [\n        \"Actions to Take\"\n        \"Condition Most Likely\"\n        \"Parameters to Monitor\"\n      ] possible-responses [\n      [\n        \"obtain blood cultures\"\n        \"administer prescribed fluid bolus\"\n        \"administer antipyretic\"\n        \"apply cooling blanket\"\n        \"encourage ambulation\"\n      ]\n      [\n        \"sepsis\"\n        \"pulmonary embolism\"\n        \"myocardial infarction\"\n        \"hypovolemic shock from bleeding\"\n      ]\n      [\n        \"serum lactate\"\n        \"mean arterial pressure\"\n        \"urine specific gravity\"\n        \"peak flow rate\"\n        \"capillary refill time\"\n      ]\n    ] valid-response [\n      [\n        \"obtain blood cultures\"\n        \"administer prescribed fluid bolus\"\n      ]\n      [\n        \"sepsis\"\n      ]\n      [\n        \"serum lactate\"\n        \"mean arterial pressure\"\n      ]\n    ] {}\n  ] {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "2bf6bf310261",
+      "bytes": 37039
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "bowtie-sepsis",
+    "model": "gpt-5.6-luna",
+    "code": "set-var \"lrn-id\" get-val-public \"itemId\"\nlearnosity items [\n  item questions [\n    bowtie stimulus \"A 68-year-old post-operative patient has a temperature of 38.9 °C, a heart rate of 118 beats/min, a blood pressure of 88/52 mmHg, and a rising serum lactate level. Select the priority actions, the condition most likely being experienced, and the parameters to monitor.\"\n      column-titles [\n        \"Priority Actions\"\n        \"Condition Most Likely\"\n        \"Parameters to Monitor\"\n      ] possible-responses [\n      [\n        \"Obtain blood cultures\"\n        \"Administer the prescribed fluid bolus\"\n        \"Apply a warm blanket\"\n        \"Offer oral fluids\"\n        \"Delay intervention until the next vital-sign check\"\n      ]\n      [\n        \"Sepsis\"\n        \"Normal post-operative recovery\"\n        \"Hypovolemic shock from mild dehydration\"\n        \"Anxiety-related tachycardia\"\n      ]\n      [\n        \"Serum lactate\"\n        \"Mean arterial pressure\"\n        \"Body weight\"\n        \"Bowel sounds\"\n        \"Pupil size\"\n      ]\n    ] valid-response [\n      [\n        \"Obtain blood cultures\"\n        \"Administer the prescribed fluid bolus\"\n      ]\n      [\n        \"Sepsis\"\n      ]\n      [\n        \"Serum lactate\"\n        \"Mean arterial pressure\"\n      ]\n    ] {}\n  ] {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "2bf6bf310261",
+      "bytes": 37039
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "bowtie-sepsis",
+    "model": "gpt-5.6-terra",
+    "code": "set-var \"lrn-id\" get-val-public \"itemId\"\nlearnosity items [\n  item questions [\n    bowtie stimulus \"A 68-year-old post-operative patient has a temperature of 38.9°C, heart rate 118 beats/min, blood pressure 88/52 mm Hg, and rising lactate. Select the two priority actions, the condition the patient is most likely experiencing, and the two parameters to monitor.\"\n      column-titles [\n        \"Priority Actions\"\n        \"Most Likely Condition\"\n        \"Parameters to Monitor\"\n      ] possible-responses [\n      [\n        \"Obtain blood cultures\"\n        \"Administer the prescribed fluid bolus\"\n        \"Encourage ambulation\"\n        \"Administer a sedative\"\n      ]\n      [\n        \"Sepsis\"\n        \"Hypoglycemia\"\n        \"Deep vein thrombosis\"\n      ]\n      [\n        \"Serum lactate\"\n        \"Mean arterial pressure\"\n        \"Visual acuity\"\n        \"Bowel sounds\"\n      ]\n    ] valid-response [\n      [\n        \"Obtain blood cultures\"\n        \"Administer the prescribed fluid bolus\"\n      ]\n      [\n        \"Sepsis\"\n      ]\n      [\n        \"Serum lactate\"\n        \"Mean arterial pressure\"\n      ]\n    ] {}\n  ] {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "2bf6bf310261",
+      "bytes": 37039
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "choicematrix-partial-credit",
+    "model": "claude-haiku-4-5-20251001",
+    "code": "set-var \"lrn-id\" get-val-public \"itemId\"\nlearnosity items [\n  item questions [\n    choicematrix stimulus \"Classify each statement about photosynthesis as True, False, or Cannot Be Determined.\"\n      rows [\n        \"Photosynthesis produces oxygen\"\n        \"Photosynthesis occurs only at night\"\n        \"All plants photosynthesize at the same rate\"\n        \"Chlorophyll absorbs light energy\"\n      ] columns [\n      \"True\"\n      \"False\"\n      \"Cannot Be Determined\"\n    ] valid-response [\n      [\n        0\n      ]\n      [\n        1\n      ]\n      [\n        2\n      ]\n      [\n        0\n      ]\n    ] partial-credit true {}\n  ] {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "2bf6bf310261",
+      "bytes": 37039
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "choicematrix-partial-credit",
+    "model": "claude-sonnet-5",
+    "code": "set-var \"lrn-id\" get-val-public \"itemId\"\nlearnosity items [\n  item questions [\n    choicematrix stimulus \"Classify each statement about photosynthesis as True, False, or Cannot Be Determined.\"\n      rows [\n        \"Photosynthesis produces oxygen\"\n        \"Photosynthesis occurs only at night\"\n        \"All plants photosynthesize at the same rate\"\n        \"Chlorophyll absorbs light energy\"\n      ] columns [\n      \"True\"\n      \"False\"\n      \"Cannot Be Determined\"\n    ] valid-response [\n      [\n        0\n      ]\n      [\n        1\n      ]\n      [\n        2\n      ]\n      [\n        0\n      ]\n    ] partial-credit true {}\n  ] {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "2bf6bf310261",
+      "bytes": 37039
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "choicematrix-partial-credit",
+    "model": "gpt-5.6-luna",
+    "code": "set-var \"lrn-id\" get-val-public \"itemId\"\nlearnosity items [\n  item questions [\n    choicematrix stimulus \"Classify each statement about photosynthesis as True, False, or Cannot Be Determined.\"\n      rows [\n        \"Photosynthesis produces oxygen\"\n        \"Photosynthesis occurs only at night\"\n        \"All plants photosynthesize at the same rate\"\n        \"Chlorophyll absorbs light energy\"\n      ] columns [\n      \"True\"\n      \"False\"\n      \"Cannot Be Determined\"\n    ] valid-response [\n      [\n        0\n      ]\n      [\n        1\n      ]\n      [\n        2\n      ]\n      [\n        0\n      ]\n    ] partial-credit true {}\n  ] {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "2bf6bf310261",
+      "bytes": 37039
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "choicematrix-partial-credit",
+    "model": "gpt-5.6-terra",
+    "code": "set-var \"lrn-id\" get-val-public \"itemId\"\nlearnosity items [\n  item questions [\n    choicematrix stimulus \"Classify each statement about photosynthesis.\"\n      rows [\n        \"Photosynthesis produces oxygen\"\n        \"Photosynthesis occurs only at night\"\n        \"All plants photosynthesize at the same rate\"\n        \"Chlorophyll absorbs light energy\"\n      ] columns [\n      \"True\"\n      \"False\"\n      \"Cannot Be Determined\"\n    ] valid-response [\n      [\n        0\n      ]\n      [\n        1\n      ]\n      [\n        2\n      ]\n      [\n        0\n      ]\n    ] partial-credit true {}\n  ] {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "2bf6bf310261",
+      "bytes": 37039
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "cloze-dropdown-three-blanks",
+    "model": "claude-haiku-4-5-20251001",
+    "code": "set-var \"lrn-id\" get-val-public \"itemId\"\nlearnosity items [\n  item questions [\n    clozedropdown stimulus \"Water freezes at {{response}} degrees Celsius and boils at {{response}} degrees Celsius at {{response}} atmospheric pressure.\"\n      possible-responses [\n        [\n          \"−10\"\n          \"0\"\n          \"10\"\n        ]\n        [\n          \"90\"\n          \"100\"\n          \"110\"\n        ]\n        [\n          \"low\"\n          \"standard\"\n          \"high\"\n        ]\n      ] valid-response [\n      \"0\"\n      \"100\"\n      \"standard\"\n    ] {}\n  ] {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "2bf6bf310261",
+      "bytes": 37039
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "cloze-dropdown-three-blanks",
+    "model": "claude-sonnet-5",
+    "code": "set-var \"lrn-id\" get-val-public \"itemId\"\nlearnosity items [\n  item questions [\n    clozedropdown stimulus \"Water freezes at {{response}} degrees Celsius and boils at {{response}} degrees Celsius at {{response}} atmospheric pressure.\"\n      possible-responses [\n        [\n          \"-10\"\n          \"0\"\n          \"10\"\n        ]\n        [\n          \"90\"\n          \"100\"\n          \"110\"\n        ]\n        [\n          \"low\"\n          \"standard\"\n          \"high\"\n        ]\n      ] valid-response [\n      \"0\"\n      \"100\"\n      \"standard\"\n    ] {}\n  ] {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "2bf6bf310261",
+      "bytes": 37039
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "cloze-dropdown-three-blanks",
+    "model": "gpt-5.6-luna",
+    "code": "set-var \"lrn-id\" get-val-public \"itemId\"\nlearnosity items [\n  item questions [\n    clozedropdown stimulus \"Water freezes at {{response}} degrees Celsius and boils at {{response}} degrees Celsius at {{response}} atmospheric pressure.\"\n      possible-responses [\n        [\n          \"-10\"\n          \"0\"\n          \"10\"\n        ]\n        [\n          \"90\"\n          \"100\"\n          \"110\"\n        ]\n        [\n          \"low\"\n          \"standard\"\n          \"high\"\n        ]\n      ] valid-response [\n      \"0\"\n      \"100\"\n      \"standard\"\n    ] {}\n  ] {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "2bf6bf310261",
+      "bytes": 37039
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "cloze-dropdown-three-blanks",
+    "model": "gpt-5.6-terra",
+    "code": "set-var \"lrn-id\" get-val-public \"itemId\"\nlearnosity items [\n  item questions [\n    clozedropdown stimulus \"Water freezes at {{response}} degrees Celsius and boils at {{response}} degrees Celsius at {{response}} atmospheric pressure.\"\n      possible-responses [\n        [\n          \"-10\"\n          \"0\"\n          \"10\"\n        ]\n        [\n          \"90\"\n          \"100\"\n          \"110\"\n        ]\n        [\n          \"low\"\n          \"standard\"\n          \"high\"\n        ]\n      ] valid-response [\n      \"0\"\n      \"100\"\n      \"standard\"\n    ] {}\n  ] {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "2bf6bf310261",
+      "bytes": 37039
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "clozeformula-equivalence",
+    "model": "claude-haiku-4-5-20251001",
+    "code": "set-var \"lrn-id\" get-val-public \"itemId\"\nlearnosity items [\n  item questions [\n    clozeformula stimulus \"Simplify \\(\\frac{4}{8}\\) to lowest terms: {{response}}\"\n      valid-response [\n        [\n          \"1/2\"\n          \"0.5\"\n          \"2/4\"\n        ]\n      ] method \"equivLiteral\" {}\n  ] {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "2bf6bf310261",
+      "bytes": 37039
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "clozeformula-equivalence",
+    "model": "claude-sonnet-5",
+    "code": "set-var \"lrn-id\" get-val-public \"itemId\"\nlearnosity items [\n  item questions [\n    clozeformula stimulus \"Simplify \\(\\frac{4}{8}\\) to lowest terms: {{response}}\"\n      valid-response [\n        [\n          \"1/2\"\n          \"0.5\"\n          \"2/4\"\n        ]\n      ] method \"equivLiteral\" {}\n  ] {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "2bf6bf310261",
+      "bytes": 37039
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "clozeformula-equivalence",
+    "model": "gpt-5.6-luna",
+    "code": "set-var \"lrn-id\" get-val-public \"itemId\"\nlearnosity items [\n  item questions [\n    clozeformula stimulus \"Simplify \\(\\frac{4}{8}\\) to lowest terms: {{response}}\"\n      valid-response [\n        [\n          \"1/2\"\n          \"0.5\"\n          \"2/4\"\n        ]\n      ] method \"equivLiteral\"\n      is-math true {}\n  ] {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "2bf6bf310261",
+      "bytes": 37039
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "clozeformula-equivalence",
+    "model": "gpt-5.6-terra",
+    "code": "set-var \"lrn-id\" get-val-public \"itemId\"\nlearnosity items [\n  item questions [\n    clozeformula stimulus \"Simplify \\(\\frac{4}{8}\\) to lowest terms: {{response}}\"\n      valid-response [\n        [\n          \"1/2\"\n          \"0.5\"\n          \"2/4\"\n        ]\n      ] method \"equivLiteral\" {}\n  ] {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "2bf6bf310261",
+      "bytes": 37039
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "hot-text-distractors",
+    "model": "claude-haiku-4-5-20251001",
+    "code": "set-var \"lrn-id\" get-val-public \"itemId\"\nlearnosity items [\n  item questions [\n    token-highlight stimulus \"Highlight every adjective.\"\n      passage \"The quick brown fox jumps over the lazy dog while the tired cat sleeps soundly.\"\n      valid-response [\n        \"quick\"\n        \"brown\"\n        \"lazy\"\n        \"tired\"\n      ] distractors [\n      \"fox\"\n      \"jumps\"\n      \"soundly\"\n    ] {}\n  ] {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "2bf6bf310261",
+      "bytes": 37039
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "hot-text-distractors",
+    "model": "claude-sonnet-5",
+    "code": "set-var \"lrn-id\" get-val-public \"itemId\"\nlearnosity items [\n  item questions [\n    token-highlight stimulus \"Highlight every adjective.\"\n      passage \"The quick brown fox jumps over the lazy dog while the tired cat sleeps soundly.\"\n      valid-response [\n        \"quick\"\n        \"brown\"\n        \"lazy\"\n        \"tired\"\n      ] distractors [\n      \"fox\"\n      \"jumps\"\n      \"soundly\"\n    ] {}\n  ] {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "2bf6bf310261",
+      "bytes": 37039
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "hot-text-distractors",
+    "model": "gpt-5.6-luna",
+    "code": "set-var \"lrn-id\" get-val-public \"itemId\"\nlearnosity items [\n  item questions [\n    token-highlight stimulus \"Highlight every adjective.\"\n      passage \"The quick brown fox jumps over the lazy dog while the tired cat sleeps soundly.\"\n      valid-response [\n        \"quick\"\n        \"brown\"\n        \"lazy\"\n        \"tired\"\n      ] distractors [\n      \"fox\"\n      \"jumps\"\n      \"soundly\"\n    ] {}\n  ] {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "2bf6bf310261",
+      "bytes": 37039
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "hot-text-distractors",
+    "model": "gpt-5.6-terra",
+    "code": "set-var \"lrn-id\" get-val-public \"itemId\"\nlearnosity items [\n  item questions [\n    token-highlight stimulus \"Highlight every adjective in the passage.\"\n      passage \"The quick brown fox jumps over the lazy dog while the tired cat sleeps soundly.\"\n      valid-response [\n        \"quick\"\n        \"brown\"\n        \"lazy\"\n        \"tired\"\n      ] distractors [\n      \"fox\"\n      \"jumps\"\n      \"soundly\"\n    ] {}\n  ] {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "2bf6bf310261",
+      "bytes": 37039
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "itembank-save-credentials",
+    "model": "claude-haiku-4-5-20251001",
+    "code": "set-var \"lrn-id\" get-val-public \"itemId\"\nset-var \"learnosity-key\" get-val-public \"learnosity-key\"\nset-var \"learnosity-secret\" get-val-private \"learnosity-secret\"\nlearnosity items [\n  item questions [\n    shorttext stimulus \"What is the chemical symbol of potassium?\"\n      valid-response \"K\" {}\n  ] {}\n] save-to-itembank true {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "2bf6bf310261",
+      "bytes": 37039
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "itembank-save-credentials",
+    "model": "claude-sonnet-5",
+    "code": "set-var \"lrn-id\" get-val-public \"itemId\"\nset-var \"learnosity-key\" get-val-public \"learnosity-key\"\nset-var \"learnosity-secret\" get-val-private \"learnosity-secret\"\nlearnosity items [\n  item questions [\n    shorttext stimulus \"What is the chemical symbol for potassium?\"\n      valid-response \"K\" {}\n  ] {}\n] save-to-itembank true {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "2bf6bf310261",
+      "bytes": 37039
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "itembank-save-credentials",
+    "model": "gpt-5.6-luna",
+    "code": "set-var \"lrn-id\" get-val-public \"itemId\"\nset-var \"learnosity-key\" get-val-public \"learnosity-key\"\nset-var \"learnosity-secret\" get-val-private \"learnosity-secret\"\nlearnosity items [\n  item questions [\n    shorttext stimulus \"What is the chemical symbol for potassium?\"\n      valid-response \"K\" {}\n  ] {}\n] save-to-itembank true {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "2bf6bf310261",
+      "bytes": 37039
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "itembank-save-credentials",
+    "model": "gpt-5.6-terra",
+    "code": "set-var \"lrn-id\" get-val-public \"itemId\"\nset-var \"learnosity-key\" get-val-public \"learnosity-key\"\nset-var \"learnosity-secret\" get-val-private \"learnosity-secret\"\nlearnosity items [\n  item questions [\n    shorttext stimulus \"What is the chemical symbol for potassium?\"\n      valid-response \"K\" {}\n  ] {}\n] save-to-itembank true {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "2bf6bf310261",
+      "bytes": 37039
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "mcq-rationale-standards",
+    "model": "claude-haiku-4-5-20251001",
+    "code": "set-var \"lrn-id\" get-val-public \"itemId\"\nlearnosity items [\n  item metadata [\n    tags {\n      CCSS: \"HS-LS1-7\"\n      DOK: 2\n      Difficulty: \"medium\"\n    }\n  ] questions [\n    mcq stimulus \"Which organelle is the site of aerobic respiration?\"\n      options [\n        \"Mitochondrion\"\n        \"Chloroplast\"\n        \"Ribosome\"\n        \"Nucleus\"\n      ] valid-response [\n      0\n    ] metadata [\n      distractor-rationale [\n        \"Correct — the mitochondrion is where aerobic respiration occurs.\"\n        \"Chloroplasts are the site of photosynthesis, not aerobic respiration. They capture light energy, while mitochondria release chemical energy from glucose.\"\n        \"Ribosomes are the site of protein synthesis. They translate mRNA into proteins but do not participate in aerobic respiration.\"\n        \"The nucleus stores and protects genetic material and controls cell activities, but aerobic respiration occurs in the mitochondrion, not the nucleus.\"\n      ]\n    ] {}\n  ] {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "2bf6bf310261",
+      "bytes": 37039
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "mcq-rationale-standards",
+    "model": "claude-sonnet-5",
+    "code": "set-var \"lrn-id\" get-val-public \"itemId\"\nlearnosity items [\n  item metadata [\n    tags {\n      \"Common Core\": \"HS-LS1-7\"\n      DOK: 2\n      Difficulty: \"medium\"\n    }\n  ] questions [\n    mcq stimulus \"Which organelle is the site of aerobic respiration?\"\n      options [\n        \"Mitochondrion\"\n        \"Chloroplast\"\n        \"Golgi apparatus\"\n        \"Ribosome\"\n      ] valid-response [\n      0\n    ] metadata [\n      distractor-rationale [\n        \"Correct — the mitochondrion is the site of aerobic respiration.\"\n        \"Confuses respiration with photosynthesis, which occurs in chloroplasts.\"\n        \"Confuses respiration with the Golgi apparatus's role in packaging and secreting proteins.\"\n        \"Confuses respiration with the ribosome's role in protein synthesis.\"\n      ]\n    ] {}\n  ] {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "2bf6bf310261",
+      "bytes": 37039
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "mcq-rationale-standards",
+    "model": "gpt-5.6-luna",
+    "code": "set-var \"lrn-id\" get-val-public \"itemId\"\nlearnosity items [\n  item metadata [\n    tags {\n      CCSS: \"HS-LS1-7\"\n      DOK: 2\n      Difficulty: \"medium\"\n    }\n  ] questions [\n    mcq stimulus \"Which organelle is the site of aerobic respiration?\"\n      options [\n        \"Mitochondrion\"\n        \"Nucleus\"\n        \"Ribosome\"\n        \"Chloroplast\"\n      ] valid-response [\n      0\n    ] metadata [\n      distractor-rationale [\n        \"Correct — mitochondria carry out aerobic respiration and produce ATP.\"\n        \"Misconception — the nucleus stores genetic material and directs cell activities, but it is not the site of aerobic respiration.\"\n        \"Misconception — ribosomes synthesize proteins; they do not carry out aerobic respiration.\"\n        \"Misconception — chloroplasts carry out photosynthesis, not aerobic respiration.\"\n      ]\n    ] {}\n  ] {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "2bf6bf310261",
+      "bytes": 37039
+    },
+    "anchorVersion": 2
+  },
+  {
+    "id": "mcq-rationale-standards",
+    "model": "gpt-5.6-terra",
+    "code": "set-var \"lrn-id\" get-val-public \"itemId\"\nlearnosity items [\n  item metadata [\n    tags {\n      \"Common Core\": \"HS-LS1-7\"\n      DOK: 2\n      Difficulty: \"medium\"\n    }\n  ] questions [\n    mcq stimulus \"Which organelle is the site of aerobic respiration?\"\n      options [\n        \"Mitochondrion\"\n        \"Nucleus\"\n        \"Ribosome\"\n        \"Chloroplast\"\n      ] valid-response [\n      0\n    ] metadata [\n      distractor-rationale [\n        \"Correct — mitochondria produce ATP through aerobic cellular respiration.\"\n        \"The nucleus contains genetic material and regulates cell activities; it is not the main site of aerobic respiration.\"\n        \"Ribosomes synthesize proteins, but they do not carry out aerobic respiration.\"\n        \"Chloroplasts perform photosynthesis in plant cells; they are not the site of aerobic respiration.\"\n      ]\n    ] {}\n  ] {}\n] {}..",
+    "overall": 3,
+    "correctness": null,
+    "instructionFollowing": null,
+    "idiomaticity": null,
+    "turns": 1,
+    "converged": true,
+    "warningsFixable": 0,
+    "dialect": {
+      "hash": "2bf6bf310261",
+      "bytes": 37039
+    },
+    "anchorVersion": 2
+  }
+]

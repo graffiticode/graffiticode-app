@@ -1,0 +1,15 @@
+# Treat source as text so git renders diffs even when files contain multibyte
+# characters (em dashes, ×, ≥, etc.) that trip git's binary heuristic.
+#
+# `text` alone does NOT do that — it only controls end-of-line normalization.
+# Git decides whether to render a diff by looking for a NUL byte in the first 8k,
+# and `text` does not override that. `diff` does. This was learned the hard way:
+# scripts/model-eval.ts used a raw NUL as a map-key separator, so every diff of it
+# read `Bin 23178 -> 23417 bytes` and its changes were unreviewable. Setting `diff`
+# means a stray NUL degrades to an ugly diff instead of no diff at all.
+*.ts   text diff
+*.tsx  text diff
+*.js   text diff
+*.jsx  text diff
+*.json text diff
+*.md   text diff

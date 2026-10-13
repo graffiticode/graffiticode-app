@@ -1,0 +1,86 @@
+[
+  {
+    "id": "iris-species-means",
+    "prompt": "From https://l0185.graffiticode.org/data/iris.csv, give me the mean petal length and mean petal width for each species, longest petals first."
+  },
+  {
+    "id": "todos-open-per-user",
+    "prompt": "Using https://l0185.graffiticode.org/data/todos.json, count the unfinished todos for each userId and list the users with the most open work first."
+  },
+  {
+    "id": "posts-title-length",
+    "prompt": "Load https://l0185.graffiticode.org/data/posts.json and add a field with the number of characters in each title. Keep only id, title and that length."
+  },
+  {
+    "id": "products-cheap-beauty",
+    "prompt": "From the products in https://l0185.graffiticode.org/data/products.json (the list is under products), show title, brand and price of beauty items under $10, cheapest first."
+  },
+  {
+    "id": "products-category-stock",
+    "prompt": "Total stock and the number of products per category for https://l0185.graffiticode.org/data/products.json — the records are in the products field."
+  },
+  {
+    "id": "users-city-company",
+    "prompt": "Flatten https://l0185.graffiticode.org/data/users.json into one row per user with name, email, address city and company name."
+  },
+  {
+    "id": "earthquakes-strongest",
+    "prompt": "From the GeoJSON at https://l0185.graffiticode.org/data/earthquakes.json, list the five strongest quakes: magnitude and place from each feature's properties."
+  },
+  {
+    "id": "stats-goals-per-match",
+    "prompt": "Using the top_scorers list in https://l0185.graffiticode.org/data/stats.json, compute goals per match for each player and show player name, team and that ratio, best first."
+  },
+  {
+    "id": "comments-per-post",
+    "prompt": "How many comments does each post have in https://l0185.graffiticode.org/data/comments.json? Show only the 10 most commented posts."
+  },
+  {
+    "id": "albums-distinct-users",
+    "prompt": "Which distinct userIds own albums in https://l0185.graffiticode.org/data/albums.json?"
+  },
+  {
+    "id": "photos-page-three",
+    "prompt": "Show the third page of photos from https://l0185.graffiticode.org/data/photos.json, 25 per page, with just id and title."
+  },
+  {
+    "id": "nested-customer-orders",
+    "prompt": "https://l0185.graffiticode.org/data/nested.json has customers under results.users, each with a list of orders. Make one row per order with the customer name, order id and total."
+  },
+  {
+    "id": "inline-grades",
+    "prompt": "Here are test scores: Mia 88, Leo 72, Ava 95, Sam 61, Zoe 79. Give me the students who scored at least 75, with a pass label, highest first."
+  },
+  {
+    "id": "inline-budget-format",
+    "prompt": "Take these expenses — rent 1450, groceries 380.5, transit 92, utilities 210.75 — and show them sorted largest first with amounts formatted as dollars with cents."
+  },
+  {
+    "id": "join-todos-users",
+    "prompt": "Join https://l0185.graffiticode.org/data/todos.json with https://l0185.graffiticode.org/data/users.json on userId = id and show each completed todo's title with the user's name."
+  },
+  {
+    "id": "iris-wide-sepals",
+    "prompt": "From https://l0185.graffiticode.org/data/iris.csv keep flowers whose sepal width is above 3.5 or whose species is virginica with petal length over 6. Show all columns."
+  },
+  {
+    "id": "edit-add-limit",
+    "prompt": "Only keep the top 3.",
+    "currentCode": "sort-by [\"revenue\" DESC]\nsummarize {orders: COUNT revenue: [SUM \"amount\"]}\ngroup-by [\"region\"]\nfetch \"https://l0185.graffiticode.org/data/sales.csv\"\n{}.."
+  },
+  {
+    "id": "edit-filter-paid",
+    "prompt": "Count only paid orders, and also report the average amount per region.",
+    "currentCode": "summarize {orders: COUNT revenue: [SUM \"amount\"]}\ngroup-by [\"region\"]\nfetch \"https://l0185.graffiticode.org/data/sales.csv\"\n{}.."
+  },
+  {
+    "id": "edit-rename-fields",
+    "prompt": "Rename name to customer and city to location, and drop email.",
+    "currentCode": "pick [\"name\" \"city\" \"email\"]\nfetch \"https://l0185.graffiticode.org/data/people.json\"\n{}.."
+  },
+  {
+    "id": "edit-switch-source",
+    "prompt": "Use https://l0185.graffiticode.org/data/users.json instead — it has no age, so show every user — with their address city in place of city.",
+    "currentCode": "pick [\"name\" \"city\"]\nwhere [\"age\" ABOVE 30]\nfetch \"https://l0185.graffiticode.org/data/people.json\"\n{}.."
+  }
+]
