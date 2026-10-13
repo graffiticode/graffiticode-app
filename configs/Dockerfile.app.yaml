@@ -1,0 +1,32 @@
+# app (app.graffiticode.org). Built from the repo root (gc-deploy snapshots the
+# whole tree). app has its own install and lockfile under packages/app, outside
+# the root npm workspace, and uses packages/auth-react as a file: dependency.
+FROM node:22.23.3-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS build
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+# NEXT_PUBLIC_* values are inlined into the client bundle at build time;
+# gc-deploy passes no build args. Public values only; never put a secret here.
+ENV NEXT_PUBLIC_GC_API_URL=https://api.graffiticode.org \
+    NEXT_PUBLIC_GC_AUTH_URL=https://auth.graffiticode.org \
+    NEXT_PUBLIC_PRIVY_APP_ID=cmom2ijrw00040cl4hd9qvjnq \
+    NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyAoVuUNi8ElnS7cn6wc3D8XExML-URLw0I
+COPY packages/auth-react packages/auth-react
+COPY packages/app packages/app
+RUN npm ci --prefix packages/app && npm --prefix packages/app run build
+
+FROM node:22.23.3-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS runtime
+WORKDIR /app
+ENV NODE_ENV=production
+RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
+
+# outputFileTracingRoot is the repo root, so the standalone tree mirrors the
+# monorepo layout and the server lives at packages/app/server.js.
+COPY --from=build --chown=nextjs:nodejs /app/packages/app/.next/standalone ./
+COPY --from=build --chown=nextjs:nodejs /app/packages/app/.next/static ./packages/app/.next/static
+COPY --from=build /app/packages/app/public ./packages/app/public
+
+USER nextjs
+WORKDIR /app/packages/app
+ENV PORT=8080 HOSTNAME=0.0.0.0
+EXPOSE 8080
+CMD ["node", "server.js"]

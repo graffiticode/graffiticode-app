@@ -26,7 +26,12 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            packages/app/package-lock.json
       - run: npm ci
+      - name: Install app (own lockfile, outside the root workspace)
+        run: npm run install:app
       - name: Typecheck
         run: npm run typecheck
       - name: Tests (console; mcp-server builds dist/ and the widget first)
@@ -47,6 +52,9 @@ jobs:
           - service: console
             port: 8080
             paths: /
+          - service: app
+            port: 8080
+            paths: / /sign-in
           - service: mcp
             port: 3001
             paths: /health /widget/lang/L0180.mjs /favicon.ico

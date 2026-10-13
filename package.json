@@ -14,10 +14,12 @@
     "build:console": "npm run build -w packages/console",
     "build:mcp": "npm run build -w packages/mcp-server",
     "lint": "npm run lint -w packages/console",
-    "typecheck": "npm run typecheck -w packages/console && npm run typecheck -w packages/mcp-server",
+    "typecheck": "npm run typecheck -w packages/console && npm run typecheck -w packages/mcp-server && npm --prefix packages/app run typecheck",
     "test": "npm test -w packages/console && npm test -w packages/mcp-server",
     "deploy": "gc-deploy",
-    "rollback": "gc-deploy rollback"
+    "rollback": "gc-deploy rollback",
+    "install:app": "npm ci --prefix packages/app",
+    "build:app": "npm --prefix packages/app run build"
   },
   "devDependencies": {
     "@graffiticode/deploy": "file:vendor/graffiticode-deploy-0.1.0.tgz"

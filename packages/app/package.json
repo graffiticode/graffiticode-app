@@ -1,27 +1,23 @@
 {
-  "name": "graffiticode-app",
+  "name": "@graffiticode-app/app",
   "version": "0.1.0",
   "private": true,
   "engines": {
     "node": ">=18.17.0"
   },
-  "workspaces": [
-    "packages/*"
-  ],
   "scripts": {
     "dev": "cross-env NODE_NO_WARNINGS=1 next dev",
     "build": "cross-env NODE_NO_WARNINGS=1 next build",
     "start": "cross-env NODE_NO_WARNINGS=1 next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "gcp:build": "gcloud builds submit --config cloudbuild.yaml --project graffiticode-app --substitutions=_TAG=$(git rev-parse --short HEAD 2>/dev/null || echo 'latest')",
     "gcp:logs": "gcloud logging read 'resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"app\"' --project graffiticode-app --limit 100 --format='table(timestamp,severity,httpRequest.status,httpRequest.requestMethod,httpRequest.requestUrl,httpRequest.latency,textPayload)'",
     "gcp:logs:tail": "gcloud beta run services logs tail app --project graffiticode-app --region us-central1"
   },
   "dependencies": {
     "@ethereumjs/util": "^8.0.3",
     "@graffiticode/auth": "^2.1.2",
-    "@graffiticode/auth-react": "*",
+    "@graffiticode/auth-react": "file:../auth-react",
     "@headlessui/react": "^1.7.16",
     "@heroicons/react": "^2.1.1",
     "@privy-io/react-auth": "^1.99.1",
