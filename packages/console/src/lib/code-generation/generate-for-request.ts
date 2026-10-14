@@ -47,7 +47,7 @@ import {
   exhausted,
   tripped,
 } from "../request-budget";
-import { setItemGenerationChars } from "../../pages/api/resolvers";
+import { setItemGenerationChars } from "../../core/generation-lease";
 import { ragLog, generateRequestId } from "../logger";
 import { langKey, emitEvent, actor } from "../funnel-events";
 import { classifyPromptLanguage, promptLanguageKey } from "../prompt-language";

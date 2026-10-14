@@ -13,7 +13,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { postApiCompile, getLanguageAsset, getLanguageLexicon, isLangOverridden, languageOfflineMessage, isLanguageOfflineError } from "./api";
-import { postTask, getData, parseCode } from "../pages/api/resolvers";
+import { postTask, getData, parseCode } from "./task-api";
 import admin from "firebase-admin";
 import { ragLog, generateRequestId } from "./logger";
 import {
