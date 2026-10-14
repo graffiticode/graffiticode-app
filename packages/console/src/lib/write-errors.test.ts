@@ -1,7 +1,7 @@
 // node:test via tsx: `npm test`.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { describeWriteProblem, canRetryWrite, isCheckableWrite, reconcileTarget, describeReconcile, describeReconcileRefusal } from "./write-errors";
+import { describeWriteProblem, canRetryWrite, isCheckableWrite, itemWriteFields, reconcileTarget, describeReconcile, describeReconcileRefusal } from "./write-errors";
 
 const failed = (message: string) => describeWriteProblem({ status: "failed", message });
 
@@ -118,4 +118,31 @@ test("a refused check says why in plain language, never as a bare code", () => {
   assert.match(describeReconcileRefusal(undefined), /Try again in a moment/);
   // Anything unforeseen still names its code, so it can be looked up.
   assert.match(describeReconcileRefusal("something-new"), /something-new/);
+});
+
+test("an item's lastWrite reaches GraphQL with what the check needs: its key, confirmed and the latest check", () => {
+  // As stored on the item doc: numeric times, the key the attempt used.
+  const stored = {
+    taskId: "t1", connectionId: "conn-1", status: "failed", message: "Error: Item bank save uncertain: socket hang up",
+    at: 1760000000000, idempotencyKey: "save:item-1:t1:conn-1",
+    reconcile: { verdict: "unresolved", text: "Not confirmed yet.", at: 1760000060000 },
+  };
+  const parent = itemWriteFields(stored);
+  // ItemWrite.checkable is Boolean(reconcileTarget(parent)): the projection must keep the key.
+  assert.deepEqual(reconcileTarget(parent), { connectionId: "conn-1", idempotencyKey: "save:item-1:t1:conn-1" });
+  assert.deepEqual(parent?.reconcile, { verdict: "unresolved", text: "Not confirmed yet.", at: "1760000060000" });
+  assert.equal(parent?.at, "1760000000000");
+  assert.equal(parent?.confirmed, null);
+
+  // After a check confirmed it: a success, confirmed, no longer checkable.
+  const { message: _m, ...rest } = stored;
+  const confirmed = itemWriteFields({ ...rest, status: "ok", confirmed: true, reconcile: { verdict: "applied", text: "Confirmed.", at: 1760000120000 } });
+  assert.equal(confirmed?.confirmed, true);
+  assert.equal(confirmed?.reconcile?.verdict, "applied");
+  assert.equal(reconcileTarget(confirmed), null);
+
+  // No write recorded yet; a save from before keys were stored can't be checked.
+  assert.equal(itemWriteFields(undefined), null);
+  const { idempotencyKey: _k, ...legacy } = stored;
+  assert.equal(reconcileTarget(itemWriteFields(legacy)), null);
 });
