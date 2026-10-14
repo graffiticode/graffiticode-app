@@ -17,7 +17,7 @@ export async function setItemGenerationStatus({
   status: "generating" | "ready" | "failed";
   error?: string | null;
 }) {
-  const itemRef = db.doc(`users/${auth.uid}/items/${id}`);
+  const itemRef = db().doc(`users/${auth.uid}/items/${id}`);
   const updates: Record<string, any> = {
     generationStatus: status,
     generationError: status === "failed" ? error : null,
@@ -53,7 +53,7 @@ export async function setItemGenerationChars({
   id: string;
   chars: number;
 }) {
-  await db.doc(`users/${auth.uid}/items/${id}`).update({ generationChars: chars });
+  await db().doc(`users/${auth.uid}/items/${id}`).update({ generationChars: chars });
 }
 
 // --- Generation lease (idempotency for the Cloud Tasks worker) --------------
@@ -95,8 +95,8 @@ export async function claimGeneration({
   id: string;
   owner: string;
 }): Promise<GenerationClaim> {
-  const itemRef = db.doc(`users/${auth.uid}/items/${id}`);
-  return db.runTransaction(async (tx) => {
+  const itemRef = db().doc(`users/${auth.uid}/items/${id}`);
+  return db().runTransaction(async (tx) => {
     const snap = await tx.get(itemRef);
     if (!snap.exists) return "missing" as GenerationClaim;
     const data = snap.data() || {};
@@ -124,9 +124,9 @@ export async function releaseGeneration({
   id: string;
   owner: string;
 }): Promise<void> {
-  const itemRef = db.doc(`users/${auth.uid}/items/${id}`);
+  const itemRef = db().doc(`users/${auth.uid}/items/${id}`);
   try {
-    await db.runTransaction(async (tx) => {
+    await db().runTransaction(async (tx) => {
       const snap = await tx.get(itemRef);
       if (!snap.exists) return;
       if ((snap.data() || {}).generationLeaseOwner !== owner) return;

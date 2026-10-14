@@ -29,13 +29,14 @@ import {
   type LlmProvider,
 } from "./llm-models";
 import { getJudgeConfig } from "./rag-config";
+import { coreConfig } from "../core/config";
 
 // Must cover the WHOLE reason-before-score response: the <analysis> block (every
 // requirement enumerated and each formula traced) AND the JSON verdict that
 // follows it. At 2048 the analysis alone exhausted the budget on content-heavy
 // items, so the verdict was never emitted and the candidate silently dropped out
 // of the sample — the dominant cause of judge "errors" once timeouts were fixed.
-const JUDGE_MAX_TOKENS = parseInt(process.env.JUDGE_MAX_TOKENS || "8192", 10);
+const JUDGE_MAX_TOKENS = () => coreConfig().judgeMaxTokens;
 
 export interface JudgeVerdict {
   correctness: number;          // 1–5: does the code correctly accomplish what the prompt asks
@@ -397,7 +398,7 @@ async function callJudge(
     model,
     systemPrompt: system,
     messages: [{ role: "user", content: user }],
-    options: { maxTokens: JUDGE_MAX_TOKENS, temperature: 0, timeoutMs },
+    options: { maxTokens: JUDGE_MAX_TOKENS(), temperature: 0, timeoutMs },
   });
   if (failure) throw new Error(failure.message);
   return { content, usage };

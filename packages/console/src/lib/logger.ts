@@ -1,4 +1,5 @@
-const enabled = !!process.env.RAG_DEBUG;
+import { coreConfig } from "../core/config";
+const enabled = () => coreConfig().ragDebug;
 
 const MAX_STRING_LENGTH = 300;
 const SENSITIVE_KEYS = ["api_key", "apiKey", "token", "password", "secret"];
@@ -34,7 +35,7 @@ function safe(data: any): any {
 }
 
 export const ragLog = (rid: string, stage: string, data?: any) => {
-  if (!enabled) return;
+  if (!enabled()) return;
 
   const timestamp = new Date().toISOString();
   const safeData = data !== undefined ? safe(data) : {};

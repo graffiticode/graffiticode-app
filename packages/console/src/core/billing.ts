@@ -25,7 +25,7 @@ export async function incrementItemCounter(
   now: Date,
   usageDoc?: admin.firestore.DocumentSnapshot,
 ): Promise<number> {
-  const ref = db.collection("usage").doc(uid);
+  const ref = db().collection("usage").doc(uid);
   const doc = usageDoc ?? await ref.get();
   const lastReset = doc.exists && doc.data()?.lastReset ? new Date(doc.data()?.lastReset) : null;
   if (lastReset && lastReset >= periodStart) {
@@ -72,10 +72,10 @@ export async function debitSponsor({
   env: string;
   now: Date;
 }) {
-  const sponsorDoc = await db.collection("users").doc(sponsorUid).get();
+  const sponsorDoc = await db().collection("users").doc(sponsorUid).get();
   const sponsorData = sponsorDoc.exists ? sponsorDoc.data() : {};
   const subscription = sponsorData?.subscription || {};
-  await db.collection("usage").add({
+  await db().collection("usage").add({
     userId: sponsorUid,
     itemId,
     taskId,
@@ -146,11 +146,11 @@ export async function recordBillableItem({
     // Share/claim copies re-post existing content; they are not authored items.
     if (source === "claim" || source === "share") return;
 
-    const itemRef = db.doc(`users/${auth.uid}/items/${itemId}`);
+    const itemRef = db().doc(`users/${auth.uid}/items/${itemId}`);
 
     // Idempotency: count each distinct item once. Set `billed` on the item doc
     // in a transaction; bail if it's already billed or is a copy.
-    const shouldCount = await db.runTransaction(async (tx) => {
+    const shouldCount = await db().runTransaction(async (tx) => {
       const snap = await tx.get(itemRef);
       if (!snap.exists) return false;
       const d = snap.data() || {};
@@ -190,7 +190,7 @@ export async function recordBillableItem({
     // on their usage page, a local script run is ours and must never appear
     // there. Absent on rows written before this existed, which reads correctly
     // as "billable".
-    await db.collection("usage").add({
+    await db().collection("usage").add({
       userId: auth.uid,
       itemId,
       taskId,
@@ -220,10 +220,10 @@ export async function recordBillableItem({
 
     // Increment the monthly counter, resetting at the billing-period boundary
     // (mirrors logCompile). currentMonthTotal is the item count for the period.
-    const userDoc = await db.collection("users").doc(auth.uid).get();
+    const userDoc = await db().collection("users").doc(auth.uid).get();
     const userData = userDoc.exists ? userDoc.data() : {};
     const subscription = userData?.subscription || {};
-    const usageDoc = await db.collection("usage").doc(auth.uid).get();
+    const usageDoc = await db().collection("usage").doc(auth.uid).get();
     // The usage doc is created by the first billable item and never deleted, so
     // its absence is the account's first-ever item (not merely first this period).
     const firstForAccount = !usageDoc.exists;

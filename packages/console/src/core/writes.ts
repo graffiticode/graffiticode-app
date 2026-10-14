@@ -151,10 +151,10 @@ export async function recordLastWrite({ auth, itemId, taskId, connectionId, mess
   if (lastWrite.status === "failed") {
     console.error("writeThroughCurrentConnection(): write failed for item", itemId, message);
   }
-  const itemRef = db.doc(`users/${auth.uid}/items/${itemId}`);
+  const itemRef = db().doc(`users/${auth.uid}/items/${itemId}`);
   try {
     // A targeted write, not updateItem: recording the outcome is not a content change.
-    return await db.runTransaction(async tx => {
+    return await db().runTransaction(async tx => {
       const prev = (await tx.get(itemRef)).data()?.lastWrite;
       if (lastWrite.status !== "ok" && prev?.status === "ok" && prev.taskId === taskId &&
           (lastWrite.status === "skipped" || prev.connectionId === connectionId)) {
@@ -193,7 +193,7 @@ export async function itemConnectionFields(auth: AuthArg, data: any) {
 // response never repeats the write.
 export async function retryItemWrite({ auth, id }: { auth: AuthArg; id: string }) {
   requireFullAccount(auth, "connections");
-  const itemDoc = await db.doc(`users/${auth.uid}/items/${id}`).get();
+  const itemDoc = await db().doc(`users/${auth.uid}/items/${id}`).get();
   if (!itemDoc.exists) {
     throw new Error("Item not found");
   }
@@ -217,7 +217,7 @@ export async function retryItemWrite({ auth, id }: { auth: AuthArg; id: string }
 // failure stands. Nothing is written to the item bank.
 export async function reconcileItemWrite({ auth, id }: { auth: AuthArg; id: string }) {
   requireFullAccount(auth, "connections");
-  const itemRef = db.doc(`users/${auth.uid}/items/${id}`);
+  const itemRef = db().doc(`users/${auth.uid}/items/${id}`);
   const itemDoc = await itemRef.get();
   if (!itemDoc.exists) {
     throw new Error("Item not found");
@@ -228,7 +228,7 @@ export async function reconcileItemWrite({ auth, id }: { auth: AuthArg; id: stri
     throw new Error("This save can't be checked: only an uncertain or partial save made since checks began can be.");
   }
   const summary = describeReconcile(await reconcileSave(auth.token, target));
-  await db.runTransaction(async tx => {
+  await db().runTransaction(async tx => {
     const now = (await tx.get(itemRef)).data()?.lastWrite as LastWrite | undefined;
     // A newer save since the check started: it decides, not this check.
     if (!now || now.idempotencyKey !== target.idempotencyKey || now.taskId !== write.taskId) return;
@@ -251,7 +251,7 @@ export async function reconcileItemWrite({ auth, id }: { auth: AuthArg; id: stri
 // is replaced, and the caller reloads the preview.
 export async function recompileItem({ auth, id }: { auth: AuthArg; id: string }) {
   requireFullAccount(auth, "connections");
-  const itemDoc = await db.doc(`users/${auth.uid}/items/${id}`).get();
+  const itemDoc = await db().doc(`users/${auth.uid}/items/${id}`).get();
   if (!itemDoc.exists) {
     throw new Error("Item not found");
   }
@@ -288,7 +288,7 @@ export async function recompileItem({ auth, id }: { auth: AuthArg; id: string })
 // unpublished in between.
 export async function republishItem({ auth, id }: { auth: AuthArg; id: string }) {
   requireFullAccount(auth, "connections");
-  const itemRef = db.doc(`users/${auth.uid}/items/${id}`);
+  const itemRef = db().doc(`users/${auth.uid}/items/${id}`);
   const itemDoc = await itemRef.get();
   if (!itemDoc.exists) {
     throw new Error("Item not found");

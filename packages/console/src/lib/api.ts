@@ -1,10 +1,12 @@
 import bent from "bent";
+import { coreConfig } from "../core/config";
 
-const apiUrl = process.env.NEXT_PUBLIC_GC_API_URL || "https://api.graffiticode.org";
-const getApiString = bent(apiUrl, "GET", "string");
-const getApiJSON = bent(apiUrl, "GET", "json");
+// Built on use from the configured api URL, so importing this module has no
+// side effect (Phase 1e).
+const getApiString = (...args: any[]) => (bent(coreConfig().apiUrl, "GET", "string") as any)(...args);
+const getApiJSON = (...args: any[]) => (bent(coreConfig().apiUrl, "GET", "json") as any)(...args);
 
-export const getBaseUrlForApi = () => apiUrl;
+export const getBaseUrlForApi = () => coreConfig().apiUrl;
 
 // Which languages the current user has a per-user binding override for. Cached
 // per token with a short TTL. The local asset caches below key their read/write
@@ -245,7 +247,7 @@ export const postApiCompile = async ({ accessToken, id, data, connectionId = nul
       authorization: accessToken,
       "x-graffiticode-storage-type": "persistent",
     };
-    const post = bent(apiUrl, "POST", "json", headers);
+    const post = bent(coreConfig().apiUrl, "POST", "json", headers);
     const body = connectionId ? { id, data, connectionId, ...(idempotencyKey ? { idempotencyKey } : {}) } : { id, data };
     const resp = await post('/compile', body);
     if (resp.status !== "success") {

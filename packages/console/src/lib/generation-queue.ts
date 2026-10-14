@@ -10,16 +10,12 @@
 // route. REST has no such footprint.
 
 import { getAccessToken } from "./gcp-token";
+import { coreConfig } from "../core/config";
 
-const PROJECT =
-  process.env.GENERATION_QUEUE_PROJECT ||
-  process.env.GOOGLE_CLOUD_PROJECT ||
-  process.env.GCLOUD_PROJECT ||
-  "graffiticode-app";
-const LOCATION = process.env.GENERATION_QUEUE_LOCATION || "us-central1";
-const QUEUE = process.env.GENERATION_QUEUE_NAME || "generation-jobs";
-const SECRET = process.env.INTERNAL_JOB_SECRET || "";
-const CONSOLE_URL = process.env.CONSOLE_URL || "https://console.graffiticode.org";
+const PROJECT = () => coreConfig().generationQueue.project;
+const LOCATION = () => coreConfig().generationQueue.location;
+const QUEUE = () => coreConfig().generationQueue.name;
+const SECRET = () => coreConfig().generationQueue.secret;
 // Where Cloud Tasks dispatches the worker. This MUST be the service's own
 // origin, not the public hostname: console.graffiticode.org is proxied by
 // Cloudflare, which cuts an origin connection at ~100s and returns 524 to the
@@ -36,10 +32,10 @@ const CONSOLE_URL = process.env.CONSOLE_URL || "https://console.graffiticode.org
 // The MCP server's own worker-died guard (GENERATION_STALE_MS in
 // graffiticode-mcp-server/src/tools.ts) MUST stay above this 900s ceiling, or it
 // reports a still-running generation to the agent as failed. Move the two together.
-const WORKER_URL = process.env.GENERATION_JOB_URL || `${CONSOLE_URL}/api/generate-job`;
+const WORKER_URL = () => coreConfig().generationQueue.workerUrl;
 // Fire the worker directly (un-awaited fetch) instead of via Cloud Tasks. Set
 // for local dev, where the dev server stays running and there's no queue.
-const LOCAL = process.env.GENERATION_QUEUE_LOCAL === "1";
+const LOCAL = () => coreConfig().generationQueue.local;
 
 // Worker auth: how the worker re-derives credentials to act as the caller.
 // Free-plan re-derives fresh creds (idTokens are short-lived, dispatch can lag),
@@ -100,33 +96,33 @@ export interface GenerationJob {
 }
 
 export async function enqueueGenerationJob(job: GenerationJob): Promise<void> {
-  if (!SECRET) {
+  if (!SECRET()) {
     throw new Error("INTERNAL_JOB_SECRET is not configured — cannot enqueue generation job");
   }
   const body = JSON.stringify({ v: GENERATION_JOB_VERSION, ...job });
 
-  if (LOCAL) {
+  if (LOCAL()) {
     // Local dev: invoke the worker without awaiting completion. The dev server
     // keeps running, so the request finishes in the background.
-    void fetch(WORKER_URL, {
+    void fetch(WORKER_URL(), {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Internal-Job-Secret": SECRET },
+      headers: { "Content-Type": "application/json", "X-Internal-Job-Secret": SECRET() },
       body,
     }).catch((err) => console.error("[generation-queue] local dispatch failed", err));
     return;
   }
 
   const token = await getAccessToken();
-  const url = `https://cloudtasks.googleapis.com/v2/projects/${PROJECT}/locations/${LOCATION}/queues/${QUEUE}/tasks`;
+  const url = `https://cloudtasks.googleapis.com/v2/projects/${PROJECT()}/locations/${LOCATION()}/queues/${QUEUE()}/tasks`;
   const res = await fetch(url, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       task: {
         httpRequest: {
-          url: WORKER_URL,
+          url: WORKER_URL(),
           httpMethod: "POST",
-          headers: { "Content-Type": "application/json", "X-Internal-Job-Secret": SECRET },
+          headers: { "Content-Type": "application/json", "X-Internal-Job-Secret": SECRET() },
           body: Buffer.from(body).toString("base64"),
         },
         // Must be >= the worker's own Cloud Run request timeout, or Cloud Tasks

@@ -1,10 +1,20 @@
 // Moved from pages/api/index.ts and pages/api/generate-job.ts (Phase 1: untangle
 // inside the console). How a request's credentials become a Principal.
-import { client } from "../lib/auth";
+import { createClient } from "@graffiticode/auth/client";
+import { coreConfig } from "./config";
 import { getCredentialsForApiKey } from "../lib/api-credentials";
 import { getFreePlanCredentials, isFreePlanRequest } from "../lib/free-plan-context";
 import { checkBurstLimit, BURST } from "../lib/free-plan-throttle";
 import type { AuthReplay } from "../lib/generation-queue";
+
+// The auth service client, created on first use from the configured URL (and
+// again if it changes), so importing core has no side effect.
+let authClient: { url: string; client: ReturnType<typeof createClient> } | null = null;
+function client() {
+  const url = coreConfig().authUrl;
+  if (!authClient || authClient.url !== url) authClient = { url, client: createClient(url) };
+  return authClient.client;
+}
 
 // Normalizes any inbound credential into { uid, idToken }, where idToken is
 // always a Firebase ID token (or signed JWT) suitable for forwarding to
@@ -12,7 +22,7 @@ import type { AuthReplay } from "../lib/generation-queue";
 // Graffiticode api key — the api-key path exchanges via the auth service.
 export async function authenticate(token: string): Promise<{ uid: string; idToken: string }> {
   try {
-    const { uid } = await client.verifyToken(token);
+    const { uid } = await client().verifyToken(token);
     return { uid, idToken: token };
   } catch {
     const { uid, idToken } = await getCredentialsForApiKey(token);

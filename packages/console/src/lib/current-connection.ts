@@ -31,7 +31,8 @@ export type CurrentConnection = {
   candidates: CandidateConnection[];
 };
 
-const db = getFirestore();
+// Resolved on use, so importing this module has no side effect.
+const db = () => getFirestore();
 
 // Per request: the auth object is built fresh for every request, so keying on it
 // makes an item list do one pair of policy calls and one user-doc read, not one
@@ -57,7 +58,7 @@ function connectionsFor(auth: Auth): Promise<CandidateConnection[]> {
 function choicesFor(auth: Auth): Promise<Record<string, string>> {
   let read = choices.get(auth);
   if (!read) {
-    read = db.doc(`users/${auth.uid}`).get().then(doc => doc.data()?.currentConnections || {});
+    read = db().doc(`users/${auth.uid}`).get().then(doc => doc.data()?.currentConnections || {});
     choices.set(auth, read);
   }
   return read;
@@ -130,7 +131,7 @@ export async function setCurrentConnection({ auth, lang, connectionId }: { auth:
       throw new Error(`That connection is not one of your active ${backend} connections for L${key}.`);
     }
   }
-  await db.doc(`users/${auth.uid}`).set({
+  await db().doc(`users/${auth.uid}`).set({
     currentConnections: { [choiceKey(key, backend)]: connectionId || admin.firestore.FieldValue.delete() },
   }, { merge: true });
   choices.delete(auth);

@@ -1,7 +1,8 @@
 import { getFirestore } from "../utils/db";
 import { FreePlanError, buildSignupUrl } from "./free-plan-context";
 
-const db = getFirestore();
+// Resolved on use, so importing this module has no side effect.
+const db = () => getFirestore();
 
 // Runaway-loop guard for anonymous free-plan traffic.
 //
@@ -75,13 +76,13 @@ export async function checkBurstLimit(
   const nowMs = now.getTime();
   const cutoff = nowMs - windowMs;
 
-  const ref = db
+  const ref = db()
     .collection("free-plan-state")
     .doc("sessions")
     .collection(key)
     .doc(surface.bucket);
 
-  const retryAfterSeconds = await db.runTransaction(async (tx) => {
+  const retryAfterSeconds = await db().runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const raw = snap.exists ? snap.data()?.hits : undefined;
     // Keep only hits still inside the window; this prunes the array each call so

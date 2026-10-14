@@ -1,3 +1,4 @@
+import { coreConfig } from "../core/config";
 // SendGrid email sender.
 //
 // Plain REST + bearer auth rather than @sendgrid/mail, for the same reasons
@@ -7,8 +8,8 @@
 // Unconfigured is a supported state, not an error: the message is logged instead
 // of sent. Recipient addresses never reach the logs (privacy contract).
 
-const API_KEY = process.env.SENDGRID_API_KEY || "";
-const FROM = process.env.ALERT_EMAIL_FROM || "";
+const API_KEY = () => coreConfig().alerts.sendgridApiKey;
+const FROM = () => coreConfig().alerts.emailFrom;
 
 /** Operator recipients, comma-separated in ALERT_EMAIL_TO. */
 export function operatorEmails(): string[] {
@@ -16,7 +17,7 @@ export function operatorEmails(): string[] {
 }
 
 export function isEmailConfigured(): boolean {
-  return !!(API_KEY && FROM);
+  return !!(API_KEY() && FROM());
 }
 
 export interface EmailResult {
@@ -60,11 +61,11 @@ export async function sendEmail({
       const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${API_KEY}`,
+          Authorization: `Bearer ${API_KEY()}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          from: { email: FROM },
+          from: { email: FROM() },
           personalizations: [{ to: [{ email }] }],
           subject,
           headers: { "X-Priority": "1", Importance: "high" },

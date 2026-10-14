@@ -103,7 +103,7 @@ export async function recordVersion({
     if (auth.freePlan) {
       Object.assign(version, freePlanItemFields(auth, createdAt));
     }
-    const ref = db.doc(`users/${auth.uid}/versions/${itemId}__${taskId}`);
+    const ref = db().doc(`users/${auth.uid}/versions/${itemId}__${taskId}`);
     // create-if-absent, NOT set/merge: reverting to an earlier state re-derives
     // the same content-addressed taskId, and merging would overwrite that
     // version's original createdAt/source — silently rewriting history and
@@ -146,7 +146,7 @@ export async function getTaskVersions({
 }) {
   requireFullAccount(auth, "history");
   try {
-    let query = db
+    let query = db()
       .collection(`users/${auth.uid}/versions`)
       .where("lang", "==", lang) as FirebaseFirestore.Query;
     if (client && client !== "all") {

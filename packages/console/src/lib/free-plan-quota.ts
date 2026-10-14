@@ -18,7 +18,8 @@ import { emitEvent } from "./funnel-events";
 // scales or restarts, so session-keyed quota silently does nothing for the
 // clients that matter. These counters live in Firestore and outlive all of that.
 
-const db = getFirestore();
+// Resolved on use, so importing this module has no side effect.
+const db = () => getFirestore();
 
 function todayKey(now = new Date()): string {
   const y = now.getUTCFullYear();
@@ -28,7 +29,7 @@ function todayKey(now = new Date()): string {
 }
 
 function dailyDocRef(now = new Date()) {
-  return db.collection("free-plan-state").doc(`items-${todayKey(now)}`);
+  return db().collection("free-plan-state").doc(`items-${todayKey(now)}`);
 }
 
 function nextUtcMidnightIso(now = new Date()): string {
@@ -104,8 +105,8 @@ export function dailyItemAllowance({
  */
 export async function recordSpend(usd: number, now = new Date()): Promise<void> {
   if (!Number.isFinite(usd) || usd <= 0) return;
-  const ref = db.collection("free-plan-state").doc(`spend-${todayKey(now)}`);
-  await db.runTransaction(async (tx) => {
+  const ref = db().collection("free-plan-state").doc(`spend-${todayKey(now)}`);
+  await db().runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const prev = snap.exists ? Number(snap.data()?.usd) : 0;
     const next = (Number.isFinite(prev) ? prev : 0) + usd;
@@ -123,7 +124,7 @@ export async function getTodayItemCount(now = new Date()): Promise<number> {
 /** Increment today's trial item counter. Best-effort; called after a successful create. */
 export async function recordTrialItem(now = new Date()): Promise<void> {
   const ref = dailyDocRef(now);
-  await db.runTransaction(async (tx) => {
+  await db().runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const prev = snap.exists ? Number(snap.data()?.count) : 0;
     const next = (Number.isFinite(prev) ? prev : 0) + 1;
@@ -221,9 +222,9 @@ export async function maybeAlertBudget({
 
   // Key on the period end so the flags roll over with the billing period.
   const periodKey = (periodEnd ?? new Date()).toISOString().slice(0, 10);
-  const ref = db.collection("free-plan-state").doc(`alerts-${periodKey}`);
+  const ref = db().collection("free-plan-state").doc(`alerts-${periodKey}`);
   try {
-    const fired = await db.runTransaction(async (tx) => {
+    const fired = await db().runTransaction(async (tx) => {
       const snap = await tx.get(ref);
       const prev = Number(snap.exists ? snap.data()?.threshold : 0) || 0;
       if (prev >= threshold) return false;
