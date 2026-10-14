@@ -6,7 +6,7 @@
 // routes — cancel their subscription or change their plan against the card on
 // file. This is the shared replacement.
 //
-// Same contract as the GraphQL endpoint's authenticate() (src/pages/api/index.ts):
+// Same contract as the GraphQL endpoint's authenticate() (src/core/auth.ts):
 // a Firebase ID token first, falling back to an api key, so both credentials
 // work everywhere. Modelled on the existing route-level pattern in
 // src/pages/api/linked-emails/check.ts.
