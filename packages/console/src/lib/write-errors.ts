@@ -104,6 +104,33 @@ export const reconcileTarget = (write: (LastWriteLike & { connectionId?: string 
     ? { connectionId: write.connectionId, idempotencyKey: write.idempotencyKey }
     : null;
 
+// An item's stored lastWrite as the GraphQL ItemWrite parent. It keeps the
+// idempotency key, which the schema hides, so the checkable resolver can see
+// it (reconcileTarget), and passes confirmed and the latest check through.
+type StoredLastWrite = NonNullable<LastWriteLike> & {
+  taskId?: string;
+  connectionId?: string | null;
+  at?: number | string;
+  idempotencyKey?: string | null;
+  confirmed?: boolean;
+  reconcile?: { verdict: string; text: string; at: number | string } | null;
+};
+export const itemWriteFields = (write: StoredLastWrite | null | undefined) =>
+  write?.taskId
+    ? {
+      taskId: write.taskId,
+      connectionId: write.connectionId ?? null,
+      status: write.status,
+      message: write.message ?? null,
+      at: String(write.at),
+      idempotencyKey: write.idempotencyKey ?? null,
+      confirmed: write.confirmed ?? null,
+      reconcile: write.reconcile
+        ? { verdict: write.reconcile.verdict, text: write.reconcile.text, at: String(write.reconcile.at) }
+        : null,
+    }
+    : null;
+
 type ReconcileRecord = { landed?: boolean; matches?: boolean; found?: boolean };
 type ReconcileOperation = { verdict?: string; final?: boolean; reason?: string; retryAfter?: string; records?: ReconcileRecord[] };
 
