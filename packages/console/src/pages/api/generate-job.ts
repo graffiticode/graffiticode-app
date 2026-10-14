@@ -16,31 +16,11 @@ import {
   claimGeneration,
   releaseGeneration,
 } from "./resolvers";
-import { client } from "../../lib/auth";
-import { getCredentialsForApiKey } from "../../lib/api-credentials";
-import { getFreePlanCredentials } from "../../lib/free-plan-context";
+import { principalFromReplay, type Principal } from "../../core/auth";
 import { GENERATION_JOB_VERSION } from "../../lib/generation-queue";
-import type { AuthReplay, GenerationJob } from "../../lib/generation-queue";
+import type { GenerationJob } from "../../lib/generation-queue";
 import { emitEvent, actor } from "../../lib/funnel-events";
 import { resolveFirstOutcome } from "../../lib/workspace-registry";
-
-type Auth = { uid: string; token: string; freePlan?: boolean; sessionNamespace?: string };
-
-// Mirror of the auth resolution in api/index.ts, driven by the replayed
-// credential rather than live request headers.
-async function reconstructAuth(replay: AuthReplay): Promise<Auth> {
-  if (replay.kind === "freePlan") {
-    const { uid, idToken } = await getFreePlanCredentials();
-    return { uid, token: idToken, freePlan: true, sessionNamespace: replay.sessionNamespace };
-  }
-  try {
-    const { uid } = await client.verifyToken(replay.token);
-    return { uid, token: replay.token };
-  } catch {
-    const { uid, idToken } = await getCredentialsForApiKey(replay.token);
-    return { uid, token: idToken };
-  }
-}
 
 // Help-history entry shape shared with the MCP server's parseHelp /
 // buildContextualPrompt — keep in lockstep so subsequent updates parse it.
@@ -106,9 +86,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: "unsupported_job_version", v });
   }
 
-  let auth: Auth;
+  let auth: Principal;
   try {
-    auth = await reconstructAuth(authReplay);
+    auth = await principalFromReplay(authReplay);
   } catch (err) {
     // Auth could not be reconstructed — return 5xx so Cloud Tasks retries
     // (capped by the queue's maxAttempts) in case it was a transient blip.

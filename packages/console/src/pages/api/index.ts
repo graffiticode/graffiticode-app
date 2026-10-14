@@ -38,11 +38,8 @@ import {
 import { listCurrentConnections, setCurrentConnection } from "../../lib/current-connection";
 import { verifyClaimToken } from "../../lib/claim-token";
 import { checkItemCreateAllowed } from "../../lib/usage-service";
-import { checkBurstLimit, BURST } from "../../lib/free-plan-throttle";
 import { listLanguages, getLanguageInfo } from "./languages";
-import { client } from "../../lib/auth";
 import { findAccounts, isSystemAccount, profileName, shortAccountId } from "../../lib/account-lookup";
-import { getCredentialsForApiKey } from "../../lib/api-credentials";
 import {
   listConnections,
   createConnection,
@@ -73,56 +70,14 @@ import {
   verifiedEmailHashes,
 } from "../../lib/connection-sharing";
 import { enqueueGenerationJob } from "../../lib/generation-queue";
-import {
-  FreePlanError,
-  getFreePlanCredentials,
-  isFreePlanRequest,
-} from "../../lib/free-plan-context";
+import { FreePlanError, getFreePlanCredentials } from "../../lib/free-plan-context";
+import { admitRequest, authenticate, resolveAuth } from "../../core/auth";
 import { hashUid, langKey } from "../../lib/funnel-events";
 import { isInternalRequest } from "../../lib/funnel-exclusions";
 import {
   registerFirstCreateAttempt,
   resolveFirstOutcome,
 } from "../../lib/workspace-registry";
-
-// Normalizes any inbound credential into { uid, idToken }, where idToken is
-// always a Firebase ID token (or signed JWT) suitable for forwarding to
-// api.graffiticode.org. Inbound can be either a Firebase ID token or a raw
-// Graffiticode api key — the api-key path exchanges via the auth service.
-async function authenticate(token: string): Promise<{ uid: string; idToken: string }> {
-  try {
-    const { uid } = await client.verifyToken(token);
-    return { uid, idToken: token };
-  } catch {
-    const { uid, idToken } = await getCredentialsForApiKey(token);
-    return { uid, idToken };
-  }
-}
-
-type AuthContext = {
-  uid: string;
-  token: string;
-  freePlan?: boolean;
-  sessionNamespace?: string;
-  sessionUuid?: string;
-};
-
-async function resolveAuth(ctx): Promise<AuthContext> {
-  if (ctx.freePlan) {
-    const { uid, idToken } = await getFreePlanCredentials();
-    // A fresh object per request — resolvers may rebind sessionNamespace onto it
-    // (adoptWorkspace) and that must not leak across requests.
-    return {
-      uid,
-      token: idToken,
-      freePlan: true,
-      sessionNamespace: ctx.sessionNamespace,
-      sessionUuid: ctx.sessionUuid,
-    };
-  }
-  const { uid, idToken } = await authenticate(ctx.token);
-  return { uid, token: idToken };
-}
 
 // Policy errors surface as their reason only ("not-owner", "unavailable", …).
 async function viaPolicy<T>(fn: () => Promise<T>): Promise<T> {
@@ -1171,16 +1126,9 @@ export default async function handler(req, res) {
     res.setHeader('Content-Type', 'text/html');
     res.send(html);
   } else {
-    let freePlan: Awaited<ReturnType<typeof isFreePlanRequest>>;
+    let freePlan: Awaited<ReturnType<typeof admitRequest>>;
     try {
-      freePlan = await isFreePlanRequest(req);
-      // Hammering guard for every free-plan surface, applied once here rather
-      // than resolver by resolver — reads, writes and anything added later are
-      // covered without having to remember to. Generously sized (see BURST.API);
-      // the actual budget is items, enforced at creation.
-      if (freePlan.freePlan) {
-        await checkBurstLimit(freePlan.sessionNamespace, BURST.API);
-      }
+      freePlan = await admitRequest(req);
     } catch (err) {
       // A rejected free-plan session (bad signature, expired, or raw uuid once
       // signed sessions are required) is an auth failure, not a GraphQL error.
