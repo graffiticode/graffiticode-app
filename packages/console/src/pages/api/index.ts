@@ -1,4 +1,5 @@
 import { makeExecutableSchema } from "@graphql-tools/schema";
+import { describeReconcileRefusal, reconcileTarget } from "../../lib/write-errors";
 import { generateCodeForRequest } from "../../lib/code-generation/generate-for-request";
 import {
   getGraphQLParameters,
@@ -241,6 +242,9 @@ const typeDefs = `
     # Set when a check against the item bank confirmed an uncertain or
     # partial save (capability W5), which made it a success.
     confirmed: Boolean
+    # Whether this save can be checked against the item bank: uncertain or
+    # partial, and made since saves record their key.
+    checkable: Boolean
     # The latest check of an uncertain or partial save against the item bank.
     reconcile: ItemWriteCheck
   }
@@ -960,7 +964,13 @@ const resolvers = {
     reconcileItemWrite: async (_, args, ctx) => {
       if (ctx.freePlan) throw new Error("Connections require a full account.");
       const auth = await resolveAuth(ctx);
-      return await viaPolicy(() => reconcileItemWrite({ auth, id: args.id }));
+      try {
+        return await reconcileItemWrite({ auth, id: args.id });
+      } catch (err) {
+        // A refusal says why in plain language, not as a reason code.
+        if (err instanceof PolicyError) throw new Error(describeReconcileRefusal(err.reason));
+        throw err;
+      }
     },
     recompileItem: async (_, args, ctx) => {
       const auth = await resolveAuth(ctx);
@@ -1105,6 +1115,9 @@ const resolvers = {
       await viaPolicy(() => deleteConnection(auth.token, args.connectionId));
       return true;
     },
+  },
+  ItemWrite: {
+    checkable: write => Boolean(reconcileTarget(write)),
   },
   Item: {
     task: async (parent, _, ctx) => {

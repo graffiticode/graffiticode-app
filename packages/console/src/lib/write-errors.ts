@@ -140,3 +140,29 @@ export function describeReconcile(result: { operations?: ReconcileOperation[] } 
       "To save again, recompile the item (the write may repeat).",
   };
 }
+
+// Why a check couldn't run, in plain language, from Policy's or Broker's
+// reason code.
+export function describeReconcileRefusal(reason: string | null | undefined): string {
+  switch (reason) {
+  case "receipt-not-found":
+  case "invocation-not-found":
+    return "This save isn't in the records any more, so it can't be checked.";
+  case "not-granted":
+  case "not-owner":
+    return "Your access to this connection no longer covers saving, so you can't check this save.";
+  case "connection-not-found":
+  case "connection-disabled":
+  case "no-credential":
+    return "This connection is no longer available, so the save can't be checked.";
+  case "credential-binding-mismatch":
+    return "This connection's credentials have changed since the save, so it can't be checked.";
+  case "unavailable":
+  case "policy-unavailable":
+  case undefined:
+  case null:
+    return "The check couldn't run just now. Try again in a moment.";
+  default:
+    return `The check couldn't run (${reason}).`;
+  }
+}

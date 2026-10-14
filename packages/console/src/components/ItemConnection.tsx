@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { loadCurrentConnections, reconcileItemWrite, republishItem, retryItemWrite } from '../utils/swr/fetchers';
 import { backendForLang, normalizeLang } from '../lib/connectable';
 import { getCredentialBackend } from '../lib/credential-backends';
-import { canRetryWrite, describeWriteProblem, isCheckableWrite } from '../lib/write-errors';
+import { canRetryWrite, describeWriteProblem } from '../lib/write-errors';
 
 // Fired after a write through a connection, so the preview (which shows the
 // stored result) reloads: a write changes that result without changing the item.
@@ -76,7 +76,8 @@ export default function ItemConnection({ user, itemId, lang, taskId, connectionI
   const problemWrite = lastWrite && lastWrite.taskId === taskId ? lastWrite : null;
   const problem = taskId ? describeWriteProblem(problemWrite) : null;
   const showRetry = canRetryWrite(problem, problemWrite, connectionId);
-  const showCheck = isCheckableWrite(problemWrite);
+  // Only a save the server says can be checked: uncertain or partial, with its key recorded.
+  const showCheck = Boolean(problemWrite?.checkable);
   const staleVersion = Boolean(publicationId && publishedTaskId && publishedTaskId !== taskId);
   const staleConnection = Boolean(publicationId && connectionId && publicationConnectionId && publicationConnectionId !== connectionId);
   const buttonClass = 'px-3 py-1 text-xs text-gray-700 border border-gray-300 hover:bg-gray-100 rounded-none disabled:opacity-50';

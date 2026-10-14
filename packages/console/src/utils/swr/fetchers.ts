@@ -66,7 +66,7 @@ export const setCurrentConnection = async ({ user, lang, connectionId }: { user:
 
 const ITEM_CONNECTION_FIELDS = `
   id taskId connectionId publicationId publicationConnectionId publishedTaskId
-  lastWrite { taskId connectionId status message at confirmed reconcile { verdict text at } }
+  lastWrite { taskId connectionId status message at confirmed checkable reconcile { verdict text at } }
 `;
 
 // Writes the item's current version through the current connection again,
@@ -485,7 +485,7 @@ export const loadItems = async ({ user, lang, mark, client: clientId }) => {
         publicationId
         publicationConnectionId
         publishedTaskId
-        lastWrite { taskId connectionId status message at confirmed reconcile { verdict text at } }
+        lastWrite { taskId connectionId status message at confirmed checkable reconcile { verdict text at } }
       }
     }
   `;
@@ -533,7 +533,7 @@ export const createItem = async ({ user, lang, name, taskId, mark, help, isPubli
         client
         upstreamLangs
         connectionId
-        lastWrite { taskId connectionId status message at confirmed reconcile { verdict text at } }
+        lastWrite { taskId connectionId status message at confirmed checkable reconcile { verdict text at } }
       }
     }
   `;
@@ -568,7 +568,7 @@ export const updateItem = async ({ user, id, name, taskId, mark, help, isPublic,
         publicationId
         publicationConnectionId
         publishedTaskId
-        lastWrite { taskId connectionId status message at confirmed reconcile { verdict text at } }
+        lastWrite { taskId connectionId status message at confirmed checkable reconcile { verdict text at } }
       }
     }
   `;

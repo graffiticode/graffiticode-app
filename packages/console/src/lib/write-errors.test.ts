@@ -1,7 +1,7 @@
 // node:test via tsx: `npm test`.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { describeWriteProblem, canRetryWrite, isCheckableWrite, reconcileTarget, describeReconcile } from "./write-errors";
+import { describeWriteProblem, canRetryWrite, isCheckableWrite, reconcileTarget, describeReconcile, describeReconcileRefusal } from "./write-errors";
 
 const failed = (message: string) => describeWriteProblem({ status: "failed", message });
 
@@ -99,4 +99,23 @@ test("a check's verdict reads plainly: confirmed only when every record carries 
   // An applied verdict that isn't final, or none at all, never confirms.
   assert.equal(describeReconcile({ operations: [{ verdict: "applied", final: false }] }).verdict, "unresolved");
   assert.equal(describeReconcile({ operations: [] }).verdict, "unresolved");
+});
+
+test("a save is checkable only when it is uncertain or partial and its key was recorded", () => {
+  const uncertain = { status: "failed", message: "Error: Item bank save uncertain: socket hang up", connectionId: "conn-1" };
+  // The server's `checkable` field is exactly this: a save made before keys were recorded isn't.
+  assert.equal(Boolean(reconcileTarget(uncertain)), false);
+  assert.equal(Boolean(reconcileTarget({ ...uncertain, idempotencyKey: "save:k" })), true);
+  assert.equal(Boolean(reconcileTarget({ ...uncertain, message: "Error: permission denied (not-granted)", idempotencyKey: "save:k" })), false);
+});
+
+test("a refused check says why in plain language, never as a bare code", () => {
+  assert.match(describeReconcileRefusal("receipt-not-found"), /isn't in the records/);
+  assert.match(describeReconcileRefusal("invocation-not-found"), /isn't in the records/);
+  assert.match(describeReconcileRefusal("not-granted"), /no longer covers saving/);
+  assert.match(describeReconcileRefusal("no-credential"), /no longer available/);
+  assert.match(describeReconcileRefusal("credential-binding-mismatch"), /credentials have changed/);
+  assert.match(describeReconcileRefusal(undefined), /Try again in a moment/);
+  // Anything unforeseen still names its code, so it can be looked up.
+  assert.match(describeReconcileRefusal("something-new"), /something-new/);
 });
