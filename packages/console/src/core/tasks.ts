@@ -1,4 +1,6 @@
 // Moved from pages/api/resolvers.ts (Phase 1: untangle inside the console).
+import type { AuthArg } from "./types";
+import { getData } from "../lib/task-api";
 import { getApiTask, getLanguageLexicon } from "../lib/api";
 import { unparse } from "@graffiticode/parser";
 
@@ -24,4 +26,10 @@ export async function getTask({ auth, id }) {
     console.error("getTask()", "ERROR", error);
     throw new Error(`Failed to get task: ${error.message}`);
   }
+}
+
+// A task's compiled data. A connection is a full-account feature, so a
+// free-plan caller's connectionId is ignored: it previews like any other item.
+export async function readItemData({ auth, id, connectionId = null }: { auth: AuthArg; id: string; connectionId?: string | null }) {
+  return getData({ authToken: auth.token, id, connectionId: auth.freePlan ? null : connectionId });
 }

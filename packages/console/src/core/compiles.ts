@@ -3,6 +3,7 @@ import { getApiTask } from "../lib/api";
 import path from "path";
 import { db } from "./db";
 import { getItems } from "./items";
+import { requireFullAccount } from "./errors";
 
 export async function logCompile({ auth, units, id, timestamp, status, data }) {
   try {
@@ -32,6 +33,7 @@ export async function logCompile({ auth, units, id, timestamp, status, data }) {
 }
 
 export async function getTasks({ auth, lang, mark }) {
+  requireFullAccount(auth, "history");
   try {
     // Get items from the items collection (primary source)
     const items = await getItems({ auth, lang, mark, client: 'console' });
@@ -118,6 +120,7 @@ export async function getTasks({ auth, lang, mark }) {
 }
 
 export async function compiles({ auth, lang, type }) {
+  requireFullAccount(auth, "history");
   try {
     const compilesDocs = await db
       .collection(`users/${auth.uid}/compiles`)

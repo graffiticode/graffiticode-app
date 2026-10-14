@@ -9,6 +9,7 @@ import { describeReconcile, itemWriteFields, reconcileTarget } from "../lib/writ
 import { db } from "./db";
 import { getItem } from "./items";
 import type { AuthArg } from "./types";
+import { requireFullAccount } from "./errors";
 
 export type LastWrite = {
   taskId: string;
@@ -191,9 +192,7 @@ export async function itemConnectionFields(auth: AuthArg, data: any) {
 // chosen since. Same key derivation as the save, so a retry after a lost
 // response never repeats the write.
 export async function retryItemWrite({ auth, id }: { auth: AuthArg; id: string }) {
-  if (auth.freePlan) {
-    throw new Error("Connections require a full account.");
-  }
+  requireFullAccount(auth, "connections");
   const itemDoc = await db.doc(`users/${auth.uid}/items/${id}`).get();
   if (!itemDoc.exists) {
     throw new Error("Item not found");
@@ -217,9 +216,7 @@ export async function retryItemWrite({ auth, id }: { auth: AuthArg; id: string }
 // becomes a success; anything else records what the check found, and the
 // failure stands. Nothing is written to the item bank.
 export async function reconcileItemWrite({ auth, id }: { auth: AuthArg; id: string }) {
-  if (auth.freePlan) {
-    throw new Error("Connections require a full account.");
-  }
+  requireFullAccount(auth, "connections");
   const itemRef = db.doc(`users/${auth.uid}/items/${id}`);
   const itemDoc = await itemRef.get();
   if (!itemDoc.exists) {
@@ -253,6 +250,7 @@ export async function reconcileItemWrite({ auth, id }: { auth: AuthArg; id: stri
 // Anything else recompiles with the api's refresh. Either way the stored result
 // is replaced, and the caller reloads the preview.
 export async function recompileItem({ auth, id }: { auth: AuthArg; id: string }) {
+  requireFullAccount(auth, "connections");
   const itemDoc = await db.doc(`users/${auth.uid}/items/${id}`).get();
   if (!itemDoc.exists) {
     throw new Error("Item not found");
@@ -289,9 +287,7 @@ export async function recompileItem({ auth, id }: { auth: AuthArg; id: string })
 // the save wrote), then the old one is deleted, so the item is never
 // unpublished in between.
 export async function republishItem({ auth, id }: { auth: AuthArg; id: string }) {
-  if (auth.freePlan) {
-    throw new Error("Connections require a full account.");
-  }
+  requireFullAccount(auth, "connections");
   const itemRef = db.doc(`users/${auth.uid}/items/${id}`);
   const itemDoc = await itemRef.get();
   if (!itemDoc.exists) {
