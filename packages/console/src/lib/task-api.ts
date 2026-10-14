@@ -76,7 +76,7 @@ export async function parseCode(
   }
 }
 
-const postApiJSON = bent(getBaseUrlForApi(), "POST", "json");
+const postApiJSON = (...args: any[]) => (bent(getBaseUrlForApi(), "POST", "json") as any)(...args);
 
 export async function postTask({ auth, task, ephemeral, isPublic }) {
   try {

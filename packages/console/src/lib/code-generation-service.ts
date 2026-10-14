@@ -15,6 +15,7 @@ import * as path from "path";
 import { postApiCompile, getLanguageAsset, getLanguageLexicon, isLangOverridden, languageOfflineMessage, isLanguageOfflineError } from "./api";
 import { postTask, getData, parseCode } from "./task-api";
 import admin from "firebase-admin";
+import { coreConfig } from "../core/config";
 import { ragLog, generateRequestId } from "./logger";
 import {
   generateEmbedding,
@@ -353,8 +354,8 @@ export async function getRelevantExamples({ prompt, lang, limit = 3, rid = null 
 
     // Load the markdown file from local /training directory
     const mdFilePath = path.join(
-      process.cwd(),
-      `./training/l${lang}-training-examples.md`,
+      coreConfig().trainingDir,
+      `l${lang}-training-examples.md`,
     );
 
     if (fs.existsSync(mdFilePath)) {

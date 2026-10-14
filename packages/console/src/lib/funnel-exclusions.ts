@@ -1,3 +1,4 @@
+import { coreConfig } from "../core/config";
 // Which traffic the funnel reports deliberately ignore.
 //
 // Extracted from funnel-digest.ts so BOTH consumers can share one list: the
@@ -31,10 +32,7 @@ const EXCLUDED_SESSIONS = new Set([
  * hashes. Additive to EXCLUDED_SESSIONS so a new test account can be muted
  * without a deploy.
  */
-const EXTRA_EXCLUDED = (process.env.FUNNEL_EXCLUDE_SESSIONS ?? "")
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
+const EXTRA_EXCLUDED = () => coreConfig().funnel.excludeSessions;
 
 /**
  * Free-plan workspaces to treat as internal, as a comma-separated list of
@@ -42,10 +40,7 @@ const EXTRA_EXCLUDED = (process.env.FUNNEL_EXCLUDE_SESSIONS ?? "")
  * anonymous caller shares the trial account's uid, so our own anonymous testing
  * is otherwise indistinguishable from a customer's.
  */
-const INTERNAL_NAMESPACES = (process.env.FUNNEL_INTERNAL_NAMESPACES ?? "")
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
+const INTERNAL_NAMESPACES = () => coreConfig().funnel.internalNamespaces;
 
 /**
  * The shared secret an internal caller presents as `X-GC-Internal`.
@@ -54,12 +49,12 @@ const INTERNAL_NAMESPACES = (process.env.FUNNEL_INTERNAL_NAMESPACES ?? "")
  * enqueue, and this value travels on ordinary developer requests. Unset means
  * the header is ignored entirely rather than trusted.
  */
-const INTERNAL_TOKEN = process.env.FUNNEL_INTERNAL_TOKEN ?? "";
+const INTERNAL_TOKEN = () => coreConfig().funnel.internalToken;
 
 /** Whether this session key belongs to an account the reports ignore. */
 export function isExcludedSession(key: string | undefined | null): boolean {
   if (typeof key !== "string" || !key) return false;
-  return EXCLUDED_SESSIONS.has(key) || EXTRA_EXCLUDED.includes(key);
+  return EXCLUDED_SESSIONS.has(key) || EXTRA_EXCLUDED().includes(key);
 }
 
 /**
@@ -78,9 +73,9 @@ export function isInternalRequest(input: {
   const header = Array.isArray(input.internalHeader)
     ? input.internalHeader[0]
     : input.internalHeader;
-  if (INTERNAL_TOKEN && header && header === INTERNAL_TOKEN) return true;
+  if (INTERNAL_TOKEN() && header && header === INTERNAL_TOKEN()) return true;
   if (isExcludedSession(input.uidHash)) return true;
-  if (input.sessionNamespace && INTERNAL_NAMESPACES.includes(input.sessionNamespace)) {
+  if (input.sessionNamespace && INTERNAL_NAMESPACES().includes(input.sessionNamespace)) {
     return true;
   }
   return false;

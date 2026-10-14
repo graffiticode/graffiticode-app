@@ -1,3 +1,4 @@
+import { coreConfig } from "../core/config";
 // Exchange a raw Graffiticode api key for a Firebase ID token.
 //
 // api.graffiticode.org's auth middleware (packages/api/src/auth.js) only
@@ -9,8 +10,8 @@
 // same key are deduped via the inFlight map so the first concurrent miss
 // triggers exactly one HTTP round-trip pair.
 
-const AUTH_URL = process.env.NEXT_PUBLIC_GC_AUTH_URL || "https://auth.graffiticode.org";
-const FIREBASE_API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "";
+const AUTH_URL = () => coreConfig().authUrl;
+const FIREBASE_API_KEY = () => coreConfig().firebaseWebApiKey;
 
 export interface ApiKeyCredentials {
   idToken: string;
@@ -33,12 +34,12 @@ function decodeJwtSub(jwt: string): string | null {
 }
 
 async function exchangeApiKeyForIdToken(apiKey: string): Promise<ApiKeyCredentials> {
-  if (!FIREBASE_API_KEY) {
+  if (!FIREBASE_API_KEY()) {
     throw new Error("NEXT_PUBLIC_FIREBASE_API_KEY is not configured");
   }
 
   // Step 1: api key → Firebase custom token.
-  const authResponse = await fetch(`${AUTH_URL}/authenticate/api-key`, {
+  const authResponse = await fetch(`${AUTH_URL()}/authenticate/api-key`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ token: apiKey }),
@@ -59,7 +60,7 @@ async function exchangeApiKeyForIdToken(apiKey: string): Promise<ApiKeyCredentia
 
   // Step 2: custom token → Firebase ID token.
   const fbResponse = await fetch(
-    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${FIREBASE_API_KEY}`,
+    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${FIREBASE_API_KEY()}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },

@@ -1,3 +1,4 @@
+import { coreConfig } from "../core/config";
 // Twilio SMS sender.
 //
 // Plain REST + basic auth rather than the `twilio` npm package: one endpoint,
@@ -8,13 +9,13 @@
 // deploys log the message instead of sending it, so the digest can be developed
 // end to end without a Twilio account or a phone buzzing.
 
-const ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || "";
-const AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || "";
-const FROM = process.env.TWILIO_FROM || "";
-const TO = process.env.ALERT_SMS_TO || "";
+const ACCOUNT_SID = () => coreConfig().alerts.twilioAccountSid;
+const AUTH_TOKEN = () => coreConfig().alerts.twilioAuthToken;
+const FROM = () => coreConfig().alerts.twilioFrom;
+const TO = () => coreConfig().alerts.smsTo;
 
 export function isSmsConfigured(): boolean {
-  return !!(ACCOUNT_SID && AUTH_TOKEN && FROM && TO);
+  return !!(ACCOUNT_SID() && AUTH_TOKEN() && FROM() && TO());
 }
 
 export interface SmsResult {
@@ -35,9 +36,9 @@ export async function sendSms(body: string): Promise<SmsResult> {
     return { sent: false, reason: "not_configured" };
   }
 
-  const recipients = TO.split(",").map((n) => n.trim()).filter(Boolean);
-  const url = `https://api.twilio.com/2010-04-01/Accounts/${ACCOUNT_SID}/Messages.json`;
-  const auth = Buffer.from(`${ACCOUNT_SID}:${AUTH_TOKEN}`).toString("base64");
+  const recipients = TO().split(",").map((n) => n.trim()).filter(Boolean);
+  const url = `https://api.twilio.com/2010-04-01/Accounts/${ACCOUNT_SID()}/Messages.json`;
+  const auth = Buffer.from(`${ACCOUNT_SID()}:${AUTH_TOKEN()}`).toString("base64");
 
   let sent = 0;
   for (const to of recipients) {
@@ -48,7 +49,7 @@ export async function sendSms(body: string): Promise<SmsResult> {
           Authorization: `Basic ${auth}`,
           "Content-Type": "application/x-www-form-urlencoded",
         },
-        body: new URLSearchParams({ To: to, From: FROM, Body: body }).toString(),
+        body: new URLSearchParams({ To: to, From: FROM(), Body: body }).toString(),
       });
       if (!res.ok) {
         const text = await res.text().catch(() => "");

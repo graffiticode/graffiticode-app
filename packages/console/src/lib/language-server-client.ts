@@ -112,8 +112,9 @@ function staleWhileRevalidate<T>(
 }
 
 import { isLangOverridden } from "./api";
+import { coreConfig } from "../core/config";
 
-const apiUrl = process.env.NEXT_PUBLIC_GC_API_URL || "https://api.graffiticode.org";
+const apiUrl = () => coreConfig().apiUrl;
 
 // Build the URL for a language resource. By default these route through the API
 // gateway (`${apiUrl}/L<id>/<file>`) so a per-user language-server binding
@@ -125,7 +126,7 @@ function assetUrlFor(langId: string, file: string): string {
   if (override) {
     return `${override.replace(/\/+$/, "")}/${file}`;
   }
-  return `${apiUrl}/L${langId}/${file}`;
+  return `${apiUrl()}/L${langId}/${file}`;
 }
 
 async function fetchText(url: string, accessToken?: string): Promise<string | null> {
