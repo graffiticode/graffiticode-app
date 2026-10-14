@@ -37,7 +37,7 @@ import { listCurrentConnections, setCurrentConnection } from "../../lib/current-
 import { verifyClaimToken } from "../../lib/claim-token";
 import { checkItemCreateAllowed } from "../../lib/usage-service";
 import { listLanguages, getLanguageInfo } from "./languages";
-import { findAccounts, isSystemAccount, profileName, shortAccountId } from "../../lib/account-lookup";
+import { isSystemAccount, profileName, shortAccountId } from "../../lib/account-lookup";
 import {
   listConnections,
   createConnection,
@@ -58,13 +58,11 @@ import {
 } from "../../lib/policy-client";
 import {
   accountExists,
-  accountForEmail,
   accountLabel,
-  emailHash,
+  emailShare,
   isAccountId,
   isEmail,
   normalizeAccountId,
-  normalizeEmail,
   verifiedEmailHashes,
 } from "../../lib/connection-sharing";
 import { FreePlanError, getFreePlanCredentials } from "../../lib/free-plan-context";
@@ -360,8 +358,8 @@ const typeDefs = `
     delegable: Boolean!
   }
 
-  # One person a connection is shared with, as its owner sees it. pending: shared
-  # to an email that has not signed in yet.
+  # One person a connection is shared with, as its owner sees it. pending: an
+  # email share nobody has claimed yet (every email share starts pending).
   type ConnectionGrant {
     grantId: String!
     recipient: String
@@ -398,20 +396,6 @@ const typeDefs = `
     languages(search: String, domain: String): [Language!]!
     language(id: String!): LanguageInfo
     itemData(id: String!): String!
-    # Accounts to share with, for a typeahead: any account whose profile name,
-    # linked email or account ID contains the query (any case). At least 2
-    # characters; at most 10 matches, exact then prefix then substring; never
-    # the caller or the shared trial account; never returns an email.
-    findAccounts(query: String!): [AccountMatch!]!
-  }
-
-  type AccountMatch {
-    accountId: String!
-    # Profile name, or the short ID when the account has none.
-    name: String!
-    shortId: String!
-    # "email", "name" or "id".
-    matchedBy: String!
   }
 
   type ShareItemResult {
@@ -501,6 +485,14 @@ const typeDefs = `
   }
 `;
 
+// Shares made to this user's verified emails become theirs: an email share
+// is always pending until its recipient signs in and opens their connections
+// (the connections page or an item's). Best effort: a failure only delays it.
+const claimPendingShares = async (userToken: string) => {
+  const hashes = await verifiedEmailHashes(userToken);
+  if (hashes.length) await claimConnectionGrants(userToken, hashes).catch(() => null);
+};
+
 const resolvers = {
   Query: {
     checkItemCreateAllowed: async (_, __, ctx) => {
@@ -537,12 +529,7 @@ const resolvers = {
     connections: async (_, __, ctx) => {
       if (ctx.freePlan) return [];
       const auth = await resolveAuth(ctx);
-      // Shares made to this user's emails before they had an account become
-      // theirs now. Best effort: a failure here only delays them.
-      const hashes = await verifiedEmailHashes(auth.token);
-      if (hashes.length) {
-        await claimConnectionGrants(auth.token, hashes).catch(() => null);
-      }
+      await claimPendingShares(auth.token);
       const [owned, shared] = await viaPolicy(() => Promise.all([
         listConnections(auth.token),
         listSharedConnections(auth.token),
@@ -562,6 +549,7 @@ const resolvers = {
     currentConnections: async (_, __, ctx) => {
       if (ctx.freePlan) return [];
       const auth = await resolveAuth(ctx);
+      await claimPendingShares(auth.token);
       return await viaPolicy(() => listCurrentConnections({ auth }));
     },
     connectionGrants: async (_, args, ctx) => {
@@ -668,11 +656,6 @@ const resolvers = {
     language: async (_, args) => {
       const { id } = args;
       return await getLanguageInfo(id);
-    },
-    findAccounts: async (_, args, ctx) => {
-      if (ctx.freePlan) throw new Error("Sharing requires a full account.");
-      const { uid } = await authenticate(ctx.token);
-      return await findAccounts(uid, args.query);
     },
     itemData: async (_, args, ctx) => {
       const { id } = args;
@@ -797,7 +780,11 @@ const resolvers = {
         throw new Error("Sharing requires a full account.");
       }
       const { token } = ctx;
-      const { itemId, targetUserId } = args;
+      const { itemId } = args;
+      // An exact account ID: there is no account search (AT-02).
+      if (!isAccountId(args.targetUserId)) throw new Error("An account ID is 40 hexadecimal characters, with or without 0x.");
+      const targetUserId = normalizeAccountId(args.targetUserId);
+      if (isSystemAccount(targetUserId)) return { success: false, message: "Target user not found", newItemId: null };
       const { uid, idToken } = await authenticate(token);
       return await shareItem({ auth: { uid, token: idToken }, itemId, targetUserId });
     },
@@ -884,14 +871,9 @@ const resolvers = {
         }));
         return true;
       }
-      const email = normalizeEmail(args.email);
-      const recipientUid = await accountForEmail(email);
-      if (recipientUid === auth.uid) throw new Error("You already own this connection.");
-      await viaPolicy(() => shareConnection(auth.token, args.connectionId, {
-        ...(recipientUid ? { recipientUid } : { recipientEmailHash: emailHash(email) }),
-        recipientLabel: email,
-        ...access,
-      }));
+      // Always pending, whether or not an account has this email (AT-02).
+      const pending = emailShare(args.email, await verifiedEmailHashes(auth.token));
+      await viaPolicy(() => shareConnection(auth.token, args.connectionId, { ...pending, ...access }));
       return true;
     },
     updateConnectionGrant: async (_, args, ctx) => {

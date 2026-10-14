@@ -1,10 +1,11 @@
-// Identity for sharing a connection. The owner names a person by email or by
-// account ID. For an email, the auth service maps a linked email to an account;
-// an email with no account is shared as a hash, and becomes a grant when that
-// person signs in with it, so the owner sees the same result either way and
-// learns nothing about whether an account exists. Emails are never logged (and
-// never put in a URL). An account ID is shared directly, once it is confirmed to
-// exist: IDs are not secret, and a typo should fail rather than wait forever.
+// Identity for sharing a connection. The owner names a person by exact email
+// or exact account ID; nothing searches or lists accounts (AT-02: no account
+// enumeration). An email is always shared as a hash, pending until someone
+// signs in with that email verified and claims it, so the owner sees the same
+// result whether or not an account has that email. Emails are never logged
+// (and never put in a URL). An account ID is shared directly, once it is
+// confirmed to exist: IDs are not secret, and a typo should fail rather than
+// wait forever.
 import { createHash } from "crypto";
 
 const AUTH_SERVICE_URL = process.env.NEXT_PUBLIC_GC_AUTH_URL || "https://auth.graffiticode.org";
@@ -16,46 +17,6 @@ export const emailHash = (email: string) => createHash("sha256").update(normaliz
 
 export const isEmail = (email: unknown): email is string =>
   typeof email === "string" && email.length <= 254 && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim());
-
-// The account an email is linked to, or null. Null also when the lookup is
-// unavailable: the share then waits as pending rather than failing.
-export async function accountForEmail(email: string): Promise<string | null> {
-  if (!INTERNAL_API_KEY) return null;
-  try {
-    const res = await fetch(`${AUTH_SERVICE_URL.replace(/\/$/, "")}/linked-emails/internal/lookup`, {
-      method: "POST",
-      headers: { "X-Internal-API-Key": INTERNAL_API_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify({ email: normalizeEmail(email) }),
-    });
-    if (!res.ok) return null;
-    const body = await res.json();
-    return body?.status === "success" && body.data?.matched && typeof body.data.uid === "string" ? body.data.uid : null;
-  } catch {
-    return null;
-  }
-}
-
-// Accounts whose linked email contains the fragment (auth's partial-match
-// search). Returns uids only — the auth service never sends the emails back.
-// Empty when the search is unavailable (not configured, or an auth service
-// without the route), so account lookup falls back to name and ID matching.
-export async function accountsForEmailFragment(fragment: string): Promise<string[]> {
-  const needle = typeof fragment === "string" ? fragment.trim().toLowerCase() : "";
-  if (!INTERNAL_API_KEY || needle.length < 2) return [];
-  try {
-    const res = await fetch(`${AUTH_SERVICE_URL.replace(/\/$/, "")}/linked-emails/internal/search`, {
-      method: "POST",
-      headers: { "X-Internal-API-Key": INTERNAL_API_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify({ fragment: needle }),
-    });
-    if (!res.ok) return [];
-    const body = await res.json();
-    const uids: unknown = body?.status === "success" ? body.data?.uids : null;
-    return Array.isArray(uids) ? [...new Set(uids.filter((u): u is string => typeof u === "string" && u !== ""))] : [];
-  } catch {
-    return [];
-  }
-}
 
 // An account ID is the account's 40-hex address, written with or without 0x.
 // Stored (and granted) lowercase, without the prefix.
@@ -95,3 +56,13 @@ export async function verifiedEmailHashes(userToken: string): Promise<string[]> 
     return [];
   }
 }
+
+// The pending share for an email: always by hash, never resolved to an
+// account here. The owner's own verified emails are refused, which tells them
+// only about themselves.
+export function emailShare(email: string, ownerEmailHashes: string[]) {
+  const recipientEmailHash = emailHash(email);
+  if (ownerEmailHashes.includes(recipientEmailHash)) throw new Error("You already own this connection.");
+  return { recipientEmailHash, recipientLabel: normalizeEmail(email) };
+}
+

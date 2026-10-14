@@ -2,8 +2,8 @@ import { Fragment, useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { ShareIcon, CheckCircleIcon, ExclamationCircleIcon } from '@heroicons/react/20/solid';
-import UserSearchCombobox from './UserSearchCombobox';
-import { shareItem, type AccountMatch } from '../utils/swr/fetchers';
+import { shareItem } from '../utils/swr/fetchers';
+import { parseRecipient } from '../lib/share-recipient';
 import useGraffiticodeAuth from '@graffiticode/auth-react';
 
 interface ShareItemDialogProps {
@@ -24,12 +24,16 @@ export default function ShareItemDialog({
   onShareSuccess
 }: ShareItemDialogProps) {
   const { user } = useGraffiticodeAuth();
-  const [selectedUser, setSelectedUser] = useState<AccountMatch | null>(null);
+  // An exact account ID: there is no account search, and a copy needs an
+  // existing account, so an email isn't accepted here.
+  const [accountText, setAccountText] = useState('');
+  const parsed = parseRecipient(accountText);
+  const accountId = parsed?.kind === 'account' ? parsed.accountId : null;
   const [isSharing, setIsSharing] = useState(false);
   const [shareResult, setShareResult] = useState<{ success: boolean; message: string } | null>(null);
 
   const handleShare = async () => {
-    if (!selectedUser || !user) return;
+    if (!accountId || !user) return;
 
     setIsSharing(true);
     setShareResult(null);
@@ -38,7 +42,7 @@ export default function ShareItemDialog({
       const result = await shareItem({
         user,
         itemId,
-        targetUserId: selectedUser.accountId
+        targetUserId: accountId
       });
 
       setShareResult({
@@ -48,7 +52,7 @@ export default function ShareItemDialog({
 
       if (result.success) {
         // Clear selection for next share
-        setSelectedUser(null);
+        setAccountText('');
         // Notify parent of success
         if (onShareSuccess) {
           onShareSuccess();
@@ -74,7 +78,7 @@ export default function ShareItemDialog({
 
   const handleClose = () => {
     // Reset state when closing
-    setSelectedUser(null);
+    setAccountText('');
     setShareResult(null);
     onClose();
   };
@@ -146,12 +150,20 @@ export default function ShareItemDialog({
 
                     <div className="mt-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Find an account (name, email or account ID)
+                        Account ID
                       </label>
-                      <UserSearchCombobox
-                        selectedUser={selectedUser}
-                        onSelectUser={setSelectedUser}
+                      <input
+                        type="text"
+                        className="w-full rounded-none border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500 sm:text-sm"
+                        value={accountText}
+                        onChange={(e) => setAccountText(e.target.value)}
+                        placeholder="0x…"
+                        autoComplete="off"
+                        spellCheck={false}
                       />
+                      {accountText.trim() !== '' && !accountId && (
+                        <p className="mt-1 text-sm text-gray-600">An account ID is 40 hexadecimal characters, with or without 0x.</p>
+                      )}
                     </div>
 
                     {shareResult && (
@@ -177,7 +189,7 @@ export default function ShareItemDialog({
                 <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
                   <button
                     type="button"
-                    disabled={!selectedUser || isSharing}
+                    disabled={!accountId || isSharing}
                     onClick={handleShare}
                     className="inline-flex w-full justify-center rounded-none bg-gray-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-700 disabled:bg-gray-300 disabled:cursor-not-allowed sm:ml-3 sm:w-auto"
                   >

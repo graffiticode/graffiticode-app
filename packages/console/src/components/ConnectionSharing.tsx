@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import UserSearchCombobox from "./UserSearchCombobox";
 import {
   loadConnectionFunctions,
   loadConnectionGrants,
@@ -8,8 +7,8 @@ import {
   setOwnerPermissions,
   shareConnection,
   updateConnectionGrant,
-  type AccountMatch,
 } from "../utils/swr/fetchers";
+import { parseRecipient, shortId } from "../lib/share-recipient";
 
 // Plain descriptions of protected functions (share form, column tooltips); anything
 // unlisted shows its name.
@@ -48,11 +47,6 @@ const toDate = (iso: string | null) => {
 const fromDate = (date: string) => (date ? new Date(`${date}T23:59:59`).toISOString() : null);
 const accessVars = (a: Access) => ({ permissions: a.permissions, expiresAt: fromDate(a.expires) });
 
-const looksLikeEmail = (s: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s);
-
-// Who a new share goes to: an account picked from the lookup, or (when an
-// email finds no account) the email itself, pending until they link it.
-type Recipient = { kind: "account"; match: AccountMatch } | { kind: "email"; email: string };
 
 const errorText = (err: any) =>
   String(err?.response?.errors?.[0]?.message || err?.message || err).replace(/^Connection request refused: /, "Refused: ");
@@ -123,13 +117,9 @@ export default function ConnectionSharing({ user, connectionId, ownerPermissions
 }) {
   const [grants, setGrants] = useState<Grant[] | null>(null);
   const [fns, setFns] = useState<Fn[] | null>(null);
-  // The typed text and its settled matches (null: not searched yet), for the
-  // share-by-email fallback when a complete email finds no account.
-  const [query, setQuery] = useState("");
-  const [matches, setMatches] = useState<AccountMatch[] | null>(null);
-  // Bumped after a share to clear the typeahead.
-  const [searchKey, setSearchKey] = useState(0);
-  const [recipient, setRecipient] = useState<Recipient | null>(null);
+  // Who the next share goes to, typed exactly: an email or an account ID.
+  const [recipientText, setRecipientText] = useState("");
+  const recipient = parseRecipient(recipientText);
   const [access, setAccess] = useState<Access>(blank);
   // Unsaved edits: the owner's list (undefined: unchanged; null: everything),
   // and each sharee's access by grant.
@@ -173,31 +163,21 @@ export default function ConnectionSharing({ user, connectionId, ownerPermissions
     }
   };
 
-  const onResults = useCallback((q: string, found: AccountMatch[] | null) => {
-    setQuery(q);
-    setMatches(found);
-    // A share-by-email choice belongs to the text it was made for.
-    setRecipient(r => (r?.kind === "email" && r.email !== q ? null : r));
-  }, []);
-
   const share = async () => {
     if (!recipient) return;
     const ok = await run(
       () => shareConnection({
         user,
         connectionId,
-        ...(recipient.kind === "account" ? { accountId: recipient.match.accountId } : { email: recipient.email }),
+        ...(recipient.kind === "account" ? { accountId: recipient.accountId } : { email: recipient.email }),
         ...accessVars(access),
       }),
       recipient.kind === "account"
-        ? `Shared with ${recipient.match.name} (${recipient.match.shortId}).`
-        : `Shared with ${recipient.email}. It applies when they link this email to their account.`);
+        ? `Shared with account ${shortId(recipient.accountId)}.`
+        : `Shared with ${recipient.email}. It applies once they sign in with this email, verified.`);
     if (ok) {
-      setQuery("");
-      setMatches(null);
-      setRecipient(null);
+      setRecipientText("");
       setAccess(blank);
-      setSearchKey(k => k + 1);
     }
   };
 
@@ -365,20 +345,20 @@ export default function ConnectionSharing({ user, connectionId, ownerPermissions
     </div>
   );
 
-  // Finding an account and sharing with it, beneath the table.
+  // Naming a person exactly and sharing with them, beneath the table.
   const findAndShare = (
     <div className="space-y-3">
       <div className="flex flex-wrap items-end gap-2">
         <div className="block text-sm flex-1 min-w-[12rem]">
-          <span className="text-gray-700">Find an account (name, email or account ID)</span>
-          <div className="mt-1">
-            <UserSearchCombobox
-              key={searchKey}
-              selectedUser={recipient?.kind === "account" ? recipient.match : null}
-              onSelectUser={m => setRecipient(m ? { kind: "account", match: m } : null)}
-              onResults={onResults}
-              placeholder="Start typing a name, email or account ID" />
-          </div>
+          <span className="text-gray-700">Share with (email or account ID)</span>
+          <input
+            type="text"
+            className="mt-1 w-full rounded-none border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500 sm:text-sm"
+            value={recipientText}
+            onChange={e => setRecipientText(e.target.value)}
+            placeholder="name@example.com or 0x…"
+            autoComplete="off"
+            spellCheck={false} />
         </div>
         <DateField value={access.expires} onChange={expires => setAccess({ ...access, expires })} />
         <button
@@ -388,20 +368,11 @@ export default function ConnectionSharing({ user, connectionId, ownerPermissions
           disabled={busy || !recipient || incomplete(access)}>
           Share
         </button>
-        {recipient?.kind === "account" && (
-          <p className="basis-full text-sm">
-            Sharing with <span className="font-medium">{recipient.match.name}</span>{" "}
-            <span className="font-mono text-xs text-gray-500">{recipient.match.shortId}</span>
-          </p>
+        {recipientText.trim() !== "" && !recipient && (
+          <p className="basis-full text-sm text-gray-600">Enter a full email address, or an account ID (40 hexadecimal characters).</p>
         )}
-        {recipient?.kind !== "account" && matches?.length === 0 && looksLikeEmail(query) && (
-          <label className="basis-full flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={recipient?.kind === "email"}
-              onChange={e => setRecipient(e.target.checked ? { kind: "email", email: query } : null)} />
-            <span>No account has linked this email. Share with this email anyway — it applies when they link it.</span>
-          </label>
+        {recipient?.kind === "email" && (
+          <p className="basis-full text-sm text-gray-600">It applies once someone signs in with this email, verified.</p>
         )}
         <FunctionPicker access={access} onChange={setAccess} shareable={shareable} />
       </div>
