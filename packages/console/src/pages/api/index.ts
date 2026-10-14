@@ -27,13 +27,11 @@ import {
   getItemNames,
   getItem,
   getSpec,
-  setItemGenerationStatus,
   getItemClientTags,
   shareItem,
   parseCode,
   claimFreePlanSession,
   logClaimEvent,
-  adoptWorkspaceFromSibling,
 } from "./resolvers";
 import { listCurrentConnections, setCurrentConnection } from "../../lib/current-connection";
 import { verifyClaimToken } from "../../lib/claim-token";
@@ -69,15 +67,9 @@ import {
   normalizeEmail,
   verifiedEmailHashes,
 } from "../../lib/connection-sharing";
-import { enqueueGenerationJob } from "../../lib/generation-queue";
 import { FreePlanError, getFreePlanCredentials } from "../../lib/free-plan-context";
 import { admitRequest, authenticate, resolveAuth } from "../../core/auth";
-import { hashUid, langKey } from "../../lib/funnel-events";
-import { isInternalRequest } from "../../lib/funnel-exclusions";
-import {
-  registerFirstCreateAttempt,
-  resolveFirstOutcome,
-} from "../../lib/workspace-registry";
+import { startGeneration } from "../../core/generation";
 
 // Policy errors surface as their reason only ("not-owner", "unavailable", …).
 async function viaPolicy<T>(fn: () => Promise<T>): Promise<T> {
@@ -724,143 +716,7 @@ const resolvers = {
     // runs the (60-110s) generation in /api/generate-job, then return immediately.
     // Lets MCP clients with short tool-call timeouts poll get_item for completion
     // instead of holding one long call. See src/lib/generation-queue.ts.
-    startCodeGeneration: async (_, args, ctx) => {
-      const {
-        itemId,
-        siblingOf,
-        lang,
-        name,
-        client,
-        clientKind,
-        geoCountry,
-        prompt,
-        modification,
-        currentSrc,
-        currentData,
-      } = args;
-
-      // The agent OMTM counts a workspace's FIRST create attempt, any outcome.
-      // Gated on `!itemId` because this resolver serves update_item too, and a
-      // revision is not a new workspace.
-      //
-      // Free-plan registers BEFORE resolveAuth: the namespace is already on ctx,
-      // so an attempt whose credential exchange fails still lands a row.
-      //
-      // The hints arrive either way — a GraphQL arg (explicit, per call) or a
-      // header (per connection). Whichever the caller sends.
-      //
-      // geoCountry MUST be forwarded: MCP→console is a server-to-server fetch
-      // from Cloud Run, so there is no edge in front of this request to read it
-      // from. Reading our own headers here would record our egress region.
-      const hints = {
-        lang: langKey(lang),
-        clientKind: clientKind ?? ctx.clientKind,
-        geoCountry: geoCountry ?? ctx.geoCountry,
-      };
-      //
-      // Also gated on `!siblingOf`: a sibling create JOINS an existing workspace,
-      // so it is by definition not a new one. Without this, a transport-per-call
-      // client registers one "new creating workspace" per ITEM and the agent OMTM
-      // reports create volume as user growth.
-      if (!itemId && !siblingOf && ctx.freePlan && ctx.sessionNamespace) {
-        await registerFirstCreateAttempt({
-          key: ctx.sessionNamespace,
-          auth: "free",
-          ...hints,
-          internal: isInternalRequest({
-            internalHeader: ctx.internalHeader,
-            sessionNamespace: ctx.sessionNamespace,
-          }),
-        });
-      }
-
-      const auth = await resolveAuth(ctx);
-
-      // Adopt BEFORE createItem: freePlanItemFields(auth) stamps the new item with
-      // auth.sessionNamespace, so the rebind has to land first or the item is
-      // written into the very workspace we are trying to escape.
-      if (!itemId) {
-        await adoptWorkspaceFromSibling(auth, siblingOf);
-      }
-
-      // Authenticated has to wait for the uid. Keyed on sha256(uid) so a token
-      // rotation doesn't invent a second workspace.
-      //
-      // Free-plan reads the ADOPTED namespace, not the header's: resolveFirstOutcome
-      // has to land on the row this create actually belongs to.
-      let workspaceKey = ctx.freePlan
-        ? (auth.sessionNamespace ?? ctx.sessionNamespace)
-        : undefined;
-      if (!ctx.freePlan && auth.uid) {
-        workspaceKey = hashUid(auth.uid);
-        if (!itemId) {
-          await registerFirstCreateAttempt({
-            key: workspaceKey,
-            auth: "firebase",
-            ...hints,
-            internal: isInternalRequest({
-              internalHeader: ctx.internalHeader,
-              uidHash: workspaceKey,
-            }),
-          });
-        }
-      }
-      // Credential the worker replays to act as this caller. For free-plan we
-      // re-derive fresh credentials in the worker (idTokens are short-lived and
-      // dispatch can lag), so carry the session, not a baked idToken.
-      //
-      // Carries the ADOPTED namespace: the item has just been written into the
-      // sibling's workspace, so a worker replaying the pre-adoption one would act
-      // as a different workspace than the item it is generating for.
-      const authReplay = ctx.freePlan
-        ? {
-            kind: "freePlan" as const,
-            sessionNamespace: auth.sessionNamespace ?? ctx.sessionNamespace,
-            sessionUuid: ctx.sessionUuid,
-          }
-        : { kind: "bearer" as const, token: ctx.token };
-
-      let id = itemId;
-      if (!id) {
-        try {
-          const shell = await createItem({ auth, lang, name, client, deferGeneration: true }) as unknown as { id: string };
-          id = shell.id;
-        } catch (err) {
-          // The synchronous half of firstOutcome. A refusal at the quota gate is
-          // still an attempt the OMTM counts, and it is the case that otherwise
-          // leaves no Firestore row at all — assertItemCreateAllowed throws
-          // before the item shell is written.
-          const cause = (err as { cause?: unknown })?.cause;
-          await resolveFirstOutcome(
-            workspaceKey,
-            cause instanceof FreePlanError ? "wall" : "error",
-          );
-          throw err;
-        }
-      } else {
-        await setItemGenerationStatus({ auth, id, status: "generating" });
-      }
-
-      await enqueueGenerationJob({
-        itemId: id,
-        lang,
-        prompt,
-        modification,
-        currentSrc,
-        // Serialized JSON, passed through untouched: the worker hands it to
-        // generateCodeForRequest, which parses and renders it as <CURRENT_DATA>.
-        // Kept as a string end to end so the queue payload stays one flat shape.
-        currentData,
-        authReplay,
-        client,
-      });
-
-      return {
-        itemId: id,
-        status: "generating",
-        workspaceNamespace: auth.freePlan ? (auth.sessionNamespace ?? null) : null,
-      };
-    },
+    startCodeGeneration: (_, args, ctx) => startGeneration(ctx, args),
 
     postTask: async (_, args, ctx) => {
       const { lang, code: codeStr, ephemeral, item } = args;
