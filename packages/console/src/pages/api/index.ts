@@ -68,6 +68,7 @@ import {
 import { FreePlanError, getFreePlanCredentials } from "../../lib/free-plan-context";
 import { admitRequest, authenticate, resolveAuth } from "../../core/auth";
 import { startGeneration } from "../../core/generation";
+import { readItemData } from "../../core/tasks";
 
 // Policy errors surface as their reason only ("not-owner", "unavailable", …).
 async function viaPolicy<T>(fn: () => Promise<T>): Promise<T> {
@@ -570,9 +571,8 @@ const resolvers = {
     },
     data: async (_, args, ctx) => {
       const { id } = args;
-      const connectionId = ctx.freePlan ? null : (args.connectionId ?? null);
       const auth = await resolveAuth(ctx);
-      const data = await getData({ authToken: auth.token, id, connectionId });
+      const data = await readItemData({ auth, id, connectionId: args.connectionId ?? null });
       return JSON.stringify(data);
     },
     compiles: async (_, args, ctx) => {

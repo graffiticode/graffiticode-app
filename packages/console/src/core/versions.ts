@@ -2,6 +2,7 @@
 import { db } from "./db";
 import { freePlanItemFields } from "./claims";
 import type { AuthArg } from "./types";
+import { requireFullAccount } from "./errors";
 
 // How a version came to be. Best-effort provenance: callers that know pass it,
 // everything else falls back to the item's client tag.
@@ -143,6 +144,7 @@ export async function getTaskVersions({
   limit?: number;
   startAfter?: string;
 }) {
+  requireFullAccount(auth, "history");
   try {
     let query = db
       .collection(`users/${auth.uid}/versions`)

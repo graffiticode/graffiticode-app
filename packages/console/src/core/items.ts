@@ -19,6 +19,7 @@ import type { AuthArg } from "./types";
 import { defaultVersionSource, normalizeVersionSource, recordVersion } from "./versions";
 import type { VersionSource } from "./versions";
 import { itemConnectionFields, writeThroughCurrentConnection } from "./writes";
+import { requireFullAccount } from "./errors";
 
 export async function createItem({
   auth,
@@ -836,6 +837,7 @@ export async function getItem({ auth, id, includeSpec = false }: {
 }
 
 export async function shareItem({ auth, itemId, targetUserId }) {
+  requireFullAccount(auth, "sharing");
   try {
     // Validate that the source item exists and belongs to the current user
     const itemRef = db.doc(`users/${auth.uid}/items/${itemId}`);
