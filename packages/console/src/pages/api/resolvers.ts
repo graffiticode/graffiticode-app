@@ -42,7 +42,7 @@ import { createPublication, deletePublication, PublicationError } from "../../li
 import { isConnectableLang, programSavesToItemBank } from "../../lib/connectable";
 import { resolveCurrentConnection, currentConnectionId, saveWriteKey } from "../../lib/current-connection";
 import { reconcileSave } from "../../lib/policy-client";
-import { describeReconcile, reconcileTarget } from "../../lib/write-errors";
+import { describeReconcile, itemWriteFields, reconcileTarget } from "../../lib/write-errors";
 
 type AuthArg = {
   uid: string;
@@ -1023,15 +1023,7 @@ async function itemConnectionFields(auth: AuthArg, data: any) {
   return {
     connectionId: isConnectableLang(data?.lang) ? await currentConnectionId({ auth, lang: data.lang }) : null,
     publicationConnectionId: publicationConnectionOf(data),
-    lastWrite: lastWrite?.taskId
-      ? {
-        taskId: lastWrite.taskId,
-        connectionId: lastWrite.connectionId ?? null,
-        status: lastWrite.status,
-        message: lastWrite.message ?? null,
-        at: String(lastWrite.at),
-      }
-      : null,
+    lastWrite: itemWriteFields(lastWrite),
   };
 }
 
