@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { loadCurrentConnections, republishItem, retryItemWrite } from '../utils/swr/fetchers';
+import { loadCurrentConnections, reconcileItemWrite, republishItem, retryItemWrite } from '../utils/swr/fetchers';
 import { backendForLang, normalizeLang } from '../lib/connectable';
 import { getCredentialBackend } from '../lib/credential-backends';
-import { canRetryWrite, describeWriteProblem } from '../lib/write-errors';
+import { canRetryWrite, describeWriteProblem, isCheckableWrite } from '../lib/write-errors';
 
 // Fired after a write through a connection, so the preview (which shows the
 // stored result) reloads: a write changes that result without changing the item.
@@ -50,6 +50,14 @@ export default function ItemConnection({ user, itemId, lang, taskId, connectionI
     }
   };
 
+  // An uncertain or partial save can be checked against the item bank: it is
+  // confirmed only if every record carries the save's own mark (capability W5).
+  const check = () => act(() => reconcileItemWrite({ user, id: itemId }), item => {
+    if (item?.lastWrite?.status === 'ok') {
+      window.dispatchEvent(new CustomEvent(ITEM_RUN_EVENT, { detail: { itemId } }));
+    }
+  });
+
   const retry = () => act(() => retryItemWrite({ user, id: itemId }), item => {
     if (item?.lastWrite?.status === 'ok') {
       window.dispatchEvent(new CustomEvent(ITEM_RUN_EVENT, { detail: { itemId } }));
@@ -68,6 +76,7 @@ export default function ItemConnection({ user, itemId, lang, taskId, connectionI
   const problemWrite = lastWrite && lastWrite.taskId === taskId ? lastWrite : null;
   const problem = taskId ? describeWriteProblem(problemWrite) : null;
   const showRetry = canRetryWrite(problem, problemWrite, connectionId);
+  const showCheck = isCheckableWrite(problemWrite);
   const staleVersion = Boolean(publicationId && publishedTaskId && publishedTaskId !== taskId);
   const staleConnection = Boolean(publicationId && connectionId && publicationConnectionId && publicationConnectionId !== connectionId);
   const buttonClass = 'px-3 py-1 text-xs text-gray-700 border border-gray-300 hover:bg-gray-100 rounded-none disabled:opacity-50';
@@ -92,15 +101,23 @@ export default function ItemConnection({ user, itemId, lang, taskId, connectionI
       {problem ? (
         <div className="text-xs text-gray-600 mt-1 break-words">
           <div title={problemWrite?.message || undefined}>{problem.headline}: {problem.text}</div>
+          {problemWrite?.reconcile?.text && (
+            <div className="mt-1 text-gray-700">{problemWrite.reconcile.text}</div>
+          )}
           {showRetry && (
             <button onClick={retry} disabled={busy} className={`mt-1 ${buttonClass}`}>
               {busy ? 'Writing…' : 'Retry'}
             </button>
           )}
+          {showCheck && (
+            <button onClick={check} disabled={busy} className={`mt-1 ml-1 ${buttonClass}`}>
+              {busy ? 'Checking…' : 'Check the item bank'}
+            </button>
+          )}
         </div>
       ) : connectionId && taskId && (
         write?.status === 'ok' ? (
-          <div className="text-xs text-green-700 mt-1">Saved to {service}.</div>
+          <div className="text-xs text-green-700 mt-1">Saved to {service}.{write.confirmed ? ' Confirmed in the item bank.' : ''}</div>
         ) : (
           <div className="text-xs text-gray-500 mt-1">Not written through this connection yet. Recompile writes it.</div>
         )

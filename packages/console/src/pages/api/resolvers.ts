@@ -41,6 +41,8 @@ import path from "path";
 import { createPublication, deletePublication, PublicationError } from "../../lib/publications";
 import { isConnectableLang, programSavesToItemBank } from "../../lib/connectable";
 import { resolveCurrentConnection, currentConnectionId, saveWriteKey } from "../../lib/current-connection";
+import { reconcileSave } from "../../lib/policy-client";
+import { describeReconcile, reconcileTarget } from "../../lib/write-errors";
 
 type AuthArg = {
   uid: string;
@@ -857,6 +859,13 @@ type LastWrite = {
   status: "ok" | "failed" | "skipped";
   message?: string;
   at: number;
+  // The idempotency key this attempt used (capability W5): reconciliation
+  // checks exactly this save, never one found by deriving a key again.
+  idempotencyKey?: string;
+  // The latest check of an uncertain or partial save against the item bank.
+  reconcile?: { verdict: "applied" | "unresolved" | "too-early"; text: string; at: number };
+  // Set when a check confirmed the save, which turned it into a success.
+  confirmed?: boolean;
 };
 
 // A stored message is display text, not a log: keep the item doc small.
@@ -954,7 +963,7 @@ async function performWrite({ auth, itemId, taskId, connectionId, idempotencyKey
   } catch (err) {
     message = `Write failed: ${err?.message ?? err}`;
   }
-  return recordLastWrite({ auth, itemId, taskId, connectionId, message });
+  return recordLastWrite({ auth, itemId, taskId, connectionId, message, idempotencyKey });
 }
 
 // Stores the outcome on the item. A failure never replaces a success for the
@@ -962,19 +971,21 @@ async function performWrite({ auth, itemId, taskId, connectionId, idempotencyKey
 // duplicate that raced it (reported "uncertain" by the broker) says nothing new.
 // Nor does a skip replace a success for the same version. Any later outcome
 // (a retry, a new version) replaces a failure or a skip.
-async function recordLastWrite({ auth, itemId, taskId, connectionId, message, status }: {
+async function recordLastWrite({ auth, itemId, taskId, connectionId, message, status, idempotencyKey }: {
   auth: AuthArg;
   itemId: string;
   taskId: string;
   connectionId: string | null;
   message: string | null;
   status?: "skipped";
+  idempotencyKey?: string;
 }): Promise<LastWrite> {
   const lastWrite: LastWrite = {
     taskId,
     connectionId,
     status: status ?? (message === null ? "ok" : "failed"),
     ...(message === null ? {} : { message: message.slice(0, LAST_WRITE_MESSAGE_LIMIT) }),
+    ...(idempotencyKey ? { idempotencyKey } : {}),
     at: Date.now(),
   };
   if (lastWrite.status === "failed") {
@@ -1536,6 +1547,40 @@ export async function retryItemWrite({ auth, id }: { auth: AuthArg; id: string }
   if (!lastWrite) {
     throw new Error("There is no current connection to write through. Choose one in Settings.");
   }
+  return getItem({ auth, id });
+}
+
+// Checks an uncertain or partial save against the item bank (capability W5,
+// WRITE-02), by the idempotency key that exact attempt used. A confirmed save
+// becomes a success; anything else records what the check found, and the
+// failure stands. Nothing is written to the item bank.
+export async function reconcileItemWrite({ auth, id }: { auth: AuthArg; id: string }) {
+  if (auth.freePlan) {
+    throw new Error("Connections require a full account.");
+  }
+  const itemRef = db.doc(`users/${auth.uid}/items/${id}`);
+  const itemDoc = await itemRef.get();
+  if (!itemDoc.exists) {
+    throw new Error("Item not found");
+  }
+  const write = itemDoc.data()?.lastWrite as LastWrite | undefined;
+  const target = reconcileTarget(write);
+  if (!target) {
+    throw new Error("This save can't be checked: only an uncertain or partial save made since checks began can be.");
+  }
+  const summary = describeReconcile(await reconcileSave(auth.token, target));
+  await db.runTransaction(async tx => {
+    const now = (await tx.get(itemRef)).data()?.lastWrite as LastWrite | undefined;
+    // A newer save since the check started: it decides, not this check.
+    if (!now || now.idempotencyKey !== target.idempotencyKey || now.taskId !== write.taskId) return;
+    const reconcile = { verdict: summary.verdict, text: summary.text, at: Date.now() };
+    const { message: _failure, ...rest } = now;
+    tx.update(itemRef, {
+      lastWrite: summary.verdict === "applied"
+        ? { ...rest, status: "ok", confirmed: true, reconcile }
+        : { ...now, reconcile },
+    });
+  });
   return getItem({ auth, id });
 }
 
