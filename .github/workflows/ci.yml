@@ -39,6 +39,30 @@ jobs:
       - name: Console build
         run: npm run build:console
 
+  # Phase 0.5 behaviour baseline: the console GraphQL handler and the MCP tools,
+  # in-process against the Firestore emulator with every other dependency faked.
+  baseline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Cache the Firestore emulator
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}
+      - run: npm ci
+      - name: Behaviour baseline
+        run: npm run test:baseline
+
   # Each image is built from the repo root with the same Dockerfile gc-deploy
   # uses, then started with its real CMD; every path in its deploy.json smoke
   # list must answer 200 (functional assets, not just a health route).

@@ -19,7 +19,8 @@
     "deploy": "gc-deploy",
     "rollback": "gc-deploy rollback",
     "install:app": "npm ci --prefix packages/app",
-    "build:app": "npm --prefix packages/app run build"
+    "build:app": "npm --prefix packages/app run build",
+    "test:baseline": "npx --yes firebase-tools@15.32.0 emulators:exec --config tests/baseline/firebase.json --only firestore --project demo-baseline \"cd packages/console && tsx --test --test-concurrency=1 ../../tests/baseline/*.test.ts\""
   },
   "devDependencies": {
     "@graffiticode/deploy": "file:vendor/graffiticode-deploy-0.1.0.tgz"

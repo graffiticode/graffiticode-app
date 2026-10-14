@@ -5,3 +5,4 @@ dist/
 !.env*.example
 .gc-deploy/
 .DS_Store
+firestore-debug.log
