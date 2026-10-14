@@ -46,20 +46,23 @@ test("an uncertain write is recorded as a failure with the key it used", async (
   assert.equal(stored.idempotencyKey, saveKey(item.id, item.taskId));
 });
 
-// KNOWN BUG (55eed1b): itemConnectionFields (resolvers.ts:1021) copies only
-// taskId/connectionId/status/message/at into Item.lastWrite, so ItemWrite.checkable
-// (index.ts:1120, needs idempotencyKey) is always false and confirmed/reconcile are
-// always null over GraphQL. The console's "Check the item bank" button
-// (ItemConnection.tsx:80) therefore never shows. The stored lastWrite is correct.
-// Fixing it should flip these assertions deliberately.
-test("KNOWN BUG: GraphQL drops checkable, confirmed and reconcile from lastWrite", async () => {
+// GraphQL exposes the W5 state of lastWrite (fixed in PR #5; before it,
+// checkable was always false and confirmed/reconcile always null).
+test("GraphQL lastWrite carries checkable, confirmed and the latest check", async () => {
   h.setCompile(uncertain);
   const item = await createItem(h, alice, { lang: "0176" });
-  assert.equal(item.lastWrite.checkable, false, "should be true: the save is uncertain and its key is stored");
+  assert.equal(item.lastWrite.checkable, true, "an uncertain save with its key stored can be checked");
   h.setReconcile(() => ({ status: 200, body: { status: "success", data: { operations: [{ verdict: "unresolved", records: [] }] } } }));
-  const w = ok(await h.gql(CHECK, { id: item.id }, alice)).reconcileItemWrite.lastWrite;
-  assert.equal(w.reconcile, null, "should carry the unresolved verdict");
-  assert.equal(w.confirmed, null);
+  const u = ok(await h.gql(CHECK, { id: item.id }, alice)).reconcileItemWrite.lastWrite;
+  assert.equal(u.reconcile.verdict, "unresolved");
+  assert.equal(u.checkable, true, "still checkable after an unresolved check");
+  assert.ok(!u.confirmed);
+  h.setReconcile(() => ({ status: 200, body: { status: "success", data: { operations: [{ verdict: "applied", final: true }] } } }));
+  const a = ok(await h.gql(CHECK, { id: item.id }, alice)).reconcileItemWrite.lastWrite;
+  assert.equal(a.status, "ok");
+  assert.equal(a.confirmed, true);
+  assert.equal(a.reconcile.verdict, "applied");
+  assert.equal(a.checkable, false, "a confirmed save is no longer checkable");
 });
 
 test("retry replays the same key; recompile writes under a fresh key", async () => {

@@ -20,5 +20,3 @@ On macOS with Homebrew's keg-only `openjdk@21`, put it on `PATH` first:
 Files run one at a time (`--test-concurrency=1`) because they share one
 emulator and each test clears it.
 
-Known bug pinned here, not fixed: `writes.test.ts` "KNOWN BUG: GraphQL drops
-checkable, confirmed and reconcile from lastWrite".
