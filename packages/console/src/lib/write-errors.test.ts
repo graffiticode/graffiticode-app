@@ -1,7 +1,7 @@
 // node:test via tsx: `npm test`.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { describeWriteProblem, canRetryWrite } from "./write-errors";
+import { describeWriteProblem, canRetryWrite, isCheckableWrite, reconcileTarget, describeReconcile } from "./write-errors";
 
 const failed = (message: string) => describeWriteProblem({ status: "failed", message });
 
@@ -50,4 +50,54 @@ test("an uncertain outcome still says so, and earlier mappings are unchanged", (
   assert.equal(failed("Error: permission denied (not-granted)")?.retryable, false);
   assert.equal(failed("something unexpected")?.retryable, true);
   assert.equal(describeWriteProblem({ status: "ok", message: null }), null);
+});
+
+// Reconciliation (capability W5, WRITE-02).
+test("a partial save is explained, and Retry isn't offered: it would only replay the partial outcome", () => {
+  const p = failed("Error: Item bank save partial: items write failed (authorization-denied:not-granted)");
+  assert.equal(p?.retryable, false);
+  assert.match(p!.text, /Only part of this save/);
+});
+
+test("only an uncertain or partial save can be checked", () => {
+  assert.equal(isCheckableWrite({ status: "failed", message: "Error: Item bank save uncertain: socket hang up" }), true);
+  assert.equal(isCheckableWrite({ status: "failed", message: "Error: Item bank save partial: items" }), true);
+  assert.equal(isCheckableWrite({ status: "failed", message: "Error: permission denied (not-granted)" }), false);
+  assert.equal(isCheckableWrite({ status: "ok" }), false);
+  assert.equal(isCheckableWrite(null), false);
+});
+
+test("a check targets the exact attempt: after a fresh rerun, reloaded, it's the rerun's key, never a derived one", () => {
+  const uncertain = "Error: Item bank save uncertain: socket hang up";
+  // The first save, then a deliberate rerun with a fresh key; each replaces lastWrite.
+  const first = { taskId: "t1", connectionId: "conn-1", status: "failed", message: uncertain, idempotencyKey: "save:item-1:t1:conn-1" };
+  const rerun = { ...first, idempotencyKey: "recompile:3f2a…", at: 2 };
+  // As stored and read back after a reload.
+  const reloaded = JSON.parse(JSON.stringify(rerun));
+  assert.deepEqual(reconcileTarget(reloaded), { connectionId: "conn-1", idempotencyKey: "recompile:3f2a…" });
+  assert.notDeepEqual(reconcileTarget(reloaded), reconcileTarget(first));
+  // A save from before keys were stored can't be checked.
+  const { idempotencyKey: _k, ...legacy } = first;
+  assert.equal(reconcileTarget(legacy), null);
+  assert.equal(reconcileTarget({ ...rerun, connectionId: null }), null);
+});
+
+test("a check's verdict reads plainly: confirmed only when every record carries the save's mark", () => {
+  const applied = describeReconcile({ operations: [{ verdict: "applied", final: true, records: [{ landed: true }, { landed: true }] }] });
+  assert.equal(applied.verdict, "applied");
+  assert.match(applied.text, /^Confirmed/);
+
+  const unresolved = describeReconcile({ operations: [{ verdict: "unresolved", final: false, records: [{ landed: true, found: true, matches: true }, { landed: false, found: true, matches: false }] }] });
+  assert.equal(unresolved.verdict, "unresolved");
+  assert.match(unresolved.text, /1 of 2 records .* carry its mark, and the item bank now holds different content/);
+  assert.match(unresolved.text, /may repeat/);
+
+  const early = describeReconcile({ operations: [{ verdict: "too-early", retryAfter: "2026-10-14T18:00:00.000Z" }] });
+  assert.deepEqual([early.verdict, early.retryAfter], ["too-early", "2026-10-14T18:00:00.000Z"]);
+
+  assert.match(describeReconcile({ operations: [{ verdict: "unresolved", reason: "no-evidence" }] }).text, /before saves could be checked/);
+  assert.match(describeReconcile({ operations: [{ verdict: "unresolved", reason: "read-failed" }] }).text, /couldn't be read/);
+  // An applied verdict that isn't final, or none at all, never confirms.
+  assert.equal(describeReconcile({ operations: [{ verdict: "applied", final: false }] }).verdict, "unresolved");
+  assert.equal(describeReconcile({ operations: [] }).verdict, "unresolved");
 });

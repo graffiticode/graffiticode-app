@@ -172,3 +172,11 @@ export const leaveSharedConnection = (userToken: string, connectionId: string) =
 
 export const claimConnectionGrants = (userToken: string, emailHashes: string[]): Promise<{ claimed: number }> =>
   call("POST", "/v1/grants/claim", userToken, { emailHashes });
+
+// Reconciliation (capability W5, WRITE-02): asks Policy to check one save
+// against the item bank, by the exact idempotency key that save used. Policy
+// decides whether this user may (the connection's owner, or the user who saved
+// while their access still covers saving), then Broker reads the item bank and
+// reports whether each record carries the save's mark. It never writes.
+export const reconcileSave = (userToken: string, { connectionId, idempotencyKey }: { connectionId: string; idempotencyKey: string }) =>
+  call("POST", "/v1/receipts/reconcile", userToken, { connectionId, idempotencyKey });

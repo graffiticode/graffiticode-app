@@ -34,6 +34,19 @@ export function describeWriteProblem(write: LastWriteLike): WriteProblem | null 
   }
   const failed = (text: string, retryable: boolean): WriteProblem =>
     ({ headline: "Not saved to the Learnosity item bank", text, retryable });
+  // What the item bank holds comes first: a partial or uncertain save says
+  // more than its cause (a partial save stopped by a revoked permission still
+  // wrote its first part).
+  if (has(message, "partial")) {
+    // Retrying reuses the save's idempotency key, which only returns the same
+    // partial outcome.
+    return failed("Only part of this save was written to the item bank. Check the item bank; to save again, recompile the item (the parts already written are written again).", false);
+  }
+  if (has(message, "uncertain")) {
+    // Retrying reuses the save's idempotency key, which only returns the same
+    // uncertain outcome; Recompile writes again under a new one.
+    return failed("The save is uncertain — it may or may not have been written. Check the item bank; to save again anyway, recompile the item (the write may repeat).", false);
+  }
   if (has(message, "system-connection")) {
     return failed("This is Graffiticode's preview account; it can't write to an item bank. Add your own Learnosity connection in Settings.", false);
   }
@@ -76,10 +89,57 @@ export function describeWriteProblem(write: LastWriteLike): WriteProblem | null 
   if (has(message, "preflight-unavailable", "token-expiring", "policy-unavailable")) {
     return failed("A service didn't respond in time. Try again in a moment.", true);
   }
-  if (has(message, "uncertain")) {
-    // Retrying reuses the save's idempotency key, which only returns the same
-    // uncertain outcome; Recompile writes again under a new one.
-    return failed("The save is uncertain — it may or may not have been written. Check the item bank; to save again anyway, recompile the item (the write may repeat).", false);
-  }
   return failed(message || "unknown error", true);
+}
+
+// Reconciliation (capability W5, WRITE-02): an uncertain or partial save can
+// be checked against the item bank. Broker looks for the save's own mark on
+// each record it wrote: if every record carries it, the save is confirmed;
+// otherwise it stays unconfirmed, and a new save may repeat effects.
+export const isCheckableWrite = (write: LastWriteLike) =>
+  Boolean(write && write.status === "failed" && write.message && has(write.message, "uncertain", "partial"));
+
+// What to check, from an item's lastWrite: the exact attempt's connection and
+// idempotency key (a recompile's fresh key replaces the earlier one), never
+// a key derived again.
+export const reconcileTarget = (write: (LastWriteLike & { connectionId?: string | null; idempotencyKey?: string | null }) | null | undefined) =>
+  isCheckableWrite(write) && write?.connectionId && write?.idempotencyKey
+    ? { connectionId: write.connectionId, idempotencyKey: write.idempotencyKey }
+    : null;
+
+type ReconcileRecord = { landed?: boolean; matches?: boolean; found?: boolean };
+type ReconcileOperation = { verdict?: string; final?: boolean; reason?: string; retryAfter?: string; records?: ReconcileRecord[] };
+
+export type ReconcileSummary = {
+  // applied: confirmed in the item bank. Anything else leaves the save unconfirmed.
+  verdict: "applied" | "unresolved" | "too-early";
+  text: string;
+  retryAfter?: string;
+};
+
+export function describeReconcile(result: { operations?: ReconcileOperation[] } | null | undefined): ReconcileSummary {
+  const ops = Array.isArray(result?.operations) ? result.operations : [];
+  if (ops.length > 0 && ops.every(o => o.verdict === "applied" && o.final === true)) {
+    return { verdict: "applied", text: "Confirmed: this save is in the item bank." };
+  }
+  const early = ops.filter(o => o.verdict === "too-early" && o.retryAfter);
+  if (early.length) {
+    const retryAfter = early.map(o => o.retryAfter as string).sort().at(-1) as string;
+    return { verdict: "too-early", text: "It's too soon to check this save; the item bank may still be applying it. Try again in a minute.", retryAfter };
+  }
+  if (ops.some(o => o.reason === "no-evidence" || o.reason === "evidence-format-unknown")) {
+    return { verdict: "unresolved", text: "This save was made before saves could be checked, so it can't be confirmed from the item bank. Look for the item in Learnosity; to save again, recompile the item (the write may repeat)." };
+  }
+  if (ops.some(o => o.reason === "read-failed")) {
+    return { verdict: "unresolved", text: "The item bank couldn't be read just now. Try the check again in a moment." };
+  }
+  const records = ops.flatMap(o => o.records ?? []);
+  const landed = records.filter(r => r.landed).length;
+  const differs = records.some(r => r.found && !r.matches);
+  return {
+    verdict: "unresolved",
+    text: `Couldn't confirm this save: ${landed} of ${records.length} records in the item bank carry its mark` +
+      `${differs ? ", and the item bank now holds different content" : ""}. ` +
+      "To save again, recompile the item (the write may repeat).",
+  };
 }

@@ -66,7 +66,7 @@ export const setCurrentConnection = async ({ user, lang, connectionId }: { user:
 
 const ITEM_CONNECTION_FIELDS = `
   id taskId connectionId publicationId publicationConnectionId publishedTaskId
-  lastWrite { taskId connectionId status message at }
+  lastWrite { taskId connectionId status message at confirmed reconcile { verdict text at } }
 `;
 
 // Writes the item's current version through the current connection again,
@@ -79,6 +79,18 @@ export const retryItemWrite = async ({ user, id }: { user: any; id: string }) =>
     }
   `;
   return client.request(mutation, { id }).then((data: any) => data.retryItemWrite);
+};
+
+// Checks an uncertain or partial save against the item bank (capability W5):
+// never writes, and confirms the save if every record carries its mark.
+export const reconcileItemWrite = async ({ user, id }: { user: any; id: string }) => {
+  const client = await buildRequestClient({ token: await user.getToken() });
+  const mutation = gql`
+    mutation reconcileItemWrite($id: String!) {
+      reconcileItemWrite(id: $id) { ${ITEM_CONNECTION_FIELDS} }
+    }
+  `;
+  return client.request(mutation, { id }).then((data: any) => data.reconcileItemWrite);
 };
 
 // Compiles the item's current version again instead of using the cached
@@ -473,7 +485,7 @@ export const loadItems = async ({ user, lang, mark, client: clientId }) => {
         publicationId
         publicationConnectionId
         publishedTaskId
-        lastWrite { taskId connectionId status message at }
+        lastWrite { taskId connectionId status message at confirmed reconcile { verdict text at } }
       }
     }
   `;
@@ -521,7 +533,7 @@ export const createItem = async ({ user, lang, name, taskId, mark, help, isPubli
         client
         upstreamLangs
         connectionId
-        lastWrite { taskId connectionId status message at }
+        lastWrite { taskId connectionId status message at confirmed reconcile { verdict text at } }
       }
     }
   `;
@@ -556,7 +568,7 @@ export const updateItem = async ({ user, id, name, taskId, mark, help, isPublic,
         publicationId
         publicationConnectionId
         publishedTaskId
-        lastWrite { taskId connectionId status message at }
+        lastWrite { taskId connectionId status message at confirmed reconcile { verdict text at } }
       }
     }
   `;

@@ -18,6 +18,7 @@ import {
   createItem,
   updateItem,
   retryItemWrite,
+  reconcileItemWrite,
   recompileItem,
   republishItem,
   getItems,
@@ -236,6 +237,18 @@ const typeDefs = `
     # through (message "no-connection"). A later write replaces either.
     status: String!
     message: String
+    at: String!
+    # Set when a check against the item bank confirmed an uncertain or
+    # partial save (capability W5), which made it a success.
+    confirmed: Boolean
+    # The latest check of an uncertain or partial save against the item bank.
+    reconcile: ItemWriteCheck
+  }
+
+  type ItemWriteCheck {
+    # "applied" (confirmed), "unresolved" or "too-early"
+    verdict: String!
+    text: String!
     at: String!
   }
 
@@ -491,6 +504,9 @@ const typeDefs = `
     setCurrentConnection(lang: String!, connectionId: String): [CurrentConnection!]!
     # Write the item's current version through the current connection again.
     retryItemWrite(id: String!): Item!
+    # Check an uncertain or partial save against the item bank (capability
+    # W5): confirms it if every record carries the save's mark. Never writes.
+    reconcileItemWrite(id: String!): Item!
     # Compile the item's current version again instead of using the cached
     # result. Through a connection it writes again (a fresh idempotency key).
     recompileItem(id: String!): Item!
@@ -940,6 +956,11 @@ const resolvers = {
       if (ctx.freePlan) throw new Error("Connections require a full account.");
       const auth = await resolveAuth(ctx);
       return await viaPolicy(() => retryItemWrite({ auth, id: args.id }));
+    },
+    reconcileItemWrite: async (_, args, ctx) => {
+      if (ctx.freePlan) throw new Error("Connections require a full account.");
+      const auth = await resolveAuth(ctx);
+      return await viaPolicy(() => reconcileItemWrite({ auth, id: args.id }));
     },
     recompileItem: async (_, args, ctx) => {
       const auth = await resolveAuth(ctx);
