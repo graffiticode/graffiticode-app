@@ -64,7 +64,8 @@ type AuthArg = {
   sessionUuid?: string;
 };
 
-const db = getFirestore();
+// Resolved on use, so importing this module has no side effect.
+const db = () => getFirestore();
 
 // Template cache: short TTL, matching the lexicon and unparse-hints caches in lib/api.ts and
 // for the same reason — a language deploy must be picked up within minutes. Without one this
@@ -88,7 +89,7 @@ const templateCache = new Map<string, { value: string; expires: number }>();
 async function assertRevisionsRemaining(auth: AuthArg, itemId?: string): Promise<void> {
   if (!auth.freePlan || !itemId) return;
   const limit = trialItemRevisionLimit();
-  const snap = await db.doc(`users/${auth.uid}/items/${itemId}`).get();
+  const snap = await db().doc(`users/${auth.uid}/items/${itemId}`).get();
   if (!snap.exists) return;
   const used = Number(snap.data()?.trialRevisions) || 0;
   if (used >= limit) {

@@ -109,7 +109,7 @@ export async function assertItemCreateAllowed(auth: AuthArg, lang?: string): Pro
 export async function assertRevisionsRemaining(auth: AuthArg, itemId?: string): Promise<void> {
   if (!auth.freePlan || !itemId) return;
   const limit = trialItemRevisionLimit();
-  const snap = await db.doc(`users/${auth.uid}/items/${itemId}`).get();
+  const snap = await db().doc(`users/${auth.uid}/items/${itemId}`).get();
   if (!snap.exists) return;
   const used = Number(snap.data()?.trialRevisions) || 0;
   if (used >= limit) {

@@ -10,12 +10,12 @@ export async function logCompile({ auth, units, id, timestamp, status, data }) {
     const [{ lang }] = await getApiTask({ id, auth });
     const path = `users/${auth.uid}/compiles/${id}`;
     data = JSON.parse(data);
-    await db.doc(path).set({ id, timestamp, status, lang, data });
+    await db().doc(path).set({ id, timestamp, status, lang, data });
 
     // Item-based billing: compiles are free (iteration is included). Keep a
     // zero-unit audit record for history/telemetry, but never meter compiles or
     // touch the monthly item counter. Billing is driven by recordBillableItem.
-    await db.collection("usage").add({
+    await db().collection("usage").add({
       userId: auth.uid,
       taskId: id,
       units: 0,
@@ -39,7 +39,7 @@ export async function getTasks({ auth, lang, mark }) {
     const items = await getItems({ auth, lang, mark, client: 'console' });
 
     // Get taskIds from the taskIds collection (for backward compatibility)
-    const taskIdsDocs = await db
+    const taskIdsDocs = await db()
       .collection(`users/${auth.uid}/taskIds`)
       .where("lang", "==", lang)
       .where("mark", "==", mark)
@@ -56,7 +56,7 @@ export async function getTasks({ auth, lang, mark }) {
       if (!itemIds.has(taskId)) {
         // Create an item for this task
         try {
-          const itemRef = db.collection(`users/${auth.uid}/items`).doc();
+          const itemRef = db().collection(`users/${auth.uid}/items`).doc();
           const item = {
             id: itemRef.id,
             taskId: taskId,
@@ -85,14 +85,14 @@ export async function getTasks({ auth, lang, mark }) {
     }
 
     // Mark all tasks in taskIds collection with mark 5 after loading them as items
-    const allTaskIds = await db
+    const allTaskIds = await db()
       .collection(`users/${auth.uid}/taskIds`)
       .where("lang", "==", lang)
       .where("mark", "==", mark)
       .get();
 
     const updatePromises = allTaskIds.docs.map((doc) =>
-      db.doc(`users/${auth.uid}/taskIds/${doc.id}`).update({ mark: 5 }),
+      db().doc(`users/${auth.uid}/taskIds/${doc.id}`).update({ mark: 5 }),
     );
 
     await Promise.all(updatePromises);
@@ -122,7 +122,7 @@ export async function getTasks({ auth, lang, mark }) {
 export async function compiles({ auth, lang, type }) {
   requireFullAccount(auth, "history");
   try {
-    const compilesDocs = await db
+    const compilesDocs = await db()
       .collection(`users/${auth.uid}/compiles`)
       .where("lang", "==", lang)
       .get();

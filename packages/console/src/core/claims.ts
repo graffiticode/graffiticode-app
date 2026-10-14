@@ -26,7 +26,7 @@ export async function adoptWorkspaceFromSibling(
 ): Promise<void> {
   if (!auth.freePlan || !siblingId) return;
   try {
-    const doc = await db.doc(`users/${auth.uid}/items/${siblingId}`).get();
+    const doc = await db().doc(`users/${auth.uid}/items/${siblingId}`).get();
     if (!doc.exists) return;
     adoptSiblingWorkspace(auth, doc.data());
   } catch (err) {
@@ -204,7 +204,6 @@ export async function claimFreePlanSession({
   sessionNamespace: string;
   sessionUuid: string;
 }) {
-  const db = getFirestore();
   const now = Date.now();
   // One id for this whole claim, stamped on every doc it creates and logged with
   // it. Without it a claimed item can be traced back to a session but not to the
@@ -214,7 +213,7 @@ export async function claimFreePlanSession({
   const claimId = randomUUID();
 
   try {
-  const snapshot = await db
+  const snapshot = await db()
     .collection(`users/${trialAuth.uid}/items`)
     .where("freePlan", "==", true)
     .where("sessionNamespace", "==", sessionNamespace)
@@ -244,7 +243,7 @@ export async function claimFreePlanSession({
       }
     }
 
-    const targetRef = db.collection(`users/${auth.uid}/items`).doc();
+    const targetRef = db().collection(`users/${auth.uid}/items`).doc();
     const newId = targetRef.id;
     const timestamp = Date.now();
 

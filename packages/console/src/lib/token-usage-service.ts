@@ -1,4 +1,5 @@
-import { getFirestore, FieldValue, Timestamp } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { getFirestore } from "../utils/db";
 import { TokenUsage } from "./llm-generation-service";
 
 export type Env = "prod" | "local";
@@ -68,7 +69,8 @@ interface BackfillArgs {
   itemId: string;
 }
 
-const db = getFirestore();
+// Resolved on use, so importing this module has no side effect.
+const db = () => getFirestore();
 
 export async function recordTokenUsage({
   auth,
@@ -126,7 +128,7 @@ export async function recordTokenUsage({
     };
 
     // Write flat log
-    await db.collection("usage").add(doc);
+    await db().collection("usage").add(doc);
 
     // Write/update item-doc rollup if itemId is known. Failed generations are
     // deliberately excluded: the flat log carries them for cost reporting, but
@@ -148,7 +150,7 @@ async function updateItemTokenUsage(
   stage: Stage
 ): Promise<void> {
   try {
-    const itemRef = db.collection(`users/${uid}/items`).doc(itemId);
+    const itemRef = db().collection(`users/${uid}/items`).doc(itemId);
 
     // Use set with merge: true to create the doc if absent (needed for items created via
     // generation, where the doc ref is allocated before the doc exists). Nested objects inside
@@ -198,7 +200,7 @@ export async function backfillTokenUsageItemId({
 }: BackfillArgs): Promise<void> {
   try {
     // Query for pre-item usage docs with this rid that haven't been attributed yet
-    const snapshot = await db
+    const snapshot = await db()
       .collection("usage")
       .where("userId", "==", auth.uid)
       .where("rid", "==", rid)

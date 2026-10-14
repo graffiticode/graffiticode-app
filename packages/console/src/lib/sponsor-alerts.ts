@@ -18,7 +18,8 @@ import {
   overageRateFor,
 } from "./plans-config";
 
-const db = getFirestore();
+// Resolved on use, so importing this module has no side effect.
+const db = () => getFirestore();
 
 export type SponsorStage = "included_80" | "included_100" | "cap_80" | "cap_100";
 const STAGE_ORDER: SponsorStage[] = ["included_80", "included_100", "cap_80", "cap_100"];
@@ -81,7 +82,7 @@ export async function maybeAlertSponsorLimit({
   try {
     const subscription = sponsorData?.subscription || {};
     const plan = subscription.plan;
-    const usageDoc = await db.collection("usage").doc(sponsorUid).get();
+    const usageDoc = await db().collection("usage").doc(sponsorUid).get();
     const used = Number(usageDoc.data()?.currentMonthTotal) || 0;
     const included = effectiveIncludedItems(plan, subscription, now);
     const metered = !isHardCappedFor(plan, subscription);
@@ -92,8 +93,8 @@ export async function maybeAlertSponsorLimit({
 
     // Once per stage per period; a later stage still fires after an earlier one.
     const rank = STAGE_ORDER.indexOf(stage);
-    const ref = db.collection("sponsor-alerts").doc(`${sponsorUid}__${periodStart.toISOString().slice(0, 10)}`);
-    const fired = await db.runTransaction(async (tx) => {
+    const ref = db().collection("sponsor-alerts").doc(`${sponsorUid}__${periodStart.toISOString().slice(0, 10)}`);
+    const fired = await db().runTransaction(async (tx) => {
       const snap = await tx.get(ref);
       const prev = snap.exists ? Number(snap.data()?.rank) : -1;
       if (prev >= rank) return false;

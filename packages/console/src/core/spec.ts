@@ -36,7 +36,7 @@ export async function cacheSpec({ auth, id, taskId, spec, lang, coverage, model 
     // a content change, so it must not bump `updated`, refresh a free-plan `expiresAt`, or mint
     // a version record. `update` with a map value replaces the whole map, so a stale entry is
     // overwritten wholesale.
-    await db.doc(`users/${auth.uid}/items/${id}`).update({
+    await db().doc(`users/${auth.uid}/items/${id}`).update({
       spec: {
         text: spec,
         taskId,

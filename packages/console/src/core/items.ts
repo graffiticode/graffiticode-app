@@ -67,7 +67,7 @@ export async function createItem({
     await assertItemCreateAllowed(auth, lang);
 
     // Generate a unique ID for the item
-    const itemRef = db.collection(`users/${auth.uid}/items`).doc();
+    const itemRef = db().collection(`users/${auth.uid}/items`).doc();
     const id = itemRef.id;
     // If no name provided, use "unnamed"
     if (!name) {
@@ -267,7 +267,7 @@ export async function updateItem({
   let rereadMs = 0;
   let versionMs = 0;
   try {
-    const itemRef = db.doc(`users/${auth.uid}/items/${id}`);
+    const itemRef = db().doc(`users/${auth.uid}/items/${id}`);
     const tRead = Date.now();
     const itemDoc = await itemRef.get();
     readMs = Date.now() - tRead;
@@ -518,7 +518,7 @@ export async function updateItem({
 export async function countItems({ auth, langs }: { auth: AuthArg; langs: string[] }) {
   const count = async query => (await query.count().get()).data().count;
   return Promise.all(langs.map(async lang => {
-    let query = db.collection(`users/${auth.uid}/items`).where("lang", "==", lang);
+    let query = db().collection(`users/${auth.uid}/items`).where("lang", "==", lang);
     if (auth.freePlan) {
       query = query.where("sessionNamespace", "==", auth.sessionNamespace);
     }
@@ -532,7 +532,7 @@ export async function countItems({ auth, langs }: { auth: AuthArg; langs: string
 // as the Tools view's approved-thumbnail set, getItems' full items (transcripts,
 // legacy reads, connection lookups) are wasted work.
 export async function getItemNames({ auth, lang, mark }: { auth: AuthArg; lang: string; mark?: number | null }) {
-  let query = db.collection(`users/${auth.uid}/items`).where("lang", "==", lang);
+  let query = db().collection(`users/${auth.uid}/items`).where("lang", "==", lang);
   if (mark !== undefined && mark !== null) {
     query = query.where("mark", "==", mark);
   }
@@ -548,7 +548,7 @@ export async function getItems({ auth, lang, mark, client }) {
     // Build the base query (lang + optional mark + free-plan). Client filtering
     // happens in memory below so items without a client/app field are treated
     // as 'console' (the default).
-    let baseQuery = db
+    let baseQuery = db()
       .collection(`users/${auth.uid}/items`)
       .where("lang", "==", lang);
     if (mark !== undefined && mark !== null) {
@@ -577,7 +577,7 @@ export async function getItems({ auth, lang, mark, client }) {
     // items are not supported there).
     const sharedItemsData = auth.freePlan
       ? {}
-      : (await db.doc(`users/${auth.uid}`).get()).data()?.sharedItems || {};
+      : (await db().doc(`users/${auth.uid}`).get()).data()?.sharedItems || {};
 
     const now = Date.now();
 
@@ -638,7 +638,7 @@ export async function getItems({ auth, lang, mark, client }) {
       // For backward compatibility: fetch help from legacy taskIds collection
       if (!help && taskId) {
         try {
-          const taskDoc = await db
+          const taskDoc = await db()
             .doc(`users/${auth.uid}/taskIds/${taskId}`)
             .get();
           if (taskDoc.exists) {
@@ -703,7 +703,7 @@ export async function getItems({ auth, lang, mark, client }) {
 
 export async function getItemClientTags({ auth, lang }) {
   try {
-    let query = db
+    let query = db()
       .collection(`users/${auth.uid}/items`)
       .where("lang", "==", lang);
     if (auth.freePlan) {
@@ -734,7 +734,7 @@ export async function getItem({ auth, id, includeSpec = false }: {
   includeSpec?: boolean;
 }) {
   try {
-    const itemRef = db.doc(`users/${auth.uid}/items/${id}`);
+    const itemRef = db().doc(`users/${auth.uid}/items/${id}`);
     const itemDoc = await itemRef.get();
 
     if (!itemDoc.exists) {
@@ -787,7 +787,7 @@ export async function getItem({ auth, id, includeSpec = false }: {
     // For backward compatibility: fetch help from legacy taskIds collection
     if (!help && taskId) {
       try {
-        const taskDoc = await db.doc(`users/${auth.uid}/taskIds/${taskId}`).get();
+        const taskDoc = await db().doc(`users/${auth.uid}/taskIds/${taskId}`).get();
         if (taskDoc.exists) {
           const taskData = taskDoc.data();
           help = taskData.help || "[]";
@@ -840,7 +840,7 @@ export async function shareItem({ auth, itemId, targetUserId }) {
   requireFullAccount(auth, "sharing");
   try {
     // Validate that the source item exists and belongs to the current user
-    const itemRef = db.doc(`users/${auth.uid}/items/${itemId}`);
+    const itemRef = db().doc(`users/${auth.uid}/items/${itemId}`);
     const itemDoc = await itemRef.get();
 
     if (!itemDoc.exists) {
@@ -852,7 +852,7 @@ export async function shareItem({ auth, itemId, targetUserId }) {
     }
 
     // Validate that the target user exists
-    const targetUserRef = db.doc(`users/${targetUserId}`);
+    const targetUserRef = db().doc(`users/${targetUserId}`);
     const targetUserDoc = await targetUserRef.get();
 
     if (!targetUserDoc.exists) {
@@ -866,7 +866,7 @@ export async function shareItem({ auth, itemId, targetUserId }) {
     const itemData = itemDoc.data();
 
     // Create a new item in the target user's collection with "(from <uid>)" suffix
-    const targetItemRef = db.collection(`users/${targetUserId}/items`).doc();
+    const targetItemRef = db().collection(`users/${targetUserId}/items`).doc();
     const newItemId = targetItemRef.id;
     const timestamp = Date.now();
 
@@ -908,7 +908,7 @@ export async function shareItem({ auth, itemId, targetUserId }) {
     await targetItemRef.set(sharedItem);
 
     // Update the sender's user document to track shared items
-    const senderUserRef = db.doc(`users/${auth.uid}`);
+    const senderUserRef = db().doc(`users/${auth.uid}`);
     const senderUserDoc = await senderUserRef.get();
 
     const sharedItems = senderUserDoc.data()?.sharedItems || {};
