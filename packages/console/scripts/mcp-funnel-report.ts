@@ -44,7 +44,7 @@ import {
   type Metric,
   type WeeklyNewCreatingWorkspaces,
 } from '../src/lib/omtm';
-import { OMTM_CLOCK_START } from '../src/lib/workspace-week';
+import { OMTM_CLOCK_START } from '@graffiticode-app/core/lib/workspace-week';
 import { classifyClient } from '../src/lib/funnel-clients';
 
 // --- Load .env.local (same pattern as user-report.ts) -----------------------

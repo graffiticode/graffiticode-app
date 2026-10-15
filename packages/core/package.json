@@ -1,0 +1,36 @@
+{
+  "name": "@graffiticode-app/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Graffiticode app-tier domain logic shared by the console, the MCP server and the OpenAPI server.",
+  "exports": {
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@graffiticode/auth": "^2.1.2",
+    "@graffiticode/l0175": "^0.3.0",
+    "@graffiticode/parser": "^1.11.1",
+    "axios": "^1.11.0",
+    "bent": "^7.3.12",
+    "firebase-admin": "^13.5.0",
+    "google-auth-library": "^7.14.1",
+    "jose": "^4.11.4",
+    "openai": "^5.12.1",
+    "stripe": "^22.3.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "@types/node": "^24.2.1"
+  }
+}

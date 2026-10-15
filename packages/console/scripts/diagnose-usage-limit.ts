@@ -33,7 +33,7 @@ const db = admin.firestore();
 // map here went stale when compile units were retired for item-based pricing).
 import {
   PLANS, DEFAULT_PLAN, includedItemsFor, effectiveIncludedItems, isHardCapped, overageRateFor,
-} from '../src/lib/plans-config';
+} from '@graffiticode-app/core/lib/plans-config';
 
 async function findUid(arg: string): Promise<string | null> {
   if (!arg.includes('@')) {

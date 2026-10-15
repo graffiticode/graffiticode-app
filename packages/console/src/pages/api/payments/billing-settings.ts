@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getFirestore } from '../../../utils/db';
+import { getFirestore } from '@graffiticode-app/core/utils/db/index';
 import { requireUser } from '../../../lib/api-auth';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

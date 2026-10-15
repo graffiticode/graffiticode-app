@@ -4,7 +4,7 @@ import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import useGraffiticodeAuth from '@graffiticode/auth-react';
 import { paymentsGet, paymentsPost } from '../../utils/payments-client';
 import { planDetails, type PlanId } from '../../utils/plans';
-import { defaultOverageCapUsd } from '../../lib/plans-config';
+import { defaultOverageCapUsd } from '@graffiticode-app/core/lib/plans-config';
 
 interface UsageData {
   plan: string;

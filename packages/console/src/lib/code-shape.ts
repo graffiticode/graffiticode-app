@@ -18,7 +18,7 @@
 // and what is content, and a hand-rolled normalizer either keeps counting a re-indented attribute
 // list as a change or normalizes away something that mattered.
 import { parser, unparse } from "@graffiticode/parser";
-import { getLanguageLexicon } from "./api";
+import { getLanguageLexicon } from "@graffiticode-app/core/lib/api";
 
 const TOKEN_RE = /"(?:\\.|[^"\\])*"|[A-Za-z_][\w-]*|-?\d+(?:\.\d+)?|[^\s]/g;
 

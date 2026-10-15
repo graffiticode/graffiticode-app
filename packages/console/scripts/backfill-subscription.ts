@@ -43,8 +43,8 @@ const stripe = new Stripe(liveKey, { apiVersion: STRIPE_API_VERSION });
 // Plan + item allowance come from the central config (src/lib/plans-config).
 // Price ids come from env; in a test-mode .env.local these are test ids and
 // won't match a live sub — use --plan then.
-import { STRIPE_API_VERSION, priceIdToPlan, includedItemsFor, type PlanId } from '../src/lib/plans-config';
-import { subscriptionPeriod } from '../src/lib/stripe-helpers';
+import { STRIPE_API_VERSION, priceIdToPlan, includedItemsFor, type PlanId } from '@graffiticode-app/core/lib/plans-config';
+import { subscriptionPeriod } from '@graffiticode-app/core/lib/stripe-helpers';
 
 async function main() {
   const args = process.argv.slice(2);

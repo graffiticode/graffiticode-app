@@ -17,7 +17,7 @@
  */
 import "./eval-env"; // MUST be first: prod Firestore bootstrap
 
-import { getFirestore } from "../src/utils/db";
+import { getFirestore } from "@graffiticode-app/core/utils/db/index";
 
 function arg(name: string, dflt?: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);

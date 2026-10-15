@@ -16,7 +16,7 @@ import { useState } from 'react'
 import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid'
 import { Combobox } from '@headlessui/react'
 import { getTitle } from '../lib/utils';
-import { LANGUAGES, selectLanguages as selectLangs, findLanguageById, type Language } from '../lib/languages';
+import { LANGUAGES, selectLanguages as selectLangs, findLanguageById, type Language } from '@graffiticode-app/core/lib/languages';
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')

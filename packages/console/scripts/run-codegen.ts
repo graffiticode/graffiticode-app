@@ -26,8 +26,8 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { readExamplesMarkdown } from "./lang-examples";
-import { generateCode } from "../src/lib/code-generation-service";
-import { getCredentialsForApiKey } from "../src/lib/api-credentials";
+import { generateCode } from "@graffiticode-app/core/lib/code-generation-service";
+import { getCredentialsForApiKey } from "@graffiticode-app/core/lib/api-credentials";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

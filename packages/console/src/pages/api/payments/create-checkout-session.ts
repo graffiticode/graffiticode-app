@@ -1,8 +1,8 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
-import { getFirestore } from '../../../utils/db';
-import { STRIPE_API_VERSION, stripeBasePriceId, stripeMeterPriceId, getPlan, defaultOverageCapUsd, type PlanId, type BillingInterval } from '../../../lib/plans-config';
-import { emitEvent, actor } from '../../../lib/funnel-events';
+import { getFirestore } from '@graffiticode-app/core/utils/db/index';
+import { STRIPE_API_VERSION, stripeBasePriceId, stripeMeterPriceId, getPlan, defaultOverageCapUsd, type PlanId, type BillingInterval } from '@graffiticode-app/core/lib/plans-config';
+import { emitEvent, actor } from '@graffiticode-app/core/lib/funnel-events';
 import { requireUser } from '../../../lib/api-auth';
 
 // Initialize Stripe only if secret key is available

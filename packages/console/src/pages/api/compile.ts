@@ -1,10 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import bent from "bent";
-import { getBaseUrlForApi } from "../../lib/api";
+import { getBaseUrlForApi } from "@graffiticode-app/core/lib/api";
 import { client as authClient } from "../../lib/auth";
-import { getCredentialsForApiKey } from "../../lib/api-credentials";
-import { getFreePlanCredentials, isFreePlanRequest } from "../../lib/free-plan-context";
-import { checkBurstLimit, BURST } from "../../lib/free-plan-throttle";
+import { getCredentialsForApiKey } from "@graffiticode-app/core/lib/api-credentials";
+import { getFreePlanCredentials, isFreePlanRequest } from "@graffiticode-app/core/lib/free-plan-context";
+import { checkBurstLimit, BURST } from "@graffiticode-app/core/lib/free-plan-throttle";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Access-Control-Allow-Origin", "*");

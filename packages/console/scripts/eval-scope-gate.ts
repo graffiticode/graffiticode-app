@@ -93,7 +93,7 @@ const runs = Number(arg("--runs") ?? 3);
     console.error("Set ANTHROPIC_API_KEY (.env.local) — without it the gate fails open and every case reads 'in'.");
     process.exit(2);
   }
-  const { classifyAndRoute } = await import("../src/lib/language-router");
+  const { classifyAndRoute } = await import("@graffiticode-app/core/lib/language-router");
   const cases = CASES.filter((c) => !only || c.tag.includes(only) || c.prompt.includes(only));
 
   let misses = 0;

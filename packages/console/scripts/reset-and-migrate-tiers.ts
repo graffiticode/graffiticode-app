@@ -15,7 +15,7 @@
  */
 import admin from 'firebase-admin';
 import { readFileSync } from 'fs';
-import { includedItemsFor } from '../src/lib/plans-config';
+import { includedItemsFor } from '@graffiticode-app/core/lib/plans-config';
 
 const APPLY = process.argv.includes('--apply');
 

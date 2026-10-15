@@ -123,7 +123,8 @@
     "valtio": "^2.1.5",
     "versor": "^0.2.0",
     "viem": "^2.33.3",
-    "wagmi": "^2.16.1"
+    "wagmi": "^2.16.1",
+    "@graffiticode-app/core": "*"
   },
   "overrides": {
     "glob": "^10.0.0",

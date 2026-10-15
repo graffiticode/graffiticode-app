@@ -15,7 +15,7 @@ import {
   isoWeekBounds,
   type FirstOutcome,
   type WorkspaceAuth,
-} from "./workspace-week";
+} from "@graffiticode-app/core/lib/workspace-week";
 
 /**
  * A reportable number.

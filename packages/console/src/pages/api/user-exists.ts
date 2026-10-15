@@ -1,4 +1,4 @@
-import { getFirestore } from '../../utils/db';
+import { getFirestore } from '@graffiticode-app/core/utils/db/index';
 
 const AUTH_SERVICE_URL = process.env.NEXT_PUBLIC_GC_AUTH_URL || 'https://auth.graffiticode.org';
 const AUTH_SERVICE_INTERNAL_API_KEY =

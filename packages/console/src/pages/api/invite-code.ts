@@ -1,4 +1,4 @@
-import { getFirestore } from '../../utils/db';
+import { getFirestore } from '@graffiticode-app/core/utils/db/index';
 import { client } from '../../lib/auth';
 
 // Default invite codes

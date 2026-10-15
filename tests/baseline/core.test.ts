@@ -16,14 +16,14 @@ before(async () => {
   process.env.GRAFFITICODE_API_URL = h.backendOrigin;
   tools = await import("../../packages/mcp-server/src/tools");
   core = {
-    ...(await import("../../packages/console/src/core/revise")),
-    ...(await import("../../packages/console/src/core/auth")),
-    ...(await import("../../packages/console/src/core/errors")),
-    ...(await import("../../packages/console/src/core/versions")),
-    ...(await import("../../packages/console/src/core/compiles")),
-    ...(await import("../../packages/console/src/core/writes")),
-    ...(await import("../../packages/console/src/core/items")),
-    ...(await import("../../packages/console/src/core/tasks")),
+    ...(await import("@graffiticode-app/core/revise")),
+    ...(await import("@graffiticode-app/core/auth")),
+    ...(await import("@graffiticode-app/core/errors")),
+    ...(await import("@graffiticode-app/core/versions")),
+    ...(await import("@graffiticode-app/core/compiles")),
+    ...(await import("@graffiticode-app/core/writes")),
+    ...(await import("@graffiticode-app/core/items")),
+    ...(await import("@graffiticode-app/core/tasks")),
   };
 });
 after(async () => { await h?.stop(); });

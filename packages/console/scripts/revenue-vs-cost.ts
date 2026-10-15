@@ -3,7 +3,7 @@
 import admin from 'firebase-admin';
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
-import { estimateUsdCost, usdCostFromReport } from '../src/lib/model-pricing';
+import { estimateUsdCost, usdCostFromReport } from '@graffiticode-app/core/lib/model-pricing';
 
 // Load .env.local
 const envPath = resolve(process.cwd(), '.env.local');

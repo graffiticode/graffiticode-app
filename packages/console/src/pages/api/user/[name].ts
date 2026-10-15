@@ -1,5 +1,5 @@
-import { getFirestore } from '../../../utils/db';
-import { emitEvent, actor } from '../../../lib/funnel-events';
+import { getFirestore } from '@graffiticode-app/core/utils/db/index';
+import { emitEvent, actor } from '@graffiticode-app/core/lib/funnel-events';
 import { requireUser } from '../../../lib/api-auth';
 import { normalizeName } from '../../../lib/account-lookup';
 

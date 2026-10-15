@@ -20,12 +20,12 @@
 // the SDKs load runtime config that Next standalone output-tracing doesn't
 // bundle, which 500s the route.
 
-import { getFirestore } from "../utils/db";
-import { getAccessToken } from "./gcp-token";
+import { getFirestore } from "@graffiticode-app/core/utils/db/index";
+import { getAccessToken } from "@graffiticode-app/core/lib/gcp-token";
 // "0166" and "L0166" are the same language; item docs use one, MCP args the
 // other. Shared with the workspace registry so both bucket a language alike.
-import { langKey } from "./funnel-events";
-import { isExcludedSession } from "./funnel-exclusions";
+import { langKey } from "@graffiticode-app/core/lib/funnel-events";
+import { isExcludedSession } from "@graffiticode-app/core/lib/funnel-exclusions";
 import { classifyConnect, isProbeKind } from "./funnel-clients";
 
 const PROJECT =

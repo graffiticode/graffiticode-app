@@ -12,7 +12,7 @@
 // src/pages/api/linked-emails/check.ts.
 import type { NextApiRequest } from "next";
 import { client } from "./auth";
-import { getCredentialsForApiKey } from "./api-credentials";
+import { getCredentialsForApiKey } from "@graffiticode-app/core/lib/api-credentials";
 
 /**
  * Resolve the calling user from the Authorization header.

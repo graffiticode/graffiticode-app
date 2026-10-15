@@ -24,9 +24,9 @@
 import "./eval-env"; // MUST be first: prod Firestore/auth/api bootstrap
 
 import admin from "firebase-admin";
-import { generateCodeForRequest } from "../src/lib/code-generation/generate-for-request";
-import { getCredentialsForApiKey } from "../src/lib/api-credentials";
-import { getBaseUrlForApi } from "../src/lib/api";
+import { generateCodeForRequest } from "@graffiticode-app/core/lib/code-generation/generate-for-request";
+import { getCredentialsForApiKey } from "@graffiticode-app/core/lib/api-credentials";
+import { getBaseUrlForApi } from "@graffiticode-app/core/lib/api";
 import { compareShape } from "../src/lib/code-shape";
 import { harnessItemId } from "../src/lib/harness-item-ids";
 import { SWEEP_LANGUAGES } from "../src/lib/corpus-sweep";

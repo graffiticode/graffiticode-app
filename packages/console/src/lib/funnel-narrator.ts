@@ -27,7 +27,7 @@
 // but it can never cost you one.
 
 import axios from "axios";
-import { ANTHROPIC_MODELS } from "./llm-models";
+import { ANTHROPIC_MODELS } from "@graffiticode-app/core/lib/llm-models";
 import type { Digest, SplitDigest, RecentWindow } from "./funnel-digest";
 import { ptRange } from "./funnel-digest";
 

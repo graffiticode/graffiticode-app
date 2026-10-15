@@ -12,8 +12,8 @@
  */
 import "./eval-env";
 import { unparse } from "@graffiticode/parser";
-import { getLanguageLexicon } from "../src/lib/api";
-import { getFirestore } from "../src/utils/db";
+import { getLanguageLexicon } from "@graffiticode-app/core/lib/api";
+import { getFirestore } from "@graffiticode-app/core/utils/db/index";
 
 const UID = process.env.CORPUS_UID || "2c9d72e315fbafb128011bc32739666c7e6e7eb9";
 const MARK = process.argv.includes("--mark");

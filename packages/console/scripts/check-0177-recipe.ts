@@ -40,9 +40,9 @@
  */
 import "./eval-env"; // MUST be first: prod Firestore/auth/api bootstrap before app imports
 
-import { getCredentialsForApiKey } from "../src/lib/api-credentials";
-import { generateSpec } from "../src/lib/spec-generation-service";
-import { getFirestore } from "../src/utils/db";
+import { getCredentialsForApiKey } from "@graffiticode-app/core/lib/api-credentials";
+import { generateSpec } from "@graffiticode-app/core/lib/spec-generation-service";
+import { getFirestore } from "@graffiticode-app/core/utils/db/index";
 
 const arg = (name: string): string | undefined => {
   const i = process.argv.indexOf(`--${name}`);

@@ -39,7 +39,7 @@ import {
   writeState,
 } from "../../../lib/funnel-digest";
 import { formatNarratedSms, narrate, pushRecent } from "../../../lib/funnel-narrator";
-import { sendSms } from "../../../lib/alert-sms";
+import { sendSms } from "@graffiticode-app/core/lib/alert-sms";
 import { reportUrl } from "../../../lib/report-link";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

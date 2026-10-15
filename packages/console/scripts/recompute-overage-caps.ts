@@ -40,7 +40,7 @@
 import admin from 'firebase-admin';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { PLANS, DEFAULT_PLAN, getPlan, overageRateFor, overageDollarsToItems, type PlanId } from '../src/lib/plans-config';
+import { PLANS, DEFAULT_PLAN, getPlan, overageRateFor, overageDollarsToItems, type PlanId } from '@graffiticode-app/core/lib/plans-config';
 
 try {
   for (const line of readFileSync(resolve(process.cwd(), '.env.local'), 'utf-8').split('\n')) {

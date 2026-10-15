@@ -2,7 +2,7 @@
 // there is no search over accounts (AT-02: no account enumeration). The owner
 // sees a recipient only by profile name or short ID, never an email or any
 // other profile field.
-import { getFirestore } from "../utils/db";
+import { getFirestore } from "@graffiticode-app/core/utils/db/index";
 import { normalizeAccountId } from "./connection-sharing";
 
 // The form of a profile name kept as users/{uid}.nameLower wherever `name` is

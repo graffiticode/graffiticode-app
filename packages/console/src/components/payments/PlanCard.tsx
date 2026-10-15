@@ -1,5 +1,5 @@
 import { Plan, PlanId, BillingInterval, isUpgrade, isDowngrade, getButtonLabel, perItem } from '@/utils/plans';
-import { defaultOverageCapUsd } from '@/lib/plans-config';
+import { defaultOverageCapUsd } from '@graffiticode-app/core/lib/plans-config';
 
 interface PlanCardProps {
   plan: Plan;

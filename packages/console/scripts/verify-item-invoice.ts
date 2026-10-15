@@ -16,8 +16,8 @@
  * Example: Silver (pro), 600 items -> invoice $100 base + 100 x $0.20 = $120.
  */
 import Stripe from 'stripe';
-import { STRIPE_API_VERSION, stripeBasePriceId, stripeMeterPriceId, getPlan, includedItemsFor, overageRateFor, type PlanId } from '../src/lib/plans-config';
-import { subscriptionPeriod } from '../src/lib/stripe-helpers';
+import { STRIPE_API_VERSION, stripeBasePriceId, stripeMeterPriceId, getPlan, includedItemsFor, overageRateFor, type PlanId } from '@graffiticode-app/core/lib/plans-config';
+import { subscriptionPeriod } from '@graffiticode-app/core/lib/stripe-helpers';
 
 const KEY = process.env.STRIPE_SECRET_KEY;
 if (!KEY || !KEY.startsWith('sk_test_')) { console.error('A test-mode STRIPE_SECRET_KEY (sk_test_...) is required'); process.exit(1); }

@@ -19,7 +19,7 @@
  * closest thing to a declared version available over this interface.
  */
 import { createHash } from "crypto";
-import { getLanguageAsset } from "../src/lib/api";
+import { getLanguageAsset } from "@graffiticode-app/core/lib/api";
 
 export interface DialectFingerprint {
   /** First 12 hex of sha256(instructions.md) — short enough to eyeball in a diff. */

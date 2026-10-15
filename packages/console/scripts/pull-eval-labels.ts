@@ -19,9 +19,9 @@
 import "./eval-env"; // MUST be first: prod Firestore/auth bootstrap before app imports
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
-import { getCredentialsForApiKey } from "../src/lib/api-credentials";
-import { getFirestore } from "../src/utils/db";
-import { anchorVersion } from "../src/lib/judge-service";
+import { getCredentialsForApiKey } from "@graffiticode-app/core/lib/api-credentials";
+import { getFirestore } from "@graffiticode-app/core/utils/db/index";
+import { anchorVersion } from "@graffiticode-app/core/lib/judge-service";
 
 const LANG = (() => {
   const i = process.argv.indexOf("--lang");

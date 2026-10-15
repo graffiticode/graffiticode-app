@@ -1,9 +1,9 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
-import { STRIPE_API_VERSION, includedItemsFor, priceIdToPlan, DEFAULT_PLAN, PLANS, type PlanId } from '../../../lib/plans-config';
-import { subscriptionPeriodEnd } from '../../../lib/stripe-helpers';
-import { emitPlanChanged, hashUid } from '../../../lib/funnel-events';
-import { getFirestore } from '../../../utils/db';
+import { STRIPE_API_VERSION, includedItemsFor, priceIdToPlan, DEFAULT_PLAN, PLANS, type PlanId } from '@graffiticode-app/core/lib/plans-config';
+import { subscriptionPeriodEnd } from '@graffiticode-app/core/lib/stripe-helpers';
+import { emitPlanChanged, hashUid } from '@graffiticode-app/core/lib/funnel-events';
+import { getFirestore } from '@graffiticode-app/core/utils/db/index';
 import * as admin from 'firebase-admin';
 import { requireUser } from '../../../lib/api-auth';
 

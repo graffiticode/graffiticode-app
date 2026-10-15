@@ -59,8 +59,8 @@ const ONLY_UID = (() => {
 })();
 
 // Same mapping the webhook uses (src/pages/api/webhooks/stripe.ts).
-import { STRIPE_API_VERSION, priceIdToPlan, includedItemsFor, DEFAULT_PLAN } from '../src/lib/plans-config';
-import { subscriptionPeriod } from '../src/lib/stripe-helpers';
+import { STRIPE_API_VERSION, priceIdToPlan, includedItemsFor, DEFAULT_PLAN } from '@graffiticode-app/core/lib/plans-config';
+import { subscriptionPeriod } from '@graffiticode-app/core/lib/stripe-helpers';
 
 // Resolve the plan from a subscription's items (base price; a paid sub also
 // carries a metered overage price). Item counts come from the central config.

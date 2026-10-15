@@ -2,7 +2,7 @@ import { createHash } from "crypto";
 import admin from "firebase-admin";
 
 import { NotFoundError, DecodeIdError } from "../errors/http";
-import { getFirestore } from '../db';
+import { getFirestore } from '@graffiticode-app/core/utils/db/index';
 
 const createCodeHash = code =>
   createHash("sha256")

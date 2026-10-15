@@ -13,8 +13,8 @@
  */
 import * as dotenv from "dotenv";
 dotenv.config({ path: ".env.local" });
-import { updateRAGConfig, getJudgeMode } from "../src/lib/rag-config";
-import { judgeCode, judgePair, judgePanel, judgeModelForFamily } from "../src/lib/judge-service";
+import { updateRAGConfig, getJudgeMode } from "@graffiticode-app/core/lib/rag-config";
+import { judgeCode, judgePair, judgePanel, judgeModelForFamily } from "@graffiticode-app/core/lib/judge-service";
 
 async function main() {
   if (!process.env.ANTHROPIC_API_KEY) { console.error("Set ANTHROPIC_API_KEY in .env.local"); process.exit(1); }

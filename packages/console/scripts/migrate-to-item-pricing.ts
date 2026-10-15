@@ -25,7 +25,7 @@
 import Stripe from 'stripe';
 import admin from 'firebase-admin';
 import { readFileSync } from 'fs';
-import { STRIPE_API_VERSION, priceIdToPlan, stripeMeterPriceId, stripeBasePriceId, type PlanId } from '../src/lib/plans-config';
+import { STRIPE_API_VERSION, priceIdToPlan, stripeMeterPriceId, stripeBasePriceId, type PlanId } from '@graffiticode-app/core/lib/plans-config';
 
 // This script pairs LIVE Stripe with PROD Firestore. A leftover
 // FIRESTORE_EMULATOR_HOST silently points the user lookup at an empty local

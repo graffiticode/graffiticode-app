@@ -1,6 +1,6 @@
 import bent from "bent";
 import { GraphQLClient, gql } from 'graphql-request';
-import { postApiCompile } from "../../lib/api";
+import { postApiCompile } from "@graffiticode-app/core/lib/api";
 
 const buildRequestClient = async ({ token }) => {
   const client = new GraphQLClient("/api", {

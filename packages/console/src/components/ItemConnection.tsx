@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { loadCurrentConnections, reconcileItemWrite, republishItem, retryItemWrite } from '../utils/swr/fetchers';
-import { backendForLang, normalizeLang } from '../lib/connectable';
+import { backendForLang, normalizeLang } from '@graffiticode-app/core/lib/connectable';
 import { getCredentialBackend } from '../lib/credential-backends';
-import { canRetryWrite, describeWriteProblem } from '../lib/write-errors';
+import { canRetryWrite, describeWriteProblem } from '@graffiticode-app/core/lib/write-errors';
 
 // Fired after a write through a connection, so the preview (which shows the
 // stored result) reloads: a write changes that result without changing the item.

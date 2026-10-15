@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useState, useEffect, useRef } from 'react'
 import { ITEM_RUN_EVENT } from './ItemConnection';
-import { viewConnectionId } from '../lib/connectable';
-import { canRetryWrite, describeWriteProblem } from '../lib/write-errors';
+import { viewConnectionId } from '@graffiticode-app/core/lib/connectable';
+import { canRetryWrite, describeWriteProblem } from '@graffiticode-app/core/lib/write-errors';
 import Link from 'next/link';
 import useSWR from "swr";
 import { useRouter } from 'next/router';

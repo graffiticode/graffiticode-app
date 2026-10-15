@@ -4,7 +4,7 @@
 // Pure arithmetic, no Firestore — the subtlest new logic in the item-based trial
 // quota, and the repo has no unit-test runner.
 
-import { dailyItemAllowance } from "../src/lib/free-plan-quota";
+import { dailyItemAllowance } from "@graffiticode-app/core/lib/free-plan-quota";
 
 const periodEnd = new Date(Date.UTC(2026, 6, 31)); // Jul 31
 const day1 = new Date(Date.UTC(2026, 6, 2));       // Jul 2  -> 30 days left incl today

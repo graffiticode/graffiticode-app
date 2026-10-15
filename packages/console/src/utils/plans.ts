@@ -1,6 +1,6 @@
 // UI-facing plan catalog. Values are derived from the single source of truth in
 // src/lib/plans-config.ts — do not hardcode allowances/prices here.
-import { PLANS, type PlanId as ConfigPlanId, type BillingInterval as ConfigBillingInterval, isUpgrade as configIsUpgrade, isDowngrade as configIsDowngrade } from '../lib/plans-config';
+import { PLANS, type PlanId as ConfigPlanId, type BillingInterval as ConfigBillingInterval, isUpgrade as configIsUpgrade, isDowngrade as configIsDowngrade } from '@graffiticode-app/core/lib/plans-config';
 
 export type PlanId = ConfigPlanId;
 export type BillingInterval = ConfigBillingInterval;
