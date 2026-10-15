@@ -4,6 +4,7 @@
 
 import { AsyncLocalStorage } from "async_hooks";
 import { FreePlanLimitError, parseFreePlanError, parseFreePlanErrorBody } from "./free-plan-limit.js";
+import { coreBackendEnabled, coreExecute } from "./core-backend.js";
 
 const CONSOLE_API_URL = process.env.GRAFFITICODE_CONSOLE_URL || "https://console.graffiticode.org/api";
 
@@ -111,6 +112,22 @@ async function graphqlRequest<T>(
   opts?: { timeoutMs?: number }
 ): Promise<T> {
   const startedAt = Date.now();
+
+  // GRAFFITICODE_BACKEND=core: the same operation, answered by core in-process.
+  if (coreBackendEnabled()) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const work = coreExecute(auth, query, variables);
+      return await (opts?.timeoutMs
+        ? Promise.race([work, new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error("Request timed out")), opts.timeoutMs);
+        })])
+        : work) as T;
+    } finally {
+      if (timer) clearTimeout(timer);
+      recordUpstream(startedAt);
+    }
+  }
 
   // The timeout must cover the ENTIRE operation — fetch, headers, AND body
   // reading. AbortSignal.timeout on fetch alone left response.json() without
@@ -640,6 +657,7 @@ export function __setCatalogDeadlinesForTest(d: { fallbackMs: number; coldMs: nu
   CATALOG_TIMEOUT_COLD_MS = d.coldMs;
 }
 export function __resetCatalogForTest(): void {
+  getLanguageInfoCache.clear();
   listLanguagesCache.clear();
   listLanguagesInflight.clear();
   lastGoodFullCatalog = null;
