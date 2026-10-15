@@ -370,3 +370,65 @@ export function recordConnectionWrite(tx: { set(ref: admin.firestore.DocumentRef
     },
   });
 }
+
+// --- billing deliveries that need an operator (scripts/billing-uncertain.ts) --
+
+export type BillingAttention = {
+  id: string;
+  state: "uncertain" | "failed";
+  uid: string;
+  itemId: string;
+  payer: string;
+  stripeCustomerId: string | null;
+  identifier: string;
+  // When the item completed (the event's timestamp) and when it was first sent.
+  completedAt: number;
+  firstSentAt: number | null;
+  attempts: number;
+  lastError: string | null;
+};
+
+export async function listBillingAttention(): Promise<BillingAttention[]> {
+  const snap = await db().collection("effects").where("state", "in", ["uncertain", "failed"]).get();
+  return snap.docs
+    .map(d => ({ id: d.id, ...(d.data() as EffectDoc) }))
+    .filter(e => e.kind === "stripe_meter")
+    .map(e => ({
+      id: e.id,
+      state: e.state as "uncertain" | "failed",
+      uid: e.uid,
+      itemId: e.itemId,
+      payer: e.payload?.payer ?? "creator",
+      stripeCustomerId: e.payload?.stripeCustomerId ?? null,
+      identifier: e.payload?.identifier,
+      completedAt: Number(e.payload?.timestamp) || 0,
+      firstSentAt: e.firstSentAt ?? null,
+      attempts: e.attempts,
+      lastError: e.lastError,
+    }))
+    .sort((a, b) => a.completedAt - b.completedAt);
+}
+
+/**
+ * An operator's decision on a billing delivery that stopped. `done`: Stripe's
+ * meter event summaries show it arrived (or it should not be billed). `resend`:
+ * it did not arrive; send it again with the same identifier. A deliberate act:
+ * past Stripe's dedupe window the identifier no longer protects against a
+ * duplicate, which is why the operator checked first.
+ */
+export async function resolveBillingEffect(id: string, action: "done" | "resend", by: string, now = Date.now()) {
+  return db().runTransaction(async (tx) => {
+    const snap = await tx.get(effectRef(id));
+    const e = snap.data() as EffectDoc | undefined;
+    if (!e || e.kind !== "stripe_meter") throw new Error(`${id} is not a billing effect`);
+    if (e.state !== "uncertain" && e.state !== "failed") throw new Error(`${id} is ${e.state}, not waiting for an operator`);
+    const resolution = { action, by, at: now, previousState: e.state };
+    if (action === "done") {
+      tx.update(effectRef(id), { state: "done", resolution, nextAttemptAt: NEVER });
+    } else {
+      // Clearing firstSentAt lets the next claim send it once more.
+      tx.update(effectRef(id), { state: "pending", resolution, nextAttemptAt: now, firstSentAt: null, lastError: null });
+    }
+    return resolution;
+  });
+}

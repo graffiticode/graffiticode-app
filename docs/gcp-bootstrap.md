@@ -98,6 +98,20 @@ nothing to do while no v2 jobs exist.
   (`generation-jobs.dispatch.nextDispatchAt`, `effects.nextAttemptAt`) and the
   worker's is an equality on `effects.sourceId`; all use automatic indexes.
 
+### Enabling v2 (R1.1)
+
+1. Every tag on a pre-R1 console revision (and pre-R0.5 mcp revision) is
+   retired: `npm run deploy -- retire-tags console`, the same for `mcp`, then
+   `gc-deploy release-check`.
+2. `npm run enable-generation-v2 -w packages/console -- --console-floor <first R1 revision> --mcp-floor <first R0.5 revision>`
+   runs the drain check (no tags, no traffic, no instances on older revisions
+   for 20 minutes); with `--yes` it writes the one-way Firestore floor.
+3. Set `GENERATION_PROTOCOL=v2` in the console's `deploy.json` env, record the R1
+   release as its `baselines` entry, and deploy. The console's verify module
+   (`verify/console.mjs`) refuses any candidate whose effective protocol is
+   below the floor.
+4. Watch `generation_sweep` log lines and `npm run billing-uncertain`.
+
 ## Open items
 
 - TODO: existing secret mounts use `:latest`, which gc-deploy rejects. Pin them
