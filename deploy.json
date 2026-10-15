@@ -58,7 +58,9 @@
         }
       ],
       "env": {},
-      "secrets": {},
+      "secrets": {
+        "ACT_AS_GRANT_SECRET": "ACT_AS_GRANT_SECRET:1"
+      },
       "smoke": [
         {
           "path": "/",

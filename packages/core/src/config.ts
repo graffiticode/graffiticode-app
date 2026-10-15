@@ -37,6 +37,11 @@ export function configFromEnv(env: NodeJS.ProcessEnv = process.env) {
       internalNamespaces: list(env.FUNNEL_INTERNAL_NAMESPACES),
       internalToken: env.FUNNEL_INTERNAL_TOKEN ?? "",
     },
+    // Acting as a user for generation jobs and their effects (act-as.ts).
+    actAs: {
+      grantSecret: env.ACT_AS_GRANT_SECRET || "",
+      audience: env.ACT_AS_AUDIENCE || "urn:graffiticode:auth",
+    },
     // Generation protocol this revision produces (1 or 2); see generation-protocol.ts.
     generationProtocol: env.GENERATION_PROTOCOL === "v2" || env.GENERATION_PROTOCOL === "2" ? 2 : 1,
     ragDebug: !!env.RAG_DEBUG,

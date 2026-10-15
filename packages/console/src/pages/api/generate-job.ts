@@ -10,6 +10,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { GENERATION_JOB_VERSION } from "@graffiticode-app/core/lib/generation-queue";
 import type { GenerationJob } from "@graffiticode-app/core/lib/generation-queue";
 import { runJob } from "@graffiticode-app/core/generation";
+import { runJobV2 } from "@graffiticode-app/core/generation-jobs";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -18,6 +19,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const secret = process.env.INTERNAL_JOB_SECRET || "";
   if (!secret || req.headers["x-internal-job-secret"] !== secret) {
     return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  // v2: only the job id; the job itself is in Firestore (generation-jobs.ts).
+  if (req.body?.v === 2) {
+    const generationId = req.body.generationId;
+    if (typeof generationId !== "string" || !generationId) {
+      return res.status(400).json({ error: "Missing generationId" });
+    }
+    const r = await runJobV2(generationId);
+    return res.status(r.status).json(r.body);
   }
 
   const job = req.body as GenerationJob;

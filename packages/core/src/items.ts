@@ -20,7 +20,33 @@ import { defaultVersionSource, normalizeVersionSource, recordVersion } from "./v
 import type { VersionSource } from "./versions.js";
 import { itemConnectionFields, writeThroughCurrentConnection } from "./writes.js";
 import { ConflictError, requireFullAccount } from "./errors.js";
-import { assertNoActiveGeneration, legacyMayComplete, LegacyJobRefused } from "./generation-protocol.js";
+import { randomUUID } from "crypto";
+import { assertNoActiveGeneration, effectiveProtocol, legacyMayComplete, LegacyJobRefused } from "./generation-protocol.js";
+import { connectionIntent, processEffectsFor, recordConnectionWrite } from "./effects.js";
+
+// A new item document before it has content. Shared by createItem and the v2
+// generation reservation, which writes the shell inside its transaction.
+export function newItemDoc({ auth, id, lang, name, mark, help, isPublic, client, upstreamLangs, timestamp }: {
+  auth: AuthArg; id: string; lang: string; name?: string; mark?: number; help?: string; isPublic?: boolean;
+  client?: string; upstreamLangs?: string[]; timestamp: number;
+}): Record<string, any> {
+  const item: Record<string, any> = {
+    id,
+    name: name || "unnamed",
+    lang,
+    mark: mark || 1, // Default to mark 1 if not provided
+    help: help || "[]",
+    isPublic: isPublic || false,
+    client: client || 'console', // Default to 'console' if not provided
+    upstreamLangs: Array.isArray(upstreamLangs) ? upstreamLangs : [],
+    created: timestamp,
+    updated: timestamp,
+  };
+  if (auth.freePlan) {
+    Object.assign(item, freePlanItemFields(auth, timestamp));
+  }
+  return item;
+}
 
 export async function createItem({
   auth,
@@ -111,18 +137,7 @@ export async function createItem({
     }
 
     const timestamp = Date.now();
-    const item: Record<string, any> = {
-      id,
-      name,
-      lang,
-      mark: mark || 1, // Default to mark 1 if not provided
-      help: generatedHelp,
-      isPublic: isPublic || false,
-      client: client || 'console', // Default to 'console' if not provided
-      upstreamLangs: Array.isArray(upstreamLangs) ? upstreamLangs : [],
-      created: timestamp,
-      updated: timestamp,
-    };
+    const item = newItemDoc({ auth, id, lang, name, mark, help: generatedHelp, isPublic, client, upstreamLangs, timestamp });
     if (taskId) {
       item.taskId = taskId;
     }
@@ -133,11 +148,18 @@ export async function createItem({
     if (code !== null) {
       item.code = code;
     }
-    if (auth.freePlan) {
-      Object.assign(item, freePlanItemFields(auth, timestamp));
-    }
+    // v2: the connection write is an intent committed with the item (see updateItem).
+    const saveId = taskId && (await effectiveProtocol()).effective >= 2 ? `save-${randomUUID()}` : null;
     // Use merge: true so the tokenUsage that was accumulated during generation is preserved
-    await itemRef.set(item, { merge: true });
+    if (saveId) {
+      const connection = await connectionIntent(auth, lang, code);
+      const batch = db().batch();
+      batch.set(itemRef, item, { merge: true });
+      recordConnectionWrite(batch, { sourceId: saveId, uid: auth.uid, itemId: id, taskId, lang, connection, now: timestamp });
+      await batch.commit();
+    } else {
+      await itemRef.set(item, { merge: true });
+    }
 
     // Backfill token usage docs that were written with itemId: null (deferred generation).
     // On the generation path, all docs have itemId set, so this is a no-op; it covers
@@ -170,8 +192,14 @@ export async function createItem({
         client: item.client,
         source: resolvedSource,
       });
-      const lastWrite = await writeThroughCurrentConnection({ auth, itemId: id, lang, taskId, code });
-      if (lastWrite) item.lastWrite = lastWrite;
+      if (saveId) {
+        await processEffectsFor(saveId, { token: auth.token });
+        const stored = (await itemRef.get()).data()?.lastWrite;
+        if (stored) item.lastWrite = stored;
+      } else {
+        const lastWrite = await writeThroughCurrentConnection({ auth, itemId: id, lang, taskId, code });
+        if (lastWrite) item.lastWrite = lastWrite;
+      }
     }
     return {
       ...item,
@@ -411,6 +439,11 @@ export async function updateItem({
       const ttlBase = updates.updated || itemData.updated || Date.now();
       updates.expiresAt = ttlBase + FREE_PLAN_ITEM_TTL_MS;
     }
+    // Under generation protocol v2 a save's connection write is an outbox
+    // intent, committed with the content and carried out right after
+    // (effects.ts), instead of a write that a crash between the two could lose.
+    const saveId = taskIdChanged && (await effectiveProtocol()).effective >= 2 ? `save-${randomUUID()}` : null;
+    const saveConnection = saveId ? await connectionIntent(auth, updates.lang ?? itemData.lang, updates.code) : null;
     const tWrite = Date.now();
     if (taskIdChanged || legacyLeaseOwner) {
       // Content changes commit only if no v2 job owns the item; a v1 worker's
@@ -420,6 +453,11 @@ export async function updateItem({
         if (legacyLeaseOwner && !legacyMayComplete(fresh, legacyLeaseOwner)) throw new LegacyJobRefused();
         assertNoActiveGeneration(fresh);
         tx.update(itemRef, updates);
+        if (saveId) {
+          recordConnectionWrite(tx, {
+            sourceId: saveId, uid: auth.uid, itemId: id, taskId, lang: updates.lang ?? itemData.lang, connection: saveConnection, now: Date.now(),
+          });
+        }
       });
     } else {
       await itemRef.update(updates);
@@ -442,9 +480,13 @@ export async function updateItem({
     let writeThroughMs = 0;
     if (taskIdChanged) {
       const tWriteThrough = Date.now();
-      // updates.code is this version's program (absent when it could not be
-      // fetched: then no skip is recorded rather than one judged on stale code).
-      await writeThroughCurrentConnection({ auth, itemId: id, lang: updates.lang ?? itemData.lang, taskId, code: updates.code });
+      if (saveId) {
+        await processEffectsFor(saveId, { token: auth.token });
+      } else {
+        // updates.code is this version's program (absent when it could not be
+        // fetched: then no skip is recorded rather than one judged on stale code).
+        await writeThroughCurrentConnection({ auth, itemId: id, lang: updates.lang ?? itemData.lang, taskId, code: updates.code });
+      }
       writeThroughMs = Date.now() - tWriteThrough;
     }
     // Re-reads the document that was just written, to build the return value.
@@ -704,6 +746,7 @@ export async function getItems({ auth, lang, mark, client }) {
         generationStatus: data.generationStatus ?? null,
         generationError: data.generationError ?? null,
         generationStartedAt: data.generationStartedAt ? String(data.generationStartedAt) : null,
+        generationDeadlineAt: data.generationDeadlineAt ? String(data.generationDeadlineAt) : null,
         generationChars: typeof data.generationChars === "number" ? data.generationChars : null,
         publicationId: data.publicationId ?? null,
         publishedTaskId: data.publishedTaskId ?? null,
@@ -836,6 +879,7 @@ export async function getItem({ auth, id, includeSpec = false }: {
       generationStatus: data.generationStatus ?? null,
       generationError: data.generationError ?? null,
       generationStartedAt: data.generationStartedAt ? String(data.generationStartedAt) : null,
+      generationDeadlineAt: data.generationDeadlineAt ? String(data.generationDeadlineAt) : null,
       // The SINGLE-item resolver, which is the one the MCP polls. Adding this field
       // to the list resolver alone left the counter reading null for every
       // render_item call while Firestore held 12,512 — the write worked and the

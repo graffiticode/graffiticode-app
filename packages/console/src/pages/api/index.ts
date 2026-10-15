@@ -147,6 +147,9 @@ const typeDefs = `
     generationStatus: String
     generationError: String
     generationStartedAt: String
+    # Set while a v2 generation job runs (its absolute deadline); null otherwise.
+    # A v2 item is reported failed only from durable state, never by staleness.
+    generationDeadlineAt: String
     # Characters written so far by a RUNNING generation; null once terminal.
     generationChars: Int
     # Free-plan only. workspace is a signed handle the client sends back as

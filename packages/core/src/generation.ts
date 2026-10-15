@@ -14,6 +14,8 @@ import { adoptWorkspaceFromSibling } from "./claims.js";
 import { createItem, getItem, updateItem } from "./items.js";
 import { claimGeneration, releaseGeneration, setItemGenerationStatus } from "./generation-lease.js";
 import { effectiveProtocol, LegacyJobRefused } from "./generation-protocol.js";
+import { appendHelpEntry, parseCurrentData, reserveGeneration } from "./generation-jobs.js";
+import { assertItemCreateAllowed } from "./access.js";
 
 // startCodeGeneration: reserve (create the shell, or mark an existing item
 // generating) and enqueue the worker job. Serves create_item and update_item.
@@ -30,13 +32,14 @@ export async function startGeneration(ctx: any, args: any) {
     modification,
     currentSrc,
     currentData,
+    // The item's taskId the revision was prepared against (core reviseItem).
+    // v2 refuses the revision if the item has moved on since.
+    baseTaskId,
   } = args;
 
-  // This revision produces v1 jobs only. Once the v2 floor is set (or v2 is
-  // configured), refuse rather than enqueue work the worker would reject.
-  if ((await effectiveProtocol()).effective >= 2) {
-    throw new Error("Generation protocol v2 is enabled, but this console revision only produces v1 jobs.");
-  }
+  // Re-read before every reservation: once the v2 floor is set, nothing here
+  // produces v1 work again (generation-protocol.ts).
+  const protocol = (await effectiveProtocol()).effective;
 
   // The agent OMTM counts a workspace's FIRST create attempt, any outcome.
   // Gated on `!itemId` because this resolver serves update_item too, and a
@@ -104,6 +107,31 @@ export async function startGeneration(ctx: any, args: any) {
       });
     }
   }
+  if (protocol >= 2) {
+    try {
+      // The create gate, as createItem runs it; a revision has no gate here.
+      if (!itemId) await assertItemCreateAllowed(auth, lang);
+      const reserved = await reserveGeneration({
+        auth, itemId, lang, name, client, prompt, modification, currentSrc, currentData,
+        ...(baseTaskId !== undefined ? { baseTaskId } : {}),
+        sessionNamespace: ctx.sessionNamespace, sessionUuid: ctx.sessionUuid, workspaceKey,
+      });
+      return {
+        itemId: reserved.itemId,
+        status: "generating",
+        workspaceNamespace: auth.freePlan ? (auth.sessionNamespace ?? null) : null,
+      };
+    } catch (err) {
+      if (itemId) throw err;
+      // As in v1 below: a refused create is still the workspace's first attempt.
+      await resolveFirstOutcome(workspaceKey, err instanceof FreePlanError ? "wall" : "error");
+      // createItem's wording, so callers see the same error either way.
+      const wrapped = new Error(`Failed to create item: ${(err as Error).message}`);
+      (wrapped as Error & { cause?: unknown }).cause = err;
+      throw wrapped;
+    }
+  }
+
   // Credential the worker replays to act as this caller. For free-plan we
   // re-derive fresh credentials in the worker (idTokens are short-lived and
   // dispatch can lag), so carry the session, not a baked idToken.
@@ -159,37 +187,6 @@ export async function startGeneration(ctx: any, args: any) {
     status: "generating",
     workspaceNamespace: auth.freePlan ? (auth.sessionNamespace ?? null) : null,
   };
-}
-
-// Help-history entry shape shared with the MCP server's parseHelp /
-// buildContextualPrompt — keep in lockstep so subsequent updates parse it.
-function appendHelpEntry(helpJson: string, modification: string, taskId: string): string {
-  let history: unknown[] = [];
-  try {
-    const parsed = JSON.parse(helpJson || "[]");
-    if (Array.isArray(parsed)) history = parsed;
-  } catch {
-    history = [];
-  }
-  history.push({
-    user: modification,
-    help: { text: modification },
-    type: "user",
-    timestamp: new Date().toISOString(),
-    taskId,
-  });
-  return JSON.stringify(history);
-}
-
-/** Job payloads carry the data model as JSON text; bad JSON means no context, never a failure. */
-function parseCurrentData(raw: unknown): unknown {
-  if (typeof raw !== "string" || raw.length === 0) return null;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    console.warn("[generate-job] currentData was not parseable JSON; generating without it");
-    return null;
-  }
 }
 
 // The generation worker's work for one job: act as the caller, claim the item,
