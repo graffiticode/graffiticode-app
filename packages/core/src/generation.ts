@@ -13,6 +13,7 @@ import { principalFromReplay, resolveAuth, type Principal } from "./auth.js";
 import { adoptWorkspaceFromSibling } from "./claims.js";
 import { createItem, getItem, updateItem } from "./items.js";
 import { claimGeneration, releaseGeneration, setItemGenerationStatus } from "./generation-lease.js";
+import { effectiveProtocol, LegacyJobRefused } from "./generation-protocol.js";
 
 // startCodeGeneration: reserve (create the shell, or mark an existing item
 // generating) and enqueue the worker job. Serves create_item and update_item.
@@ -30,6 +31,12 @@ export async function startGeneration(ctx: any, args: any) {
     currentSrc,
     currentData,
   } = args;
+
+  // This revision produces v1 jobs only. Once the v2 floor is set (or v2 is
+  // configured), refuse rather than enqueue work the worker would reject.
+  if ((await effectiveProtocol()).effective >= 2) {
+    throw new Error("Generation protocol v2 is enabled, but this console revision only produces v1 jobs.");
+  }
 
   // The agent OMTM counts a workspace's FIRST create attempt, any outcome.
   // Gated on `!itemId` because this resolver serves update_item too, and a
@@ -228,6 +235,11 @@ export async function runJob(job: GenerationJob): Promise<{ status: number; body
     console.error("[generate-job] item missing", itemId);
     return { status: 200, body: { status: "missing" } };
   }
+  if (claim === "v2") {
+    // A v2 job owns this item now; a legacy job must not write to it.
+    console.warn("[generate-job] v1 job refused: item has a v2 job", itemId);
+    return { status: 200, body: { status: "refused" } };
+  }
   if (claim === "busy") {
     // Another attempt holds the lease and is still running. 2xx so the queue
     // stops retrying: if that attempt dies, the item stays "generating" and the
@@ -305,6 +317,7 @@ export async function runJob(job: GenerationJob): Promise<{ status: number; body
       taskId: result.taskId,
       // The AST the generator just posted, so updateItem need not fetch it back.
       taskCode: (result as any).taskCode,
+      legacyLeaseOwner: attemptId,
       help: updatedHelp,
       source: "generation-job",
       label: modification,
@@ -332,6 +345,13 @@ export async function runJob(job: GenerationJob): Promise<{ status: number; body
 
     return { status: 200, body: { status: "ready", taskId: result.taskId } };
   } catch (err: any) {
+    if (err instanceof LegacyJobRefused) {
+      // The item gained a v2 job, or our lease was taken, while we generated:
+      // our result is dropped and nothing was written. Handled, so 2xx.
+      console.warn("[generate-job] v1 completion refused", itemId);
+      await releaseGeneration({ auth, id: itemId, owner: attemptId });
+      return { status: 200, body: { status: "refused" } };
+    }
     // Unexpected error: leave the item "generating" and return 5xx so Cloud
     // Tasks retries (capped by the queue's maxAttempts). If every attempt fails
     // the item stays "generating" and the MCP staleness guard reports it failed

@@ -30,3 +30,15 @@ export function requireFullAccount(auth: { freePlan?: boolean } | null | undefin
   }[feature];
   throw new ForbiddenError(message);
 }
+
+// The item can't take this change right now. `reason` is stable and safe to
+// show: "generation_in_progress" while a generation job owns the item.
+export class ConflictError extends Error {
+  readonly code = "conflict";
+  readonly reason: string;
+  constructor(reason: string, message: string) {
+    super(message);
+    this.name = "ConflictError";
+    this.reason = reason;
+  }
+}

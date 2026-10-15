@@ -37,6 +37,8 @@ export function configFromEnv(env: NodeJS.ProcessEnv = process.env) {
       internalNamespaces: list(env.FUNNEL_INTERNAL_NAMESPACES),
       internalToken: env.FUNNEL_INTERNAL_TOKEN ?? "",
     },
+    // Generation protocol this revision produces (1 or 2); see generation-protocol.ts.
+    generationProtocol: env.GENERATION_PROTOCOL === "v2" || env.GENERATION_PROTOCOL === "2" ? 2 : 1,
     ragDebug: !!env.RAG_DEBUG,
     judgeMaxTokens: parseInt(env.JUDGE_MAX_TOKENS || "8192", 10),
     // The RAG fallback's example files. Phase 2 points this at the core package.
