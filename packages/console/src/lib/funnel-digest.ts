@@ -230,7 +230,44 @@ export function aggregateSplit(
  * Note this means paging still walks console events; MAX_PAGES bounds entries
  * READ, not entries kept, so a noisy console hour can still truncate the window.
  */
+/**
+ * The events a report counts for [from, to): log lines, plus the events
+ * generation protocol v2 commits to Firestore (funnel-events/{eid}) in the
+ * transaction that completes or fails a generation (app tier Phase 3.5).
+ * Those are never also logged, so nothing is counted twice; and each carries
+ * its commit time, so it lands in the window it happened in however late a
+ * reader looks. Reading writes nothing: previews, scheduled digests and
+ * historical reports all see the same data.
+ */
 export async function fetchEvents(
+  from: Date,
+  to: Date,
+): Promise<{ events: LogEvent[]; truncated: boolean }> {
+  const [logged, stored] = await Promise.all([fetchLoggedEvents(from, to), fetchStoredEvents(from, to)]);
+  return { events: mergeEvents(logged.events, stored), truncated: logged.truncated };
+}
+
+export async function fetchStoredEvents(from: Date, to: Date): Promise<LogEvent[]> {
+  const snap = await getFirestore().collection("funnel-events")
+    .where("at", ">=", from.getTime()).where("at", "<", to.getTime()).orderBy("at").get();
+  const events: LogEvent[] = [];
+  for (const doc of snap.docs) {
+    const { at: _at, ...payload } = doc.data() as LogEvent & { at?: number };
+    if (!payload?.ev) continue;
+    if (!isMcpOrigin(payload)) continue;
+    if (isExcludedAccount(payload)) continue;
+    events.push(payload);
+  }
+  return events;
+}
+
+// One stream in time order, as the log query returns it.
+export function mergeEvents(logged: LogEvent[], stored: LogEvent[]): LogEvent[] {
+  if (!stored.length) return logged;
+  return [...logged, ...stored].sort((a, b) => String(a.t ?? "").localeCompare(String(b.t ?? "")));
+}
+
+async function fetchLoggedEvents(
   from: Date,
   to: Date,
 ): Promise<{ events: LogEvent[]; truncated: boolean }> {
