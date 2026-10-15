@@ -109,9 +109,22 @@ export async function performWrite({ auth, itemId, taskId, connectionId, idempot
   connectionId: string;
   idempotencyKey: string;
 }): Promise<LastWrite> {
-  let message: string | null = null;
+  const message = await sendWrite({ token: auth.token, taskId, connectionId, idempotencyKey });
+  return recordLastWrite({ auth, itemId, taskId, connectionId, message, idempotencyKey });
+}
+
+// Sends one write through a connection and returns its outcome as a message
+// (null for success). Persists nothing and never throws: a transport failure
+// is an outcome too. The generation outbox (effects.ts) records the result in
+// a transaction fenced on its own lease; performWrite records it directly.
+export async function sendWrite({ token, taskId, connectionId, idempotencyKey }: {
+  token: string;
+  taskId: string;
+  connectionId: string;
+  idempotencyKey: string;
+}): Promise<string | null> {
   try {
-    const resp = await compileThroughConnection({ authToken: auth.token, id: taskId, connectionId, idempotencyKey });
+    const resp = await compileThroughConnection({ authToken: token, id: taskId, connectionId, idempotencyKey });
     const errors = [
       ...(Array.isArray(resp?.data?.errors) ? resp.data.errors : []),
       ...(Array.isArray(resp?.errors) ? resp.errors : []),
@@ -119,18 +132,44 @@ export async function performWrite({ auth, itemId, taskId, connectionId, idempot
     if (resp?.status !== "success" && errors.length === 0) {
       errors.push(resp?.error ?? `compile ${resp?.status ?? "failed"}`);
     }
-    if (errors.length) message = errorMessages(errors);
+    return errors.length ? errorMessages(errors) : null;
   } catch (err) {
-    message = `Write failed: ${err?.message ?? err}`;
+    return `Write failed: ${err?.message ?? err}`;
   }
-  return recordLastWrite({ auth, itemId, taskId, connectionId, message, idempotencyKey });
 }
 
-// Stores the outcome on the item. A failure never replaces a success for the
-// same version through the same connection: the write happened, and a
-// duplicate that raced it (reported "uncertain" by the broker) says nothing new.
-// Nor does a skip replace a success for the same version. Any later outcome
-// (a retry, a new version) replaces a failure or a skip.
+export function buildLastWrite({ taskId, connectionId, message, status, idempotencyKey, at = Date.now() }: {
+  taskId: string;
+  connectionId: string | null;
+  message: string | null;
+  status?: "skipped";
+  idempotencyKey?: string | null;
+  at?: number;
+}): LastWrite {
+  return {
+    taskId,
+    connectionId,
+    status: status ?? (message === null ? "ok" : "failed"),
+    ...(message === null ? {} : { message: message.slice(0, LAST_WRITE_MESSAGE_LIMIT) }),
+    ...(idempotencyKey ? { idempotencyKey } : {}),
+    at,
+  };
+}
+
+// What the item's lastWrite becomes after `next`. A failure never replaces a
+// success for the same version through the same connection: the write
+// happened, and a duplicate that raced it (reported "uncertain" by the broker)
+// says nothing new. Nor does a skip replace a success for the same version.
+// Any later outcome (a retry, a new version) replaces a failure or a skip.
+export function applyLastWrite(prev: LastWrite | null | undefined, next: LastWrite): LastWrite {
+  if (next.status !== "ok" && prev?.status === "ok" && prev.taskId === next.taskId &&
+      (next.status === "skipped" || prev.connectionId === next.connectionId)) {
+    return prev;
+  }
+  return next;
+}
+
+// Stores the outcome on the item, by applyLastWrite's rules.
 export async function recordLastWrite({ auth, itemId, taskId, connectionId, message, status, idempotencyKey }: {
   auth: AuthArg;
   itemId: string;
@@ -140,14 +179,7 @@ export async function recordLastWrite({ auth, itemId, taskId, connectionId, mess
   status?: "skipped";
   idempotencyKey?: string;
 }): Promise<LastWrite> {
-  const lastWrite: LastWrite = {
-    taskId,
-    connectionId,
-    status: status ?? (message === null ? "ok" : "failed"),
-    ...(message === null ? {} : { message: message.slice(0, LAST_WRITE_MESSAGE_LIMIT) }),
-    ...(idempotencyKey ? { idempotencyKey } : {}),
-    at: Date.now(),
-  };
+  const lastWrite = buildLastWrite({ taskId, connectionId, message, status, idempotencyKey });
   if (lastWrite.status === "failed") {
     console.error("writeThroughCurrentConnection(): write failed for item", itemId, message);
   }
@@ -156,12 +188,9 @@ export async function recordLastWrite({ auth, itemId, taskId, connectionId, mess
     // A targeted write, not updateItem: recording the outcome is not a content change.
     return await db().runTransaction(async tx => {
       const prev = (await tx.get(itemRef)).data()?.lastWrite;
-      if (lastWrite.status !== "ok" && prev?.status === "ok" && prev.taskId === taskId &&
-          (lastWrite.status === "skipped" || prev.connectionId === connectionId)) {
-        return prev as LastWrite;
-      }
-      tx.update(itemRef, { lastWrite });
-      return lastWrite;
+      const stored = applyLastWrite(prev, lastWrite);
+      if (stored !== prev) tx.update(itemRef, { lastWrite: stored });
+      return stored;
     });
   } catch (err) {
     console.error("writeThroughCurrentConnection(): failed to record the outcome for item", itemId, err);
