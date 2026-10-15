@@ -82,28 +82,8 @@ export async function recordVersion({
 }) {
   try {
     if (!itemId || !taskId || !lang) return;
-    const upstream = Array.isArray(upstreamLangs) ? upstreamLangs : [];
-    const version: Record<string, any> = {
-      itemId,
-      taskId,
-      lang,
-      upstreamLangs: upstream,
-      // Denormalized head-first chain, so the tasks list can filter by lang
-      // sequence without a round-trip per compound task.
-      langs: [lang, ...upstream],
-      name: name ?? null,
-      mark: mark ?? null,
-      client: client ?? "console",
-      source,
-      createdAt,
-    };
-    if (label) {
-      version.label = String(label).slice(0, VERSION_LABEL_MAX);
-    }
-    if (auth.freePlan) {
-      Object.assign(version, freePlanItemFields(auth, createdAt));
-    }
-    const ref = db().doc(`users/${auth.uid}/versions/${itemId}__${taskId}`);
+    const version = buildVersionDoc({ auth, itemId, taskId, lang, upstreamLangs, name, mark, client, source, label, createdAt });
+    const ref = db().doc(versionPath(auth.uid, itemId, taskId));
     // create-if-absent, NOT set/merge: reverting to an earlier state re-derives
     // the same content-addressed taskId, and merging would overwrite that
     // version's original createdAt/source — silently rewriting history and
@@ -121,6 +101,40 @@ export async function recordVersion({
   } catch (error) {
     console.error("recordVersion()", "ERROR", itemId, taskId, error);
   }
+}
+
+export const versionPath = (uid: string, itemId: string, taskId: string) => `users/${uid}/versions/${itemId}__${taskId}`;
+
+// The version document recordVersion creates; also written by the v2
+// generation completion inside its transaction.
+export function buildVersionDoc({
+  auth, itemId, taskId, lang, upstreamLangs, name, mark, client, source = "unknown", label, createdAt = Date.now(),
+}: {
+  auth: AuthArg; itemId: string; taskId: string; lang: string; upstreamLangs?: string[]; name?: string;
+  mark?: number; client?: string; source?: VersionSource; label?: string; createdAt?: number;
+}) {
+  const upstream = Array.isArray(upstreamLangs) ? upstreamLangs : [];
+  const version: Record<string, any> = {
+    itemId,
+    taskId,
+    lang,
+    upstreamLangs: upstream,
+    // Denormalized head-first chain, so the tasks list can filter by lang
+    // sequence without a round-trip per compound task.
+    langs: [lang, ...upstream],
+    name: name ?? null,
+    mark: mark ?? null,
+    client: client ?? "console",
+    source,
+    createdAt,
+  };
+  if (label) {
+    version.label = String(label).slice(0, VERSION_LABEL_MAX);
+  }
+  if (auth.freePlan) {
+    Object.assign(version, freePlanItemFields(auth, createdAt));
+  }
+  return version;
 }
 
 export const TASK_VERSIONS_DEFAULT_LIMIT = 200;

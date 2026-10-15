@@ -22,6 +22,30 @@ import { itemConnectionFields, writeThroughCurrentConnection } from "./writes.js
 import { ConflictError, requireFullAccount } from "./errors.js";
 import { assertNoActiveGeneration, legacyMayComplete, LegacyJobRefused } from "./generation-protocol.js";
 
+// A new item document before it has content. Shared by createItem and the v2
+// generation reservation, which writes the shell inside its transaction.
+export function newItemDoc({ auth, id, lang, name, mark, help, isPublic, client, upstreamLangs, timestamp }: {
+  auth: AuthArg; id: string; lang: string; name?: string; mark?: number; help?: string; isPublic?: boolean;
+  client?: string; upstreamLangs?: string[]; timestamp: number;
+}): Record<string, any> {
+  const item: Record<string, any> = {
+    id,
+    name: name || "unnamed",
+    lang,
+    mark: mark || 1, // Default to mark 1 if not provided
+    help: help || "[]",
+    isPublic: isPublic || false,
+    client: client || 'console', // Default to 'console' if not provided
+    upstreamLangs: Array.isArray(upstreamLangs) ? upstreamLangs : [],
+    created: timestamp,
+    updated: timestamp,
+  };
+  if (auth.freePlan) {
+    Object.assign(item, freePlanItemFields(auth, timestamp));
+  }
+  return item;
+}
+
 export async function createItem({
   auth,
   lang,
@@ -111,18 +135,7 @@ export async function createItem({
     }
 
     const timestamp = Date.now();
-    const item: Record<string, any> = {
-      id,
-      name,
-      lang,
-      mark: mark || 1, // Default to mark 1 if not provided
-      help: generatedHelp,
-      isPublic: isPublic || false,
-      client: client || 'console', // Default to 'console' if not provided
-      upstreamLangs: Array.isArray(upstreamLangs) ? upstreamLangs : [],
-      created: timestamp,
-      updated: timestamp,
-    };
+    const item = newItemDoc({ auth, id, lang, name, mark, help: generatedHelp, isPublic, client, upstreamLangs, timestamp });
     if (taskId) {
       item.taskId = taskId;
     }
@@ -132,9 +145,6 @@ export async function createItem({
     }
     if (code !== null) {
       item.code = code;
-    }
-    if (auth.freePlan) {
-      Object.assign(item, freePlanItemFields(auth, timestamp));
     }
     // Use merge: true so the tokenUsage that was accumulated during generation is preserved
     await itemRef.set(item, { merge: true });
@@ -704,6 +714,7 @@ export async function getItems({ auth, lang, mark, client }) {
         generationStatus: data.generationStatus ?? null,
         generationError: data.generationError ?? null,
         generationStartedAt: data.generationStartedAt ? String(data.generationStartedAt) : null,
+        generationDeadlineAt: data.generationDeadlineAt ? String(data.generationDeadlineAt) : null,
         generationChars: typeof data.generationChars === "number" ? data.generationChars : null,
         publicationId: data.publicationId ?? null,
         publishedTaskId: data.publishedTaskId ?? null,
@@ -836,6 +847,7 @@ export async function getItem({ auth, id, includeSpec = false }: {
       generationStatus: data.generationStatus ?? null,
       generationError: data.generationError ?? null,
       generationStartedAt: data.generationStartedAt ? String(data.generationStartedAt) : null,
+      generationDeadlineAt: data.generationDeadlineAt ? String(data.generationDeadlineAt) : null,
       // The SINGLE-item resolver, which is the one the MCP polls. Adding this field
       // to the list resolver alone left the counter reading null for every
       // render_item call while Firestore held 12,512 — the write worked and the

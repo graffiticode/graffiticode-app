@@ -398,6 +398,9 @@ export interface Item {
   generationStatus?: "generating" | "ready" | "failed" | null;
   generationError?: string | null;
   generationStartedAt?: string | null;
+  // Set while a v2 generation job runs (Phase 3.5). Such an item is failed only
+  // by the console's durable state, so the stale guard must not fire for it.
+  generationDeadlineAt?: string | null;
   // Characters a RUNNING generation has emitted so far, published by the console
   // every ~2s. Null once terminal. Characters rather than tokens because that is
   // what streams — Anthropic reports output_tokens only at the end of a turn.
@@ -541,6 +544,7 @@ export async function getItemWithTask(options: {
         generationStatus
         generationError
         generationStartedAt
+        generationDeadlineAt
         generationChars
         task {
           id

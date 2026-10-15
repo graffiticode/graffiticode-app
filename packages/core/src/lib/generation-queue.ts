@@ -96,10 +96,22 @@ export interface GenerationJob {
 }
 
 export async function enqueueGenerationJob(job: GenerationJob): Promise<void> {
+  await dispatchGenerationTask({ v: GENERATION_JOB_VERSION, ...job });
+}
+
+/**
+ * v2 payload: only the job id. Everything else is in generation-jobs/{id},
+ * which the worker reads (app tier Phase 3.5). The task is only a wake-up.
+ */
+export type GenerationJobV2 = { v: 2; generationId: string };
+
+// Posts one worker task. `taskName` (v2: gen-<generationId>-<dispatchCount>)
+// lets Cloud Tasks refuse a duplicate of the same dispatch slot.
+export async function dispatchGenerationTask(payload: Record<string, unknown>, taskName?: string): Promise<void> {
   if (!SECRET()) {
     throw new Error("INTERNAL_JOB_SECRET is not configured — cannot enqueue generation job");
   }
-  const body = JSON.stringify({ v: GENERATION_JOB_VERSION, ...job });
+  const body = JSON.stringify(payload);
 
   if (LOCAL()) {
     // Local dev: invoke the worker without awaiting completion. The dev server
@@ -119,6 +131,7 @@ export async function enqueueGenerationJob(job: GenerationJob): Promise<void> {
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       task: {
+        ...(taskName ? { name: `projects/${PROJECT()}/locations/${LOCATION()}/queues/${QUEUE()}/tasks/${taskName}` } : {}),
         httpRequest: {
           url: WORKER_URL(),
           httpMethod: "POST",
@@ -149,6 +162,6 @@ export async function enqueueGenerationJob(job: GenerationJob): Promise<void> {
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`Cloud Tasks createTask failed: ${res.status} ${text}`);
+    throw Object.assign(new Error(`Cloud Tasks createTask failed: ${res.status} ${text}`), { status: res.status });
   }
 }

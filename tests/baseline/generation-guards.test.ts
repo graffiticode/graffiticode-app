@@ -98,9 +98,11 @@ test("the Firestore floor ratchets the effective protocol above the configured o
   await h.db.doc(protocol.PROTOCOL_DOC).set({ minProtocol: 2, activatedAt: Date.now(), activatedBy: "baseline" });
   protocol.resetProtocolFloorCache();
   assert.deepEqual(await protocol.effectiveProtocol(), { configured: 1, minProtocol: 2, effective: 2 });
-  // This revision can't produce v2 jobs, so it refuses rather than enqueue v1 work.
-  assert.match(errorOf(await h.gql(START, { lang: "0175", prompt: PROMPT, modification: PROMPT }, alice)).message, /protocol v2 is enabled/);
-  assert.equal(h.jobPayloads.length, 0);
+  // With the floor at 2, producers reserve v2 jobs whatever the env says.
+  ok(await h.gql(START, { lang: "0175", prompt: PROMPT, modification: PROMPT }, alice));
+  await h.drainJobs();
+  assert.equal(h.jobPayloads.length, 1);
+  assert.equal(h.jobPayloads[0].v, 2);
 });
 
 test("/api/health reports liveness, and the effective protocol with ?deep=1", async () => {

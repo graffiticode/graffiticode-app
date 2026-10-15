@@ -71,7 +71,14 @@ export type CompileResponder = (req: { id: string; connectionId: string; idempot
 export type ReconcileResponder = (req: { connectionId: string; idempotencyKey: string }) =>
   { status: number; body: unknown } | Promise<{ status: number; body: unknown }>;
 
+export type ActAsResponder = (req: { identity: string; purpose: string; uid: string; subject: string; grant: string }) =>
+  { status: number; body: unknown };
+
+export const ACT_AS_SECRET = "baseline-act-as-grant-secret-0123456789abcdef";
+export const CONSOLE_IDENTITY = "idt|console-run@graffiticode-app.iam.gserviceaccount.com|urn:graffiticode:auth";
+
 type BackendState = {
+  actAs: ActAsResponder;
   compile: CompileResponder;
   reconcile: ReconcileResponder;
   connections: any[];
@@ -92,6 +99,10 @@ function fakeBackend(calls: Calls, state: BackendState) {
         return sendJson(res, 200, { status: "success", data: { uid: token.slice(5), token } });
       }
       return sendJson(res, 401, { status: "error", error: { message: "invalid token" } });
+    }
+    if (req.method === "POST" && url.pathname === "/internal/act-as") {
+      const r = state.actAs({ identity: String(req.headers["x-caller-identity"] ?? ""), ...body });
+      return sendJson(res, r.status, r.body);
     }
     if (req.method === "POST" && url.pathname === "/authenticate/api-key") {
       const token = String(body?.token ?? "");
@@ -177,6 +188,7 @@ export type Harness = {
   jobPayloads: any[];
   setLlm(fn: LlmResponder, delayMs?: number): void;
   setCompile(fn: CompileResponder): void;
+  setActAs(fn: ActAsResponder): void;
   setReconcile(fn: ReconcileResponder): void;
   setConnections(connections: any[]): void;
   addTask(task: { lang: string; code: unknown }): string;
@@ -205,7 +217,13 @@ export async function start(): Promise<Harness> {
   const defaultLlm = (() => "```\n" + DEFAULT_PROGRAM + "\n```") as LlmResponder;
   const defaultCompile = (() => ({ status: 200, body: { status: "success", data: { id: "x" } } })) as CompileResponder;
   const defaultReconcile = (() => ({ status: 200, body: { status: "success", data: { operations: [] } } })) as ReconcileResponder;
+  // The real route checks the caller and the grant (backend auth/routes/internal.js);
+  // the fake checks the caller and answers with a token the fake verifier accepts.
+  const defaultActAs = (({ identity, uid }) => identity === CONSOLE_IDENTITY
+    ? { status: 200, body: { status: "success", data: { accessToken: `user:${uid}`, expiresIn: 300 } } }
+    : { status: 401, body: { status: "error", error: { message: "caller-rejected" } } }) as ActAsResponder;
   const state: BackendState & { llm: LlmResponder; llmDelayMs: number } = {
+    actAs: defaultActAs,
     compile: defaultCompile,
     reconcile: defaultReconcile,
     connections: [],
@@ -225,6 +243,7 @@ export async function start(): Promise<Harness> {
     FREE_PLAN_NAMESPACE_SALT: "baseline-salt",
     FREE_PLAN_API_KEY: FREE_PLAN_KEY,
     INTERNAL_JOB_SECRET: JOB_SECRET,
+    ACT_AS_GRANT_SECRET: ACT_AS_SECRET,
     GENERATION_QUEUE_LOCAL: "1",
     GENERATION_JOB_URL: WORKER_URL,
     CONSOLE_URL: "http://console.baseline.test",
@@ -291,6 +310,10 @@ export async function start(): Promise<Harness> {
     throw new Error(`baseline: refused external fetch to ${url}`);
   }) as typeof fetch;
 
+  // The worker's Cloud Run identity token (the metadata server, in production).
+  const { setIdentityTokenProvider } = await import("@graffiticode-app/core/act-as");
+  setIdentityTokenProvider(async (audience: string) => `idt|console-run@graffiticode-app.iam.gserviceaccount.com|${audience}`);
+
   const apiHandler = (await import("../../packages/console/src/pages/api/index")).default;
   jobHandler = (await import("../../packages/console/src/pages/api/generate-job")).default;
   const admin = (await import("firebase-admin")).default;
@@ -320,6 +343,7 @@ export async function start(): Promise<Harness> {
     calls, external, llmRequests, jobs, jobPayloads,
     setLlm(fn, delayMs = 0) { state.llm = fn; state.llmDelayMs = delayMs; },
     setCompile(fn) { state.compile = fn; },
+    setActAs(fn) { state.actAs = fn; },
     setReconcile(fn) { state.reconcile = fn; },
     setConnections(connections) { state.connections = connections; },
     addTask(task) {
@@ -340,7 +364,7 @@ export async function start(): Promise<Harness> {
       llmRequests.length = 0;
       jobPayloads.length = 0;
       state.llm = defaultLlm; state.llmDelayMs = 0;
-      state.compile = defaultCompile; state.reconcile = defaultReconcile;
+      state.compile = defaultCompile; state.reconcile = defaultReconcile; state.actAs = defaultActAs;
       state.connections = [];
       delete process.env.POLICY_URL;
     },
