@@ -11,7 +11,7 @@
  * Usage: npx tsx scripts/gen-label-worksheet.ts [--lang 0166]
  */
 import { readFileSync, writeFileSync, existsSync } from "fs";
-import { ANCHOR_DISCIPLINE, SOFT_BAND_DISCIPLINE, anchorTableMarkdown, anchorVersion } from "../src/lib/judge-service";
+import { ANCHOR_DISCIPLINE, SOFT_BAND_DISCIPLINE, anchorTableMarkdown, anchorVersion } from "@graffiticode-app/core/lib/judge-service";
 
 const LANG = (() => {
   const i = process.argv.indexOf("--lang");

@@ -28,12 +28,12 @@
 import "./eval-env"; // MUST be first: prod Firestore/auth/api bootstrap before app imports
 
 import { readFileSync, existsSync } from "fs";
-import { getCredentialsForApiKey } from "../src/lib/api-credentials";
+import { getCredentialsForApiKey } from "@graffiticode-app/core/lib/api-credentials";
 import {
   postTask, createItem, updateItem, parseCode,
   setItemGenerationStatus,
 } from "../src/pages/api/resolvers";
-import { getFirestore } from "../src/utils/db";
+import { getFirestore } from "@graffiticode-app/core/utils/db/index";
 
 const LANG = (() => {
   const i = process.argv.indexOf("--lang");

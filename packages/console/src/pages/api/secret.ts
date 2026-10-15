@@ -1,6 +1,6 @@
-import { getFirestore } from '../../utils/db';
+import { getFirestore } from '@graffiticode-app/core/utils/db/index';
 import Stripe from 'stripe';
-import { STRIPE_API_VERSION } from '../../lib/plans-config';
+import { STRIPE_API_VERSION } from '@graffiticode-app/core/lib/plans-config';
 import { requireUser } from '../../lib/api-auth';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {

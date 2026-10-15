@@ -44,9 +44,9 @@
 import "./eval-env"; // MUST be first: prod Firestore/auth bootstrap before any app import
 
 import { readFileSync, existsSync } from "fs";
-import { getRelevantExamples, extractSearchQuery } from "../src/lib/code-generation-service";
-import { hybridSearch } from "../src/lib/embedding-service";
-import { queryFacets } from "../src/lib/lang-embedding";
+import { getRelevantExamples, extractSearchQuery } from "@graffiticode-app/core/lib/code-generation-service";
+import { hybridSearch } from "@graffiticode-app/core/lib/embedding-service";
+import { queryFacets } from "@graffiticode-app/core/lib/lang-embedding";
 import admin from "firebase-admin";
 
 /** getRelevantExamples' own gate — the line between "exists" and "the model sees it". */

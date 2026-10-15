@@ -11,11 +11,11 @@ import {
   mintSessionToken,
   verifySessionToken,
   looksLikeSessionToken,
-} from "../src/lib/free-plan-session-token";
-import { mintClaimToken, verifyClaimToken } from "../src/lib/claim-token";
-import { isFreePlanRequest, deriveSessionNamespace } from "../src/lib/free-plan-context";
-import { adoptSiblingWorkspace } from "../src/lib/workspace-adoption";
-import { emitEvent } from "../src/lib/funnel-events";
+} from "@graffiticode-app/core/lib/free-plan-session-token";
+import { mintClaimToken, verifyClaimToken } from "@graffiticode-app/core/lib/claim-token";
+import { isFreePlanRequest, deriveSessionNamespace } from "@graffiticode-app/core/lib/free-plan-context";
+import { adoptSiblingWorkspace } from "@graffiticode-app/core/lib/workspace-adoption";
+import { emitEvent } from "@graffiticode-app/core/lib/funnel-events";
 
 let bad = 0;
 function check(label: string, ok: boolean, detail = "") {

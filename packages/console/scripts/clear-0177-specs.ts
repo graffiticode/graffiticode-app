@@ -8,8 +8,8 @@
  */
 import "./eval-env";
 import admin from "firebase-admin";
-import { getCredentialsForApiKey } from "../src/lib/api-credentials";
-import { getFirestore } from "../src/utils/db";
+import { getCredentialsForApiKey } from "@graffiticode-app/core/lib/api-credentials";
+import { getFirestore } from "@graffiticode-app/core/utils/db/index";
 
 const ACCOUNTS = ["EVAL"];
 

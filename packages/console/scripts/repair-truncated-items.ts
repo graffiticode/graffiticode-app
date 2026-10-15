@@ -35,13 +35,13 @@ import "./eval-env"; // MUST be first: prod Firestore/auth/api bootstrap
 import admin from "firebase-admin";
 import { writeFileSync } from "fs";
 import { unparse } from "@graffiticode/parser";
-import { generateCode } from "../src/lib/code-generation-service";
-import { getCredentialsForApiKey } from "../src/lib/api-credentials";
+import { generateCode } from "@graffiticode-app/core/lib/code-generation-service";
+import { getCredentialsForApiKey } from "@graffiticode-app/core/lib/api-credentials";
 import {
   parseCode,
   postTask,
 } from "../src/pages/api/resolvers";
-import { getLanguageLexicon } from "../src/lib/api";
+import { getLanguageLexicon } from "@graffiticode-app/core/lib/api";
 
 const DEFAULT_UID = "2c9d72e315fbafb128011bc32739666c7e6e7eb9";
 

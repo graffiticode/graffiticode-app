@@ -47,8 +47,8 @@
 import admin from 'firebase-admin';
 import { readFileSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
-import { estimateUsdCost, usdCostFromReport } from '../src/lib/model-pricing';
-import { PLANS, type PlanId } from '../src/lib/plans-config';
+import { estimateUsdCost, usdCostFromReport } from '@graffiticode-app/core/lib/model-pricing';
+import { PLANS, type PlanId } from '@graffiticode-app/core/lib/plans-config';
 import { harnessKindOf } from '../src/lib/harness-item-ids';
 
 // Load .env.local

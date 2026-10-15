@@ -25,10 +25,10 @@
 // sweeps establish an attributed baseline; they do not deliver a verdict.
 //
 // BILLING BOUNDARY, as with the ping: generate and stop. Never createItem/updateItem.
-import { getFirestore } from "../utils/db";
-import { generateCodeForRequest } from "./code-generation/generate-for-request";
-import { getCredentialsForApiKey } from "./api-credentials";
-import { getBaseUrlForApi, getApiTask, getLanguageLexicon } from "./api";
+import { getFirestore } from "@graffiticode-app/core/utils/db/index";
+import { generateCodeForRequest } from "@graffiticode-app/core/lib/code-generation/generate-for-request";
+import { getCredentialsForApiKey } from "@graffiticode-app/core/lib/api-credentials";
+import { getBaseUrlForApi, getApiTask, getLanguageLexicon } from "@graffiticode-app/core/lib/api";
 import { compareShape, type ShapeLevel } from "./code-shape";
 import { harnessItemId } from "./harness-item-ids";
 import { PING_LANGUAGES } from "./corpus-ping";

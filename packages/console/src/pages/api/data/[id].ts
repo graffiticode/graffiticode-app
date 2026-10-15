@@ -1,4 +1,4 @@
-import { getBaseUrlForApi } from "../../../lib/api";
+import { getBaseUrlForApi } from "@graffiticode-app/core/lib/api";
 import { isNonEmptyString } from "../../../utils";
 
 export default async function handler(req, res) {

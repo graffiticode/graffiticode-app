@@ -47,8 +47,8 @@ import {
   createEmbeddingText,
   addDocumentWithEmbedding,
   generateBatchEmbeddings
-} from '../src/lib/embedding-service';
-import { verifyExampleForPrompt } from '../src/lib/lang-embedding';
+} from '@graffiticode-app/core/lib/embedding-service';
+import { verifyExampleForPrompt } from '@graffiticode-app/core/lib/lang-embedding';
 import { FieldValue } from 'firebase-admin/firestore';
 import dotenv from 'dotenv';
 import { unparse } from '@graffiticode/parser';

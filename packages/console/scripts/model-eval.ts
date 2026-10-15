@@ -95,18 +95,18 @@
 import "./eval-env"; // MUST be first: prod Firestore/auth/api bootstrap, before any app import
 
 import { writeFileSync, readFileSync, existsSync, appendFileSync } from "fs";
-import { generateCode, getRelevantExamples } from "../src/lib/code-generation-service";
+import { generateCode, getRelevantExamples } from "@graffiticode-app/core/lib/code-generation-service";
 import { parseCode, postTask } from "../src/pages/api/resolvers";
-import { getBaseUrlForApi } from "../src/lib/api";
+import { getBaseUrlForApi } from "@graffiticode-app/core/lib/api";
 import { harnessItemId } from "../src/lib/harness-item-ids";
-import { getCredentialsForApiKey } from "../src/lib/api-credentials";
-import { judgeCode, judgePair, judgePanel, judgeModelForFamily, anchorVersion } from "../src/lib/judge-service";
-import { inferProviderFromModel, type LlmProvider } from "../src/lib/llm-models";
-import { estimateUsdCost } from "../src/lib/model-pricing";
-import { modeEffortFor } from "../src/lib/model-priority";
+import { getCredentialsForApiKey } from "@graffiticode-app/core/lib/api-credentials";
+import { judgeCode, judgePair, judgePanel, judgeModelForFamily, anchorVersion } from "@graffiticode-app/core/lib/judge-service";
+import { inferProviderFromModel, type LlmProvider } from "@graffiticode-app/core/lib/llm-models";
+import { estimateUsdCost } from "@graffiticode-app/core/lib/model-pricing";
+import { modeEffortFor } from "@graffiticode-app/core/lib/model-priority";
 import { assertHoldout } from "./eval-holdout";
 import { pickRepresentative } from "./eval-representative";
-import { verifyExampleForPrompt } from "../src/lib/lang-embedding";
+import { verifyExampleForPrompt } from "@graffiticode-app/core/lib/lang-embedding";
 import { warningsFromVerification, bucketCounts, classifyWarning } from "./eval-warning-taxonomy";
 import { dialectFingerprint, sameDialect, formatFingerprint, type DialectFingerprint } from "./eval-dialect-fingerprint";
 import { codeAgreement, canonicalizeRuns, printAgreement } from "./eval-code-agreement";

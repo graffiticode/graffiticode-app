@@ -7,9 +7,9 @@
 import "./eval-env";
 import admin from "firebase-admin";
 import { unparse } from "@graffiticode/parser";
-import { generateCodeForRequest } from "../src/lib/code-generation/generate-for-request";
-import { getCredentialsForApiKey } from "../src/lib/api-credentials";
-import { getApiTask, getLanguageLexicon } from "../src/lib/api";
+import { generateCodeForRequest } from "@graffiticode-app/core/lib/code-generation/generate-for-request";
+import { getCredentialsForApiKey } from "@graffiticode-app/core/lib/api-credentials";
+import { getApiTask, getLanguageLexicon } from "@graffiticode-app/core/lib/api";
 
 const EVAL_UID = "2c9d72e315fbafb128011bc32739666c7e6e7eb9";
 

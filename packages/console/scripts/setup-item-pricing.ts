@@ -40,7 +40,7 @@
  * .env.local (dev) / .env.production (prod) and redeploy.
  */
 import Stripe from 'stripe';
-import { PLANS, STRIPE_API_VERSION, type PlanConfig } from '../src/lib/plans-config';
+import { PLANS, STRIPE_API_VERSION, type PlanConfig } from '@graffiticode-app/core/lib/plans-config';
 
 const DRY_RUN = process.argv.includes('--dry-run');
 const KEY = process.env.STRIPE_SECRET_KEY;

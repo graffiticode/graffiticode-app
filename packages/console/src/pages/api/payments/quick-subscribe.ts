@@ -13,10 +13,10 @@ import {
   PLANS,
   type PlanId,
   type BillingInterval,
-} from '../../../lib/plans-config';
-import { subscriptionPeriodEnd } from '../../../lib/stripe-helpers';
-import { emitPlanChanged, hashUid } from '../../../lib/funnel-events';
-import { getFirestore } from '../../../utils/db';
+} from '@graffiticode-app/core/lib/plans-config';
+import { subscriptionPeriodEnd } from '@graffiticode-app/core/lib/stripe-helpers';
+import { emitPlanChanged, hashUid } from '@graffiticode-app/core/lib/funnel-events';
+import { getFirestore } from '@graffiticode-app/core/utils/db/index';
 import * as admin from 'firebase-admin';
 import { requireUser } from '../../../lib/api-auth';
 

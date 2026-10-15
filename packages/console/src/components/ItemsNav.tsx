@@ -7,7 +7,7 @@ import MarkSelector, { marks } from './mark-selector';
 import { clientOptionForId } from './client-selector';
 import PublicToggle from './public-toggle';
 import ItemConnection, { ITEM_RUN_EVENT } from './ItemConnection';
-import { isConnectableLang } from '../lib/connectable';
+import { isConnectableLang } from '@graffiticode-app/core/lib/connectable';
 import ShareItemDialog from './ShareItemDialog';
 import CopyableId from './CopyableId';
 import { createItem, recompileItem } from '../utils/swr/fetchers';

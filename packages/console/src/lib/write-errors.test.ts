@@ -1,7 +1,7 @@
 // node:test via tsx: `npm test`.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { describeWriteProblem, canRetryWrite, isCheckableWrite, itemWriteFields, reconcileTarget, describeReconcile, describeReconcileRefusal } from "./write-errors";
+import { describeWriteProblem, canRetryWrite, isCheckableWrite, itemWriteFields, reconcileTarget, describeReconcile, describeReconcileRefusal } from "@graffiticode-app/core/lib/write-errors";
 
 const failed = (message: string) => describeWriteProblem({ status: "failed", message });
 

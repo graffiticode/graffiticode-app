@@ -23,7 +23,7 @@ import { getStorage } from 'firebase/storage';
 import { useFirebaseApp } from 'reactfire';
 import { validateImageFile, uploadImageDeduped, listUserImages, fetchArchivedImages } from '../lib/image-upload';
 import type { ImageInfo } from '../lib/image-upload';
-import { getLanguageAsset } from "../lib/api";
+import { getLanguageAsset } from "@graffiticode-app/core/lib/api";
 import useLocalStorage from '../hooks/use-local-storage';
 import {
   parseCSVLine,

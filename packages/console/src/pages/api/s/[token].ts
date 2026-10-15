@@ -9,7 +9,7 @@
 // the record of what 110 generations produced at one moment, and regenerating it would cost real
 // money and answer a different question. So this reads the stored doc and renders it.
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getFirestore } from "../../../utils/db";
+import { getFirestore } from "@graffiticode-app/core/utils/db/index";
 import { verifySweepToken } from "../../../lib/report-link";
 import { renderSweepMissing, renderSweepReport } from "../../../lib/sweep-report-html";
 import type { SweepRun } from "../../../lib/corpus-sweep";

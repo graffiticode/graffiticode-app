@@ -23,7 +23,7 @@
  */
 import { execFileSync } from "child_process";
 import { PING_LANGUAGES } from "../src/lib/corpus-ping";
-import { findLanguageById } from "../src/lib/languages";
+import { findLanguageById } from "@graffiticode-app/core/lib/languages";
 
 const REGION = "us-central1";
 const WANT = 1;

@@ -7,7 +7,7 @@
 // Fire-and-forget from the client: always 204, never blocks or fails the UI.
 
 import type { NextApiRequest, NextApiResponse } from "next";
-import { emitEvent, actor } from "../../../lib/funnel-events";
+import { emitEvent, actor } from "@graffiticode-app/core/lib/funnel-events";
 
 // Where the key was minted. Allowlisted rather than passed through: `source` is
 // client-supplied and lands in the event stream, and an open string there would let

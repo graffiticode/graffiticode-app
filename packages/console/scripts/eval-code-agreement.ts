@@ -64,7 +64,7 @@
  * variants landed after iterating, not about their opening moves.
  */
 import { parser, unparse } from "@graffiticode/parser";
-import { getLanguageLexicon } from "../src/lib/api";
+import { getLanguageLexicon } from "@graffiticode-app/core/lib/api";
 import { pickRepresentative } from "./eval-representative";
 
 export interface AgreementRunLike {

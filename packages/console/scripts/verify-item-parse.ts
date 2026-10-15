@@ -37,7 +37,7 @@
 import "./eval-env"; // MUST be first: prod Firestore/auth/api bootstrap
 
 import { unparse } from "@graffiticode/parser";
-import { getFirestore } from "../src/utils/db";
+import { getFirestore } from "@graffiticode-app/core/utils/db/index";
 import {
   parseCode,
 } from "../src/pages/api/resolvers";

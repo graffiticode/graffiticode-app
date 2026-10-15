@@ -7,9 +7,9 @@
 // allocated throughout) — the console already sustains requests this long via
 // the synchronous /api path, so no special runtime config is needed.
 import type { NextApiRequest, NextApiResponse } from "next";
-import { GENERATION_JOB_VERSION } from "../../lib/generation-queue";
-import type { GenerationJob } from "../../lib/generation-queue";
-import { runJob } from "../../core/generation";
+import { GENERATION_JOB_VERSION } from "@graffiticode-app/core/lib/generation-queue";
+import type { GenerationJob } from "@graffiticode-app/core/lib/generation-queue";
+import { runJob } from "@graffiticode-app/core/generation";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {

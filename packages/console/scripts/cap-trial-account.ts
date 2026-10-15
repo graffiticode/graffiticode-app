@@ -21,7 +21,7 @@
  */
 
 import admin from 'firebase-admin';
-import { effectiveIncludedItems, getPlan, DEFAULT_PLAN } from '../src/lib/plans-config';
+import { effectiveIncludedItems, getPlan, DEFAULT_PLAN } from '@graffiticode-app/core/lib/plans-config';
 
 // Force connection to production Firestore (bypass emulator)
 delete process.env.FIRESTORE_EMULATOR_HOST;

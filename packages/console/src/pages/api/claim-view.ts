@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { verifyClaimToken } from "../../lib/claim-token";
+import { verifyClaimToken } from "@graffiticode-app/core/lib/claim-token";
 import { logClaimStage, type ClaimStage } from "./resolvers";
 
 // Three surfaces can offer a claim, and each mints its own value:

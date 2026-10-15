@@ -36,7 +36,7 @@
 import admin from 'firebase-admin';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { usdCostFromReport } from '../src/lib/model-pricing';
+import { usdCostFromReport } from '@graffiticode-app/core/lib/model-pricing';
 
 // Load .env.local
 try {

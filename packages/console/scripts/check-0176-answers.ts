@@ -24,9 +24,9 @@
 import "./eval-env"; // MUST be first: prod Firestore/auth/api bootstrap before app imports
 
 import { readFileSync } from "fs";
-import { getCredentialsForApiKey } from "../src/lib/api-credentials";
+import { getCredentialsForApiKey } from "@graffiticode-app/core/lib/api-credentials";
 import { parseCode, postTask, getData } from "../src/pages/api/resolvers";
-import { VERIFY_ITEM_ID } from "../src/lib/code-generation-service";
+import { VERIFY_ITEM_ID } from "@graffiticode-app/core/lib/code-generation-service";
 
 const arg = (name: string, dflt?: string): string | undefined => {
   const i = process.argv.indexOf(`--${name}`);

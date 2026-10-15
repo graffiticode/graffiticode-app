@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { createHash } from 'crypto';
-import { getFirestore } from '../../../utils/db';
+import { getFirestore } from '@graffiticode-app/core/utils/db/index';
 
 const authUrl = process.env.NEXT_PUBLIC_GC_AUTH_URL || "https://auth.graffiticode.org";
 

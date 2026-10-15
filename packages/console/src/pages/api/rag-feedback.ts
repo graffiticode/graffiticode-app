@@ -6,7 +6,7 @@
  */
 
 import { NextApiRequest, NextApiResponse } from "next";
-import { ragAnalytics, UserFeedback } from "../../lib/rag-analytics";
+import { ragAnalytics, UserFeedback } from "@graffiticode-app/core/lib/rag-analytics";
 import admin from "firebase-admin";
 
 // Initialize Firebase Admin if not already initialized

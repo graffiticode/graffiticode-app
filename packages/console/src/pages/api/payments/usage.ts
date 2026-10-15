@@ -1,9 +1,9 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getFirestore } from '../../../utils/db';
-import { languageSponsor } from '../../../lib/languages';
+import { getFirestore } from '@graffiticode-app/core/utils/db/index';
+import { languageSponsor } from '@graffiticode-app/core/lib/languages';
 import Stripe from 'stripe';
-import { STRIPE_API_VERSION, priceIdToPlan, effectiveIncludedItems, overageRateFor, isHardCappedFor, payAsYouGoEnabled, DEFAULT_PLAN, type PlanId } from '../../../lib/plans-config';
-import { subscriptionPeriodStart, subscriptionPeriodEnd } from '../../../lib/stripe-helpers';
+import { STRIPE_API_VERSION, priceIdToPlan, effectiveIncludedItems, overageRateFor, isHardCappedFor, payAsYouGoEnabled, DEFAULT_PLAN, type PlanId } from '@graffiticode-app/core/lib/plans-config';
+import { subscriptionPeriodStart, subscriptionPeriodEnd } from '@graffiticode-app/core/lib/stripe-helpers';
 import { requireUser } from '../../../lib/api-auth';
 
 // Initialize Stripe only if secret key is available

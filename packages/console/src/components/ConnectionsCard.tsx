@@ -14,7 +14,7 @@ import {
 import ConnectionSharing from "./ConnectionSharing";
 import CopyableId from "./CopyableId";
 import { CREDENTIAL_BACKENDS, getCredentialBackend } from "../lib/credential-backends";
-import { CONNECTABLE_LANGS } from "../lib/connectable";
+import { CONNECTABLE_LANGS } from "@graffiticode-app/core/lib/connectable";
 
 interface Connection {
   connectionId: string;

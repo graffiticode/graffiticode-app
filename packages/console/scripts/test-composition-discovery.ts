@@ -3,7 +3,7 @@
 // happens in the basis runtime at compile time.
 // Run: npx tsx scripts/test-composition-discovery.ts
 
-import { resolveUpstreams } from "../src/lib/composition-discovery";
+import { resolveUpstreams } from "@graffiticode-app/core/lib/composition-discovery";
 
 let failures = 0;
 function assertEqual(label: string, actual: any, expected: any) {

@@ -18,7 +18,7 @@
  *   npx tsx scripts/check-prompt-language.ts "your prompt here"   # ad hoc
  */
 
-import { classifyPromptLanguage, promptLanguageKey } from "../src/lib/prompt-language";
+import { classifyPromptLanguage, promptLanguageKey } from "@graffiticode-app/core/lib/prompt-language";
 
 type Expect = "english" | "non_english" | "pass";
 

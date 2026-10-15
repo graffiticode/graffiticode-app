@@ -1,6 +1,6 @@
 import { makeExecutableSchema } from "@graphql-tools/schema";
-import { describeReconcileRefusal, reconcileTarget } from "../../lib/write-errors";
-import { generateCodeForRequest } from "../../lib/code-generation/generate-for-request";
+import { describeReconcileRefusal, reconcileTarget } from "@graffiticode-app/core/lib/write-errors";
+import { generateCodeForRequest } from "@graffiticode-app/core/lib/code-generation/generate-for-request";
 import {
   getGraphQLParameters,
   processRequest,
@@ -33,10 +33,10 @@ import {
   claimFreePlanSession,
   logClaimEvent,
 } from "./resolvers";
-import { listCurrentConnections, setCurrentConnection } from "../../lib/current-connection";
-import { verifyClaimToken } from "../../lib/claim-token";
-import { checkItemCreateAllowed } from "../../lib/usage-service";
-import { listLanguages, getLanguageInfo } from "./languages";
+import { listCurrentConnections, setCurrentConnection } from "@graffiticode-app/core/lib/current-connection";
+import { verifyClaimToken } from "@graffiticode-app/core/lib/claim-token";
+import { checkItemCreateAllowed } from "@graffiticode-app/core/lib/usage-service";
+import { listLanguages, getLanguageInfo } from "@graffiticode-app/core/languages-info";
 import { isSystemAccount, profileName, shortAccountId } from "../../lib/account-lookup";
 import {
   listConnections,
@@ -55,7 +55,7 @@ import {
   leaveSharedConnection,
   claimConnectionGrants,
   PolicyError,
-} from "../../lib/policy-client";
+} from "@graffiticode-app/core/lib/policy-client";
 import {
   accountExists,
   accountLabel,
@@ -65,10 +65,10 @@ import {
   normalizeAccountId,
   verifiedEmailHashes,
 } from "../../lib/connection-sharing";
-import { FreePlanError, getFreePlanCredentials } from "../../lib/free-plan-context";
-import { admitRequest, authenticate, resolveAuth } from "../../core/auth";
-import { startGeneration } from "../../core/generation";
-import { readItemData } from "../../core/tasks";
+import { FreePlanError, getFreePlanCredentials } from "@graffiticode-app/core/lib/free-plan-context";
+import { admitRequest, authenticate, resolveAuth } from "@graffiticode-app/core/auth";
+import { startGeneration } from "@graffiticode-app/core/generation";
+import { readItemData } from "@graffiticode-app/core/tasks";
 
 // Policy errors surface as their reason only ("not-owner", "unavailable", …).
 async function viaPolicy<T>(fn: () => Promise<T>): Promise<T> {

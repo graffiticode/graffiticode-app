@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { client } from '../../../lib/auth';
-import { getFirestore } from '../../../utils/db';
+import { getFirestore } from '@graffiticode-app/core/utils/db/index';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const token = req.headers.authorization;

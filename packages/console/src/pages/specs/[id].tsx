@@ -4,7 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useToken } from '@graffiticode/auth-react';
 import { getPageTitle } from '../../lib/utils';
-import { getBaseUrlForApi, getLanguageAsset } from '../../lib/api';
+import { getBaseUrlForApi, getLanguageAsset } from '@graffiticode-app/core/lib/api';
 import { findLanguageByNumber } from '../../components/language-selector';
 
 /** Fixed per page load: a fresh visit busts the cache, a re-render does not reload the frame. */

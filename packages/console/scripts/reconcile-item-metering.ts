@@ -57,7 +57,7 @@ if (!process.env.STRIPE_SECRET_KEY) {
   process.exit(1);
 }
 
-import { STRIPE_API_VERSION, includedItemsFor, overageRateFor, getPlan } from '../src/lib/plans-config';
+import { STRIPE_API_VERSION, includedItemsFor, overageRateFor, getPlan } from '@graffiticode-app/core/lib/plans-config';
 import { classifyLine, linePriceId } from '../src/lib/stripe-invoice-lines';
 
 const arg = (name: string, def?: string) => {

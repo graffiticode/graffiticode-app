@@ -1,4 +1,4 @@
-import { getFirestore } from '../../../utils/db';
+import { getFirestore } from '@graffiticode-app/core/utils/db/index';
 import { requireUser } from '../../../lib/api-auth';
 
 // Ensure the caller's own users/{uid} doc exists and return its id. Used by
