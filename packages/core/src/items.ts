@@ -19,7 +19,8 @@ import type { AuthArg } from "./types.js";
 import { defaultVersionSource, normalizeVersionSource, recordVersion } from "./versions.js";
 import type { VersionSource } from "./versions.js";
 import { itemConnectionFields, writeThroughCurrentConnection } from "./writes.js";
-import { requireFullAccount } from "./errors.js";
+import { ConflictError, requireFullAccount } from "./errors.js";
+import { assertNoActiveGeneration, legacyMayComplete, LegacyJobRefused } from "./generation-protocol.js";
 
 export async function createItem({
   auth,
@@ -206,6 +207,7 @@ export async function updateItem({
   label,
   onRenderable,
   taskCode,
+  legacyLeaseOwner,
 }: {
   auth: AuthArg;
   id: string;
@@ -255,6 +257,11 @@ export async function updateItem({
    * the fetch.
    */
   taskCode?: unknown;
+  /**
+   * Set by the v1 generation worker: the lease it claimed. Its write lands only
+   * if it still holds that lease and the item has never had a v2 job (Phase 3.5).
+   */
+  legacyLeaseOwner?: string;
 }) {
   // Step timings for the one caller that waits on them: the generation worker,
   // whose whole post-generation path is round trips (see generate-job.ts). Logged
@@ -284,6 +291,9 @@ export async function updateItem({
     // This is a mutation on an existing item, so the item's workspace wins over
     // whatever ephemeral session the request arrived on.
     adoptWorkspace(auth, itemData);
+    // A content change may not write around a running v2 generation (checked
+    // again in the write's transaction below).
+    if (taskId !== undefined && taskId !== itemData.taskId) assertNoActiveGeneration(itemData);
     if (auth.freePlan && isPublic) {
       throw new Error("Free plan items cannot be made public.");
     }
@@ -402,7 +412,18 @@ export async function updateItem({
       updates.expiresAt = ttlBase + FREE_PLAN_ITEM_TTL_MS;
     }
     const tWrite = Date.now();
-    await itemRef.update(updates);
+    if (taskIdChanged || legacyLeaseOwner) {
+      // Content changes commit only if no v2 job owns the item; a v1 worker's
+      // only while it holds its lease on a pointer-free item.
+      await db().runTransaction(async (tx) => {
+        const fresh = (await tx.get(itemRef)).data();
+        if (legacyLeaseOwner && !legacyMayComplete(fresh, legacyLeaseOwner)) throw new LegacyJobRefused();
+        assertNoActiveGeneration(fresh);
+        tx.update(itemRef, updates);
+      });
+    } else {
+      await itemRef.update(updates);
+    }
     writeMs = Date.now() - tWrite;
     // The item now has its taskId: renderable. Announce before the bookkeeping.
     let renderableMs = 0;
@@ -506,6 +527,8 @@ export async function updateItem({
     };
   } catch (error) {
     console.error("updateItem()", "ERROR", error);
+    // Conflicts keep their type so each transport can report them as such.
+    if (error instanceof ConflictError) throw error;
     throw new Error(`Failed to update item: ${error.message}`);
   }
 }

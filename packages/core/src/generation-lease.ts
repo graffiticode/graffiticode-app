@@ -1,6 +1,7 @@
 // Moved from pages/api/resolvers.ts (Phase 1: untangle inside the console).
 import { db } from "./db.js";
 import type { AuthArg } from "./types.js";
+import { assertNoActiveGeneration } from "./generation-protocol.js";
 
 // Set the async-generation status on an item. Used by startCodeGeneration
 // (status="generating") and the /api/generate-job worker (status="ready" on
@@ -18,19 +19,29 @@ export async function setItemGenerationStatus({
   error?: string | null;
 }) {
   const itemRef = db().doc(`users/${auth.uid}/items/${id}`);
-  const updates: Record<string, any> = {
+  if (status === "generating") {
+    // A v1 revision: refused while a v2 job owns the item, and never queued
+    // onto an item that has had one (its worker would refuse the job).
+    await db().runTransaction(async (tx) => {
+      const data = (await tx.get(itemRef)).data();
+      assertNoActiveGeneration(data);
+      if (data?.generation) throw new Error("This item uses generation protocol v2; this revision can't revise it.");
+      tx.update(itemRef, {
+        generationStatus: "generating",
+        generationError: null,
+        generationStartedAt: Date.now(),
+        generationChars: 0,
+      });
+    });
+    return;
+  }
+  await itemRef.update({
     generationStatus: status,
     generationError: status === "failed" ? error : null,
-  };
-  if (status === "generating") {
-    updates.generationStartedAt = Date.now();
-    updates.generationChars = 0;
-  } else {
-    updates.generationStartedAt = null;
+    generationStartedAt: null,
     // A finished item must not report a count; the MCP only shows it while pending.
-    updates.generationChars = null;
-  }
-  await itemRef.update(updates);
+    generationChars: null,
+  });
 }
 
 /**
@@ -84,7 +95,8 @@ export async function setItemGenerationChars({
 // point Cloud Tasks has given up, so no attempt can still be live.
 export const GENERATION_LEASE_MS = 15 * 60_000;
 
-export type GenerationClaim = "claimed" | "busy" | "missing";
+// "v2": the item has a v2 job pointer, so this v1 job must not touch it.
+export type GenerationClaim = "claimed" | "busy" | "missing" | "v2";
 
 export async function claimGeneration({
   auth,
@@ -100,6 +112,7 @@ export async function claimGeneration({
     const snap = await tx.get(itemRef);
     if (!snap.exists) return "missing" as GenerationClaim;
     const data = snap.data() || {};
+    if (data.generation) return "v2" as GenerationClaim;
     const holder = data.generationLeaseOwner;
     const expires = Number(data.generationLeaseExpires) || 0;
     if (holder && holder !== owner && expires > Date.now()) {

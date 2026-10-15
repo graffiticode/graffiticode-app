@@ -64,6 +64,10 @@
           "path": "/",
           "status": 200,
           "timeoutMs": 240000
+        },
+        {
+          "path": "/api/health?deep=1",
+          "status": 200
         }
       ]
     },
@@ -104,7 +108,9 @@
           ]
         }
       ],
-      "env": {},
+      "env": {
+        "GRAFFITICODE_BACKEND": "graphql"
+      },
       "secrets": {},
       "smoke": [
         {
