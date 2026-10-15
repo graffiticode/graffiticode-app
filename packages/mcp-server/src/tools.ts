@@ -6,6 +6,7 @@ import {
   startCodeGeneration,
   listLanguages as apiListLanguages,
   getLanguageInfo as apiGetLanguageInfo,
+  captureWorkspaceNamespace,
   type AuthContext,
   type Language,
   CONSOLE_URL,
@@ -13,6 +14,7 @@ import {
   MCP_ENDPOINT,
 } from "./api.js";
 import { normalizeClientKind } from "./events.js";
+import { coreBackendEnabled, coreCreateItem, coreReviseItem } from "./core-backend.js";
 import { contentToMarkdown, describeItem, normalizeLang } from "./item-content.js";
 import { widgetResourceUris } from "./widget/index.js";
 
@@ -1266,6 +1268,20 @@ export async function handleCreateItem(
   // Normalize language ID (remove "L" prefix if present)
   const langId = language.replace(/^L/i, "");
 
+  if (coreBackendEnabled()) {
+    const job = await coreCreateItem(ctx.auth, {
+      lang: langId,
+      name,
+      siblingOf: continue_from_item_id,
+      client: "mcp",
+      clientKind: normalizeClientKind(ctx.clientKind),
+      geoCountry: ctx.geoCountry,
+      description,
+    });
+    captureWorkspaceNamespace(ctx.auth, job);
+    return buildGeneratingResponse(job.itemId, langId, name ?? null, "create");
+  }
+
   // Start async generation (creates the item shell + enqueues the work) and
   // return immediately. No long-running tool call.
   const job = await startCodeGeneration({
@@ -1326,6 +1342,21 @@ export async function handleUpdateItem(
   args: { item_id: string; modification: string }
 ): Promise<unknown> {
   const { item_id, modification } = args;
+
+  if (coreBackendEnabled()) {
+    // The shared preparation in core: the same contextual prompt, source and
+    // compiled data as below, built in-process.
+    const job = await coreReviseItem(ctx.auth, {
+      itemId: item_id,
+      modification,
+      client: "mcp",
+      clientKind: normalizeClientKind(ctx.clientKind),
+      geoCountry: ctx.geoCountry,
+    });
+    captureWorkspaceNamespace(ctx.auth, job);
+    const item = await apiGetItemWithTask({ auth: ctx.auth, id: item_id });
+    return buildGeneratingResponse(job.itemId, item?.lang ?? "", item?.name ?? null, "update");
+  }
 
   // Fetch existing item + task src to build the contextual prompt.
   const existingItem = await apiGetItemWithTask({
