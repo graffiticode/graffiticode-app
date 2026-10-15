@@ -20,12 +20,20 @@ import { drainVerdict, type DrainVerdict, type InstanceSeries, type Revision, ty
 const PROJECT = "graffiticode-app";
 const REGION = "us-central1";
 
+// A service keeps every revision it ever had; the full JSON outgrows the
+// default 1MB buffer, so ask only for what's needed, with room to spare.
 const gcloud = (args: string[]) =>
-  execFileSync("gcloud", [...args, `--project=${PROJECT}`], { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
+  execFileSync("gcloud", [...args, `--project=${PROJECT}`], {
+    encoding: "utf8", stdio: ["ignore", "pipe", "inherit"], maxBuffer: 64 * 1024 * 1024,
+  });
 
 function revisions(service: string): Revision[] {
-  const list = JSON.parse(gcloud(["run", "revisions", "list", `--service=${service}`, `--region=${REGION}`, "--format=json"]));
-  return list.map((r: any) => ({ name: r.metadata.name, createdAt: Date.parse(r.metadata.creationTimestamp) }));
+  const out = gcloud(["run", "revisions", "list", `--service=${service}`, `--region=${REGION}`,
+    "--format=value(metadata.name,metadata.creationTimestamp)"]);
+  return out.split("\n").filter(Boolean).map(line => {
+    const [name, created] = line.split("\t");
+    return { name, createdAt: Date.parse(created) };
+  });
 }
 
 function traffic(service: string): TrafficTarget[] {
