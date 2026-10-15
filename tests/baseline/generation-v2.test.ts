@@ -219,20 +219,22 @@ test("an act-as outage releases the attempt for the sweeper instead of failing",
   assert.equal((await item(g.itemId)).generationStatus, "generating");
 });
 
-test("a connectable item's completion records a connection write, sent later (R1c)", async () => {
+test("a connectable item's completion records its connection write with a fixed key and grant", async () => {
   h.enablePolicy();
   h.setConnections([{ connectionId: "conn-1", backend: "learnosity", status: "active", label: "Item bank", ownerPermissions: null }]);
   const g = ok(await generate(h, alice, { lang: "0176" })).startCodeGeneration;
   const { generationId } = h.jobPayloads[0];
   const it = await item(g.itemId);
   const effect = await doc(`effects/${generationId}:connection_write`);
-  assert.equal(effect.state, "pending");
+  assert.equal(effect.state, "done", "carried out right after the commit (outbox.test.ts)");
   assert.equal(effect.payload.taskId, it.taskId);
   assert.equal(effect.payload.connectionId, "conn-1");
   assert.match(effect.payload.idempotencyKey, /^save:/);
   const grant = verifyGrant(effect.payload.effectGrant);
   assert.deepEqual([grant.p, grant.u, grant.s], ["effect", "alice", `${generationId}:connection_write:${it.taskId}`]);
-  assert.equal(h.calls.filter(c => c.path === "/compile").length, 0, "nothing written through the connection yet");
+  const sent = h.calls.filter(c => c.path === "/compile");
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].body.idempotencyKey, effect.payload.idempotencyKey);
 });
 
 test("GraphQL and MCP: a v2 job is never failed by MCP's stale guard", async () => {

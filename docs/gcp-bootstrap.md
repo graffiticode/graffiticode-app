@@ -70,6 +70,34 @@ the deployer grants from the backend runbook, scoped to `deploy-build@`,
 | mcp-service | 1 / – | 512Mi | 300s |
 | app | – / – | 1Gi | 300s |
 
+## Generation protocol v2 (Phase 3.5)
+
+Set up before v2 is enabled (R1.1); harmless before, since the sweeper finds
+nothing to do while no v2 jobs exist.
+
+- `ACT_AS_GRANT_SECRET` (this project) holds the same value as
+  `act-as-grant-secret` in project `graffiticode`; only `console-run@` reads it
+  here (IAM review Step 12 in the backend repo). Mounted by `deploy.json`.
+- The sweeper: a Cloud Scheduler job calling the console's own origin every
+  minute with the internal job secret (see
+  `packages/console/src/pages/api/internal/sweep-generations.ts`):
+
+  ```
+  gcloud scheduler jobs create http sweep-generations \
+    --project=graffiticode-app --location=us-central1 --schedule="* * * * *" \
+    --uri="$(gcloud run services describe console --project=graffiticode-app --region=us-central1 --format='value(status.url)')/api/internal/sweep-generations" \
+    --http-method=POST \
+    --headers="X-Internal-Job-Secret=<INTERNAL_JOB_SECRET>" \
+    --attempt-deadline=60s --max-retry-attempts=0
+  ```
+
+  Missing runs are harmless (the next minute's sweep covers them), so no
+  retries. Check it after creating: `gcloud scheduler jobs run sweep-generations`
+  and the console log's `generation_sweep` lines.
+- Firestore: the sweeper's queries are single-field ranges
+  (`generation-jobs.dispatch.nextDispatchAt`, `effects.nextAttemptAt`) and the
+  worker's is an equality on `effects.sourceId`; all use automatic indexes.
+
 ## Open items
 
 - TODO: existing secret mounts use `:latest`, which gc-deploy rejects. Pin them

@@ -31,21 +31,24 @@ import { getTask } from "./tasks.js";
 import { FREE_PLAN_ITEM_TTL_MS } from "./lib/free-plan-context.js";
 import { buildEventPayload, actor } from "./lib/funnel-events.js";
 import { dailyDocRef } from "./lib/free-plan-quota.js";
-import { isConnectableLang, programSavesToItemBank } from "./lib/connectable.js";
-import { resolveCurrentConnection, saveWriteKey } from "./lib/current-connection.js";
 import { buildVersionDoc, versionPath, type VersionSource } from "./versions.js";
 import { accountFirstCompletion, billingRefs } from "./billing.js";
 import { newItemDoc } from "./items.js";
+import { NEVER, processEffectsFor, recordEffect, connectionIntent, recordConnectionWrite, type ConnectionIntent } from "./effects.js";
 
 export const JOB_DEADLINE_MS = 45 * 60_000;
 export const LEASE_MS = 3 * 60_000;
 export const RENEW_EVERY_MS = 60_000;
 // The sweeper leaves a running job alone this long after its lease expires.
 export const DISPATCH_GRACE_MS = 30_000;
+// …and a just-reserved job this long, so its own wake-up gets there first.
+export const FIRST_WAKE_GRACE_MS = 60_000;
+// The sweeper's dispatch slots: at most this many, 1/2/4/8 minutes apart.
+export const MAX_DISPATCHES = 5;
+const DISPATCH_BACKOFF_MIN = [1, 2, 4, 8];
+export const dispatchBackoffMs = (dispatchCount: number) => (DISPATCH_BACKOFF_MIN[dispatchCount - 1] ?? 8) * 60_000;
 // The generation grant outlives the job's deadline by a margin.
 export const GENERATION_GRANT_MS = 60 * 60_000;
-// An effect's grant covers its whole retry window (a week-long outage).
-export const EFFECT_GRANT_MS = 7 * 24 * 60 * 60_000;
 // currentSrc travels in the envelope up to this size; beyond it the worker
 // re-reads the source from baseTaskId.
 const MAX_INLINE_SRC = 200_000;
@@ -226,6 +229,7 @@ export async function reserveGeneration({
     nextDispatchAt: now,
     lastDispatchError: null,
   };
+  dispatch.nextDispatchAt = now + FIRST_WAKE_GRACE_MS;
 
   await db().runTransaction(async (tx) => {
     if (!itemId) {
@@ -287,32 +291,13 @@ function failureFields(failure: JobFailure) {
   };
 }
 
-function recordEffect(tx: admin.firestore.Transaction, id: string, fields: {
-  kind: string; sourceId: string; uid: string; itemId: string; payload: Record<string, unknown>; now: number;
-}) {
-  tx.set(db().doc(`effects/${id}`), {
-    kind: fields.kind,
-    sourceId: fields.sourceId,
-    uid: fields.uid,
-    itemId: fields.itemId,
-    payload: fields.payload,
-    state: "pending",
-    attempts: 0,
-    nextAttemptAt: fields.now,
-    leaseOwner: null,
-    leaseExpires: 0,
-    lastError: null,
-    createdAt: fields.now,
-  });
-}
-
 function recordEvent(tx: admin.firestore.Transaction, sourceId: string, ev: any, fields: Record<string, unknown>, now: number) {
   const payload = buildEventPayload(ev, fields as any, new Date(now).toISOString());
   tx.set(db().doc(`funnel-events/${sourceId}:${ev}`), { ...payload, at: now });
 }
 
 // Fails a non-terminal job in `tx` (the caller has read job and item).
-function failInTx(tx: admin.firestore.Transaction, generationId: string, job: GenerationJobDoc, item: any, failure: JobFailure, now: number, auth?: Principal | null) {
+export function failInTx(tx: admin.firestore.Transaction, generationId: string, job: GenerationJobDoc, item: any, failure: JobFailure, now: number, auth?: Principal | null) {
   const env = job.envelope;
   tx.update(jobRef(generationId), {
     "dispatch.state": "failed",
@@ -320,6 +305,7 @@ function failInTx(tx: admin.firestore.Transaction, generationId: string, job: Ge
     "dispatch.completedAt": now,
     "dispatch.leaseOwner": null,
     "dispatch.leaseExpires": 0,
+    "dispatch.nextDispatchAt": NEVER,
   });
   if (item && item.generation?.id === generationId) {
     tx.update(db().doc(env.itemPath), failureFields(failure));
@@ -456,26 +442,6 @@ async function principalFor(generationId: string, env: JobEnvelope): Promise<Pri
   return { uid: env.uid, token };
 }
 
-type ConnectionIntent = {
-  connectionId: string | null;
-  lookupError: string | null;
-  savesToItemBank: boolean;
-} | null;
-
-// Resolved just before the completion commits (it needs Policy, which can't
-// be called inside a transaction); recorded in the effect's fixed payload.
-async function connectionIntent(auth: Principal, lang: string, code: unknown): Promise<ConnectionIntent> {
-  if (auth.freePlan || !isConnectableLang(lang)) return null;
-  const systemUids = [process.env.FREE_PLAN_UID, process.env.EVAL_UID].filter(Boolean);
-  if (systemUids.includes(auth.uid)) return null;
-  try {
-    const connectionId = (await resolveCurrentConnection({ auth, lang }))?.connectionId ?? null;
-    return { connectionId, lookupError: null, savesToItemBank: programSavesToItemBank(code) };
-  } catch (err: any) {
-    return { connectionId: null, lookupError: `Could not look up your connections: ${err?.message ?? err}`, savesToItemBank: programSavesToItemBank(code) };
-  }
-}
-
 type Generated = { taskId: string; taskCode?: unknown; language?: string; upstreamLangs?: string[] };
 
 export async function completeJob(generationId: string, owner: string, auth: Principal, result: Generated, connection: ConnectionIntent, now = Date.now()) {
@@ -554,26 +520,7 @@ export async function completeJob(generationId: string, owner: string, auth: Pri
         }, now);
         if (auth.freePlan) updates.trialRevisions = admin.firestore.FieldValue.increment(1);
       }
-      if (connection && (connection.connectionId || connection.lookupError || connection.savesToItemBank)) {
-        const kind = "connection_write";
-        recordEffect(tx, `${generationId}:${kind}`, {
-          kind, sourceId: generationId, uid: env.uid, itemId: env.itemId, now,
-          payload: {
-            itemId: env.itemId,
-            taskId: result.taskId,
-            lang,
-            connectionId: connection.connectionId,
-            idempotencyKey: connection.connectionId
-              ? saveWriteKey({ itemId: env.itemId, taskId: result.taskId, connectionId: connection.connectionId })
-              : null,
-            lookupError: connection.lookupError,
-            savesToItemBank: connection.savesToItemBank,
-            effectGrant: signGrant({
-              purpose: "effect", uid: env.uid, subject: `${generationId}:${kind}:${result.taskId}`, notAfter: now + EFFECT_GRANT_MS,
-            }),
-          },
-        });
-      }
+      recordConnectionWrite(tx, { sourceId: generationId, uid: env.uid, itemId: env.itemId, taskId: result.taskId, lang, connection, now });
     }
     if (env.workspaceKey) {
       recordEffect(tx, `${generationId}:first_outcome`, {
@@ -587,6 +534,7 @@ export async function completeJob(generationId: string, owner: string, auth: Pri
       "dispatch.completedAt": now,
       "dispatch.leaseOwner": null,
       "dispatch.leaseExpires": 0,
+      "dispatch.nextDispatchAt": NEVER,
       "dispatch.result": { taskId: result.taskId },
     });
   });
@@ -617,6 +565,7 @@ export async function runJobV2(generationId: string): Promise<{ status: number; 
     } catch (err) {
       if (err instanceof ActAsError && err.definite) {
         await failJob(generationId, owner, { code: "credentials_refused", retryable: true, message: "This generation's authorization was refused. Try again." });
+        await processEffectsFor(generationId);
         return { status: 200, body: { status: "failed" } };
       }
       throw err;
@@ -640,12 +589,16 @@ export async function runJobV2(generationId: string): Promise<{ status: number; 
       const message = result.errors?.map((e: any) => e.message).join("\n") || "No taskId returned";
       const code = result.errors?.find((e: any) => e.code)?.code ?? "generation_failed";
       await failJob(generationId, owner, { code, retryable: false, message }, auth);
+      await processEffectsFor(generationId);
       return { status: 200, body: { status: "failed", error: message } };
     }
     const lang = result.language && result.language !== env.lang ? result.language : env.lang;
     const connection = await connectionIntent(auth, lang, result.taskCode);
     holding();
     await completeJob(generationId, owner, auth, result, connection);
+    // Right after the commit, as the user we already act as; the sweeper
+    // covers anything this doesn't finish.
+    await processEffectsFor(generationId, { token: auth.token });
     return { status: 200, body: { status: "ready", taskId: result.taskId } };
   } catch (err: any) {
     if (err instanceof LeaseLost) {
@@ -659,4 +612,52 @@ export async function runJobV2(generationId: string): Promise<{ status: number; 
   } finally {
     clearInterval(heartbeat);
   }
+}
+
+// --- the sweeper's half ------------------------------------------------------
+
+/**
+ * Gives a due job its next dispatch slot, in a transaction that re-checks it
+ * is still due and recoverable: reserved, or running with an expired lease.
+ * Past its deadline, or out of slots, the job fails instead. Two sweeps over
+ * the same job take at most one slot between them.
+ */
+export async function redispatchJob(generationId: string, now = Date.now()): Promise<"dispatched" | "failed" | "skipped"> {
+  const slot = await db().runTransaction(async (tx) => {
+    const snap = await tx.get(jobRef(generationId));
+    if (!snap.exists) return null;
+    const job = snap.data() as GenerationJobDoc;
+    const itemSnap = await tx.get(db().doc(job.envelope.itemPath));
+    const d = job.dispatch;
+    if (isTerminal(d.state)) {
+      // Left behind by a write that predates NEVER; take it out of the query.
+      if (d.nextDispatchAt !== NEVER) tx.update(jobRef(generationId), { "dispatch.nextDispatchAt": NEVER });
+      return null;
+    }
+    if (!(d.nextDispatchAt <= now)) return null;
+    const recoverable = d.state === "reserved" || (d.state === "running" && d.leaseExpires < now);
+    if (!recoverable) return null;
+    const item = itemSnap.exists ? itemSnap.data() : null;
+    if (now >= job.envelope.deadlineAt) {
+      failInTx(tx, generationId, job, item, { code: "deadline_exceeded", retryable: true, message: "Generation did not finish in time. Try again." }, now);
+      return "failed" as const;
+    }
+    if ((d.dispatchCount || 0) >= MAX_DISPATCHES) {
+      failInTx(tx, generationId, job, item, { code: "dispatch_exhausted", retryable: true, message: "Generation could not be started. Try again." }, now);
+      return "failed" as const;
+    }
+    const dispatchCount = (d.dispatchCount || 0) + 1;
+    tx.update(jobRef(generationId), {
+      "dispatch.dispatchCount": dispatchCount,
+      "dispatch.nextDispatchAt": now + dispatchBackoffMs(dispatchCount),
+    });
+    return dispatchCount;
+  });
+  if (slot === null) return "skipped";
+  if (slot === "failed") {
+    await processEffectsFor(generationId);
+    return "failed";
+  }
+  await wakeJob(generationId, slot);
+  return "dispatched";
 }
