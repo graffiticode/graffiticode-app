@@ -214,32 +214,40 @@ export function emitPlanChanged(input: {
  * Emit one event. Best-effort by contract: instrumentation must never break a
  * request, so every failure — including a serialization cycle — is swallowed.
  */
+// The event as emitted, without printing it. Generation completions store it in
+// Firestore (funnel-events/{eid}) instead of logging it (app tier Phase 3.5).
+export function buildEventPayload(
+  ev: FunnelEventName,
+  fields: FunnelEventFields = {},
+  t: string = new Date().toISOString(),
+): Record<string, unknown> {
+  const payload: Record<string, unknown> = { ev, t };
+  for (const [key, value] of Object.entries(fields)) {
+    if (value === undefined || value === null) continue;
+    // `lang` is normalized HERE rather than at each call site, because the
+    // call sites kept forgetting: item_created, item_updated,
+    // item_generation_failed and wall_hit all passed the raw `language` tool
+    // argument straight through. That argument is free text, so prompts
+    // reached the logs — and buildScopeError is the worst offender, since it
+    // fires exactly when the language was NOT recognised, which is precisely
+    // when the value is most likely to be a description. Truncating to 200
+    // chars is not a defence; the value has to be replaced, not shortened.
+    if (key === "lang") {
+      const normalized = langKey(value);
+      if (normalized !== undefined) payload[key] = normalized;
+      continue;
+    }
+    payload[key] = typeof value === "string" ? value.slice(0, 200) : value;
+  }
+  return payload;
+}
+
 export function emitEvent(
   ev: FunnelEventName,
   fields: FunnelEventFields = {},
 ): void {
   try {
-    const payload: Record<string, unknown> = {
-      ev,
-      t: new Date().toISOString(),
-    };
-    for (const [key, value] of Object.entries(fields)) {
-      if (value === undefined || value === null) continue;
-      // `lang` is normalized HERE rather than at each call site, because the
-      // call sites kept forgetting: item_created, item_updated,
-      // item_generation_failed and wall_hit all passed the raw `language` tool
-      // argument straight through. That argument is free text, so prompts
-      // reached the logs — and buildScopeError is the worst offender, since it
-      // fires exactly when the language was NOT recognised, which is precisely
-      // when the value is most likely to be a description. Truncating to 200
-      // chars is not a defence; the value has to be replaced, not shortened.
-      if (key === "lang") {
-        const normalized = langKey(value);
-        if (normalized !== undefined) payload[key] = normalized;
-        continue;
-      }
-      payload[key] = typeof value === "string" ? value.slice(0, 200) : value;
-    }
+    const payload = buildEventPayload(ev, fields);
     console.log(JSON.stringify(payload));
   } catch {
     // ignore

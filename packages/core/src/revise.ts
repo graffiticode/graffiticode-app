@@ -152,5 +152,6 @@ export async function reviseItem(
     modification,
     currentSrc,
     currentData,
+    baseTaskId: item.taskId ?? null,
   });
 }

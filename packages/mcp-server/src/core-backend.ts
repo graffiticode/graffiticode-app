@@ -79,6 +79,7 @@ async function item(i: any, ctx: Ctx, withGeneration: boolean, withTask: boolean
     out.generationStatus = str(i.generationStatus);
     out.generationError = str(i.generationError);
     out.generationStartedAt = str(i.generationStartedAt);
+    out.generationDeadlineAt = str(i.generationDeadlineAt);
     out.generationChars = int(i.generationChars);
   }
   if (withTask) {

@@ -28,7 +28,7 @@ function todayKey(now = new Date()): string {
   return `${y}${m}${d}`;
 }
 
-function dailyDocRef(now = new Date()) {
+export function dailyDocRef(now = new Date()) {
   return db().collection("free-plan-state").doc(`items-${todayKey(now)}`);
 }
 

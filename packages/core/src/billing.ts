@@ -286,3 +286,159 @@ export async function recordBillableItem({
 // move to lib/task-api.ts. New code should import from there directly. Stored
 // user credentials (the old Credentials card) are retired: parse no longer
 // reads them, and external APIs are reached only through a connection.
+
+// --- v2 generation completion: billing accounting inside its transaction ----
+//
+// recordBillableItem above runs after the item write, best-effort, as separate
+// writes; a crash between them could leave the `billed` marker without the
+// counters, and the marker then skips them for good. The v2 completion
+// (generation-jobs.ts) instead commits the same accounting in the transaction
+// that gives the item its first taskId. Stripe is not called here: each meter
+// event is captured as an effect intent and sent afterwards (R1c). The rules
+// are recordBillableItem's, unchanged.
+
+type Snap = { exists: boolean; data(): any };
+
+// An account's monthly item counter after one more item, as the document to
+// write (inside a transaction that read `snap`) and the item's position.
+export function nextItemCounter(snap: Snap | null | undefined, periodStart: Date, now: Date) {
+  const data = snap?.exists ? snap.data() || {} : {};
+  const lastReset = data.lastReset ? new Date(data.lastReset) : null;
+  if (lastReset && lastReset >= periodStart) {
+    const count = (data.currentMonthTotal || 0) + 1;
+    return { doc: { ...data, currentMonthTotal: count, lastUpdated: now.toISOString() }, count };
+  }
+  return { doc: { currentMonthTotal: 1, lastReset: periodStart.toISOString(), lastUpdated: now.toISOString() }, count: 1 };
+}
+
+// What the completion transaction must read before deciding (all reads come
+// before any write in a Firestore transaction).
+export function billingRefs({ uid, lang }: { uid: string; lang?: string }) {
+  const env = currentEnv();
+  const sponsored = isLanguageSponsored(lang);
+  const sponsorUid = sponsored && env !== "local" ? languageSponsorUid(lang) : null;
+  return {
+    env,
+    sponsored,
+    sponsorUid,
+    user: db().collection("users").doc(uid),
+    usage: db().collection("usage").doc(uid),
+    sponsorUser: sponsorUid ? db().collection("users").doc(sponsorUid) : null,
+    sponsorUsage: sponsorUid ? db().collection("usage").doc(sponsorUid) : null,
+  };
+}
+
+export type BillingEffect = { id: string; kind: "stripe_meter" | "sponsor_alert"; payload: Record<string, unknown> };
+export type BillingEvent = { ev: "item_created"; fields: Record<string, unknown> };
+
+// Writes the accounting for an item's first taskId into `tx` and returns the
+// funnel event and effect intents the caller records in the same transaction.
+// The caller has already checked the item isn't billed and isn't a copy, and
+// writes the `billed` marker itself.
+export function accountFirstCompletion(tx: admin.firestore.Transaction, {
+  auth, itemId, taskId, lang, client, source, now, refs, reads, trial,
+}: {
+  auth: AuthArg & { freePlan?: boolean };
+  itemId: string;
+  taskId: string;
+  lang?: string;
+  client?: string;
+  source?: VersionSource;
+  now: Date;
+  refs: ReturnType<typeof billingRefs>;
+  reads: { user: Snap; usage: Snap; sponsorUser?: Snap | null; sponsorUsage?: Snap | null };
+  // The free-plan daily tally document and its current snapshot, when free plan.
+  trial?: { ref: admin.firestore.DocumentReference; snap: Snap } | null;
+}): { events: BillingEvent[]; effects: BillingEffect[] } {
+  const { env, sponsored, sponsorUid } = refs;
+  const billable = env !== "local" && !sponsored;
+  const identifier = `${itemId}__${taskId}`;
+  const events: BillingEvent[] = [];
+  const effects: BillingEffect[] = [];
+
+  // Deterministic ids (item:{itemId}:…), so the accounting can only ever be
+  // written once per item, whichever completion gets there.
+  tx.set(db().collection("usage").doc(`item:${itemId}:creator`), {
+    userId: auth.uid,
+    itemId,
+    taskId,
+    units: billable ? 1 : 0,
+    ...(billable ? {} : { nonBillableReason: env === "local" ? "local-script" : "sponsored" }),
+    ...(sponsored && env !== "local" ? { sponsorId: `lang:${String(lang).replace(/^L/i, "")}` } : {}),
+    createdAt: now,
+    timestamp: now.toISOString(),
+    lang: lang ?? null,
+    client: client ?? "console",
+    env,
+    type: "item_created",
+  });
+
+  const userData = reads.user.exists ? reads.user.data() || {} : {};
+  const subscription = userData.subscription || {};
+  const firstForAccount = !reads.usage.exists;
+  let periodItemCount: number | undefined;
+  if (billable) {
+    const next = nextItemCounter(reads.usage, periodStartFor(subscription, now), now);
+    tx.set(refs.usage, next.doc);
+    periodItemCount = next.count;
+  }
+  events.push({
+    ev: "item_created",
+    fields: { ...actor(auth), lang, app: client ?? "console", first_for_account: firstForAccount || undefined, source },
+  });
+  if (env === "local") return { events, effects };
+
+  if (sponsorUid && refs.sponsorUsage && reads.sponsorUser && reads.sponsorUsage) {
+    const sponsorData = reads.sponsorUser.exists ? reads.sponsorUser.data() || {} : {};
+    const sponsorSubscription = sponsorData.subscription || {};
+    tx.set(db().collection("usage").doc(`item:${itemId}:sponsor:${sponsorUid}`), {
+      userId: sponsorUid,
+      itemId,
+      taskId,
+      units: 1,
+      sponsoredFor: auth.uid,
+      createdAt: now,
+      timestamp: now.toISOString(),
+      lang: lang ?? null,
+      client: client ?? "console",
+      env,
+      type: "item_created",
+    });
+    const periodStart = periodStartFor(sponsorSubscription, now);
+    const next = nextItemCounter(reads.sponsorUsage, periodStart, now);
+    tx.set(refs.sponsorUsage, next.doc);
+    effects.push({
+      id: `item:${itemId}:stripe_meter:sponsor`,
+      kind: "stripe_meter",
+      payload: {
+        payer: "sponsor", payerUid: sponsorUid, subscription: sponsorSubscription,
+        stripeCustomerId: sponsorData.stripeCustomerId ?? null, identifier,
+        periodItemCount: next.count, timestamp: now.getTime(),
+      },
+    });
+    effects.push({
+      id: `item:${itemId}:sponsor_alert`,
+      kind: "sponsor_alert",
+      payload: { sponsorUid, sponsorName: languageSponsor(lang) ?? null, periodStart: periodStart.getTime(), now: now.getTime() },
+    });
+  }
+
+  if (auth.freePlan) {
+    if (trial) {
+      const prev = trial.snap.exists ? Number(trial.snap.data()?.count) : 0;
+      tx.set(trial.ref, { count: (Number.isFinite(prev) ? prev : 0) + 1, updated: now.toISOString() }, { merge: true });
+    }
+    return { events, effects };
+  }
+  if (!billable) return { events, effects };
+
+  effects.push({
+    id: `item:${itemId}:stripe_meter:creator`,
+    kind: "stripe_meter",
+    payload: {
+      payer: "creator", payerUid: auth.uid, subscription, stripeCustomerId: userData.stripeCustomerId ?? null,
+      identifier, periodItemCount, timestamp: now.getTime(),
+    },
+  });
+  return { events, effects };
+}

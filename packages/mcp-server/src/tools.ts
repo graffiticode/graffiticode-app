@@ -1675,7 +1675,10 @@ async function handleItemResult(
       const startedAt = item.generationStartedAt ? Number(item.generationStartedAt) : 0;
       pendingStartedAt = startedAt;
       pendingChars = typeof item.generationChars === "number" ? item.generationChars : 0;
-      const stale = startedAt > 0 && Date.now() - startedAt > GENERATION_STALE_MS;
+      // Legacy (v1) jobs only: a v2 job is failed by the console, durably, at
+      // its deadline at the latest, so MCP and REST always agree.
+      const v2 = item.generationDeadlineAt != null;
+      const stale = !v2 && startedAt > 0 && Date.now() - startedAt > GENERATION_STALE_MS;
       if (stale) {
         return {
           item_id: item.id,
