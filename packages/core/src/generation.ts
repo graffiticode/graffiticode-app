@@ -35,6 +35,8 @@ export async function startGeneration(ctx: any, args: any) {
     // The item's taskId the revision was prepared against (core reviseItem).
     // v2 refuses the revision if the item has moved on since.
     baseTaskId,
+    // REST Idempotency-Key claim (core/idempotency.ts), bound in the reservation.
+    idempotency,
   } = args;
 
   // Re-read before every reservation: once the v2 floor is set, nothing here
@@ -114,7 +116,7 @@ export async function startGeneration(ctx: any, args: any) {
       const reserved = await reserveGeneration({
         auth, itemId, lang, name, client, prompt, modification, currentSrc, currentData,
         ...(baseTaskId !== undefined ? { baseTaskId } : {}),
-        sessionNamespace: ctx.sessionNamespace, sessionUuid: ctx.sessionUuid, workspaceKey,
+        sessionNamespace: ctx.sessionNamespace, sessionUuid: ctx.sessionUuid, workspaceKey, idempotency,
       });
       return {
         itemId: reserved.itemId,

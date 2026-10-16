@@ -139,6 +139,17 @@ free-plan credentials) and protocol ≥ the floor (`verify/mcp.mjs`).
 Rollback: set `GRAFFITICODE_BACKEND` back to `graphql` in `deploy.json` and
 deploy (same image), or `npm run rollback -- mcp` to the previous release.
 
+### REST API (Phase 4)
+
+Idempotency keys (`idempotency-keys/{hash}`) carry `expiresAt`; a TTL policy
+deletes them once past it (an expired key already reads as absent, so this
+only reclaims space). One-time, before the REST API takes traffic:
+
+```
+gcloud firestore fields ttls update expiresAt --collection-group=idempotency-keys \
+  --enable-ttl --project=graffiticode-app
+```
+
 ## Open items
 
 - TODO: existing secret mounts use `:latest`, which gc-deploy rejects. Pin them

@@ -112,8 +112,8 @@ type Hints = { client?: string; clientKind?: string; geoCountry?: string };
 // create_item: a new item generated from a natural-language description.
 export async function createFromDescription(
   ctx: RequestCredentials & Record<string, unknown>,
-  { lang, description, name, siblingOf, client, clientKind, geoCountry }:
-    { lang: string; description: string; name?: string; siblingOf?: string } & Hints,
+  { lang, description, name, siblingOf, client, clientKind, geoCountry, idempotency }:
+    { lang: string; description: string; name?: string; siblingOf?: string; idempotency?: unknown } & Hints,
 ) {
   const misuse = detectForwardedArtifact(description);
   if (misuse) throw new Error(misuse);
@@ -126,6 +126,7 @@ export async function createFromDescription(
     geoCountry,
     prompt: description,
     modification: description,
+    idempotency,
   });
 }
 
@@ -134,7 +135,7 @@ export async function createFromDescription(
 // as their own arguments.
 export async function reviseItem(
   ctx: RequestCredentials & Record<string, unknown>,
-  { itemId, modification, client, clientKind, geoCountry }: { itemId: string; modification: string } & Hints,
+  { itemId, modification, client, clientKind, geoCountry, idempotency }: { itemId: string; modification: string; idempotency?: unknown } & Hints,
 ) {
   const auth = await resolveAuth(ctx);
   const item: any = await getItem({ auth, id: itemId, connectionFields: false });
@@ -153,5 +154,6 @@ export async function reviseItem(
     currentSrc,
     currentData,
     baseTaskId: item.taskId ?? null,
+    idempotency,
   });
 }

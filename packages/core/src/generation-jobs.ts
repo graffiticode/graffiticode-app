@@ -34,6 +34,7 @@ import { dailyDocRef } from "./lib/free-plan-quota.js";
 import { buildVersionDoc, versionPath, type VersionSource } from "./versions.js";
 import { accountFirstCompletion, billingRefs } from "./billing.js";
 import { newItemDoc } from "./items.js";
+import { bindClaim, readClaim, type IdempotencyClaim } from "./idempotency.js";
 import { NEVER, processEffectsFor, recordEffect, connectionIntent, recordConnectionWrite, type ConnectionIntent } from "./effects.js";
 
 export const JOB_DEADLINE_MS = 45 * 60_000;
@@ -168,7 +169,7 @@ function pointerFields(generationId: string, state: GenerationPointer["state"], 
  */
 export async function reserveGeneration({
   auth, itemId, lang, name, client, prompt, modification, currentSrc, currentData, baseTaskId,
-  sessionNamespace, sessionUuid, workspaceKey, now = Date.now(),
+  sessionNamespace, sessionUuid, workspaceKey, idempotency, now = Date.now(),
 }: {
   auth: Principal;
   itemId?: string | null;
@@ -184,6 +185,8 @@ export async function reserveGeneration({
   sessionNamespace?: string | null;
   sessionUuid?: string | null;
   workspaceKey?: string | null;
+  // A REST Idempotency-Key claim, bound to this job in the same commit.
+  idempotency?: IdempotencyClaim | null;
   now?: number;
 }): Promise<{ itemId: string; generationId: string }> {
   const generationId = randomUUID();
@@ -232,7 +235,9 @@ export async function reserveGeneration({
   dispatch.nextDispatchAt = now + FIRST_WAKE_GRACE_MS;
 
   await db().runTransaction(async (tx) => {
+    const key = await readClaim(tx, idempotency);
     if (!itemId) {
+      bindClaim(tx, idempotency, key, { itemId: id, generationId });
       tx.set(itemRef, { ...newItemDoc({ auth, id, lang, name, client, timestamp: now }), ...pointerFields(generationId, "reserved", deadlineAt, now) });
       tx.set(jobRef(generationId), { envelope: envelope(null), dispatch });
       return;
@@ -248,6 +253,7 @@ export async function reserveGeneration({
     if (baseTaskId !== undefined && (baseTaskId ?? null) !== current) {
       throw new ConflictError("item_changed", "This item changed since the revision was prepared. Read it again (get_item), then retry.");
     }
+    bindClaim(tx, idempotency, key, { itemId: id, generationId });
     tx.update(itemRef, pointerFields(generationId, "reserved", deadlineAt, now));
     tx.set(jobRef(generationId), { envelope: envelope(current), dispatch });
   });
@@ -672,7 +678,9 @@ export async function redispatchJob(generationId: string, now = Date.now()): Pro
  * grant. Refused as item_changed if the item has moved on since, and as
  * not_retryable when its last job isn't a retryable failure.
  */
-export async function retryGeneration({ auth, itemId, now = Date.now() }: { auth: Principal; itemId: string; now?: number }) {
+export async function retryGeneration({ auth, itemId, idempotency, now = Date.now() }: {
+  auth: Principal; itemId: string; idempotency?: IdempotencyClaim | null; now?: number;
+}) {
   const item = (await db().doc(`users/${auth.uid}/items/${itemId}`).get()).data();
   if (!item) throw new NotFoundError(`Item not found: ${itemId}`);
   const pointer = item.generation as GenerationPointer | undefined;
@@ -700,6 +708,7 @@ export async function retryGeneration({ auth, itemId, now = Date.now() }: { auth
     baseTaskId: env.baseTaskId,
     sessionUuid: env.principal.kind === "freePlan" ? env.principal.sessionUuid : null,
     workspaceKey: env.workspaceKey,
+    idempotency,
     now,
   });
 }

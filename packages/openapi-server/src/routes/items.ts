@@ -16,6 +16,9 @@ import { ApiProblem, notFound } from "../problems.js";
 import { bareLanguageId, decodeCursor, encodeCursor, languageId } from "../http.js";
 import { publicBase } from "../spec.js";
 import { consoleSpec } from "../console.js";
+import { idempotent } from "../idempotency.js";
+import { db } from "@graffiticode-app/core/db";
+import { mintSessionToken } from "@graffiticode-app/core/lib/free-plan-session-token";
 import type { Validate, ValidateBody } from "../app.js";
 
 const APP_URL = () => process.env.GRAFFITICODE_APP_URL || "https://app.graffiticode.org";
@@ -108,13 +111,28 @@ function preferredWait(c: Context): number | null {
   return n >= 0 && n <= MAX_WAIT_S ? n : null;
 }
 
-async function accepted(c: Context, caller: Caller, started: { itemId: string; workspaceNamespace?: string | null }) {
+// The 202 for a started generation, as a storable response (Idempotency-Key
+// replays it verbatim).
+async function accepted(caller: Caller, started: { itemId: string; workspaceNamespace?: string | null }) {
   const { g } = await load(caller, started.itemId);
+  const headers: Record<string, string> = { Location: `${publicBase()}/items/${started.itemId}`, "Retry-After": "2" };
   const handle = await workspaceHandleIfMoved(caller, started.workspaceNamespace);
-  if (handle) c.header("Graffiticode-Workspace", handle);
-  c.header("Location", `${publicBase()}/items/${started.itemId}`);
-  c.header("Retry-After", "2");
-  return c.json(await representation(g, caller), 202);
+  if (handle) headers["Graffiticode-Workspace"] = handle;
+  return { status: 202, headers, body: await representation(g, caller) };
+}
+
+// A key bound to a job whose request never answered: the same 202, rebuilt
+// from what it made. The workspace comes from the job's envelope — the one the
+// create actually landed in — not from this retry's credentials.
+async function rebuilt(caller: Caller, op: { itemId: string; generationId: string }) {
+  const env = (await db().doc(`generation-jobs/${op.generationId}`).get()).data()?.envelope;
+  const response = await accepted(caller, { itemId: op.itemId });
+  if (caller.ctx.freePlan && env?.effectiveWorkspace && env.effectiveWorkspace !== caller.ctx.sessionNamespace) {
+    response.headers["Graffiticode-Workspace"] = await mintSessionToken({
+      sessionNamespace: env.effectiveWorkspace, sessionUuid: caller.ctx.sessionUuid || env.effectiveWorkspace,
+    });
+  }
+  return response;
 }
 
 async function run<T>(fn: () => Promise<T>): Promise<T> {
@@ -127,17 +145,21 @@ async function run<T>(fn: () => Promise<T>): Promise<T> {
 
 export function itemRoutes(app: Hono, validate: Validate, validateBody: ValidateBody) {
   app.post("/items", async (c) => {
-    const body = validateBody(await c.req.text(), "create_item");
+    validate(c, "create_item");
+    const raw = await c.req.text();
+    const body = validateBody(raw, "create_item");
     const caller = await callerFor(c);
-    const started: any = await run(() => createFromDescription(caller.ctx as any, {
+    // Credentials are checked here, so a bad one is a 401 whatever core does next.
+    await caller.principal();
+    return idempotent(c, caller, raw, async (idempotency) => accepted(caller, await run(() => createFromDescription(caller.ctx as any, {
       lang: bareLanguageId(body.language),
       description: body.description,
       name: body.name,
       siblingOf: body.source_item_id,
       client: CLIENT,
       clientKind: caller.ctx.clientKind,
-    }));
-    return accepted(c, caller, started);
+      idempotency,
+    }) as any)), (op) => rebuilt(caller, op));
   });
 
   app.get("/items", async (c) => {
@@ -204,12 +226,13 @@ export function itemRoutes(app: Hono, validate: Validate, validateBody: Validate
 
   app.post("/items/:id/revisions", async (c) => {
     const { path } = validate(c, "update_item");
-    const body = validateBody(await c.req.text(), "update_item");
+    const raw = await c.req.text();
+    const body = validateBody(raw, "update_item");
     const caller = await callerFor(c);
-    const started: any = await run(() => reviseItem(caller.ctx as any, {
-      itemId: path.id, modification: body.modification, client: CLIENT, clientKind: caller.ctx.clientKind,
-    }));
-    return accepted(c, caller, started);
+    await caller.principal();
+    return idempotent(c, caller, raw, async (idempotency) => accepted(caller, await run(() => reviseItem(caller.ctx as any, {
+      itemId: path.id, modification: body.modification, client: CLIENT, clientKind: caller.ctx.clientKind, idempotency,
+    }) as any)), (op) => rebuilt(caller, op));
   });
 
   app.get("/items/:id/revisions", async (c) => {
@@ -228,8 +251,8 @@ export function itemRoutes(app: Hono, validate: Validate, validateBody: Validate
     const { path } = validate(c, "retry_item");
     const caller = await callerFor(c);
     const { auth } = await load(caller, path.id);
-    const started = await run(() => retryGeneration({ auth, itemId: path.id }));
-    return accepted(c, caller, started);
+    return idempotent(c, caller, "", async (idempotency) =>
+      accepted(caller, await run(() => retryGeneration({ auth, itemId: path.id, idempotency }))), (op) => rebuilt(caller, op));
   });
 
   const ready = async (c: Context, operationId: string) => {
@@ -257,7 +280,11 @@ export function itemRoutes(app: Hono, validate: Validate, validateBody: Validate
     const { caller, g } = await ready(c, "get_spec");
     const s = await consoleSpec(g.id, caller.forward);
     return c.json({
-      item_id: s.itemId, language: languageId(s.lang), spec: s.spec,
+      // Leads with a blank line, as MCP's get_spec does, and for the same
+      // reason: the text is meant to follow a line of intent in a new item's
+      // description, and the scope gate takes everything after the first blank
+      // line as pasted content, not as the request.
+      item_id: s.itemId, language: languageId(s.lang), spec: `\n\n${s.spec.replace(/^\s+/, "")}`,
       coverage_checked: s.coverage.checked, coverage_missing: s.coverage.missing,
     });
   });
