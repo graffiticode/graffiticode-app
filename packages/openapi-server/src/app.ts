@@ -8,14 +8,16 @@ import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import { randomUUID } from "node:crypto";
 import { loadSpec } from "./spec.js";
-import { compileValidators, validateRequest } from "./validate.js";
+import { compileValidators, validateBody, validateRequest } from "./validate.js";
 import { ApiProblem, problemResponse } from "./problems.js";
 import { languageRoutes } from "./routes/languages.js";
 import { skillRoutes } from "./routes/skills.js";
 import { metaRoutes } from "./routes/meta.js";
-import { listLanguages } from "@graffiticode-app/core/languages-info";
+import { itemRoutes } from "./routes/items.js";
+import { coreReadiness } from "@graffiticode-app/core/readiness";
 
 export type Validate = (c: Context, operationId: string) => { path: Record<string, any>; query: Record<string, any>; header: Record<string, any> };
+export type ValidateBody = (raw: string, operationId: string) => any;
 
 export function createApp({ spec = loadSpec() }: { spec?: any } = {}) {
   const validators = compileValidators(spec);
@@ -24,6 +26,7 @@ export function createApp({ spec = loadSpec() }: { spec?: any } = {}) {
     query: Object.fromEntries(Object.entries(c.req.queries()).map(([k, v]) => [k, v[v.length - 1]])),
     header: Object.fromEntries([...c.req.raw.headers.entries()]),
   });
+  const body: ValidateBody = (raw, operationId) => validateBody(validators, operationId, raw);
 
   const app = new Hono();
 
@@ -39,21 +42,18 @@ export function createApp({ spec = loadSpec() }: { spec?: any } = {}) {
     allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
   }));
 
-  // Liveness for gc-deploy; ?deep=1 also checks the catalog core serves from.
+  // Liveness for gc-deploy; ?deep=1 checks what core needs to serve items
+  // here: Firestore, the generation queue, secrets, free-plan credentials.
   app.get("/health", async (c) => {
     c.header("Cache-Control", "no-store");
     if (c.req.query("deep") !== "1") return c.json({ status: "ok" });
-    try {
-      const n = (await listLanguages({})).length;
-      if (!n) throw new Error("empty language catalog");
-      return c.json({ status: "ok", checks: { catalog: "ok" } });
-    } catch (err) {
-      return c.json({ status: "unready", checks: { catalog: String((err as Error)?.message ?? err) } }, 503);
-    }
+    const r = await coreReadiness();
+    return c.json({ status: r.ok ? "ok" : "unready", effectiveProtocol: r.effectiveProtocol, minProtocol: r.minProtocol, checks: r.checks }, r.ok ? 200 : 503);
   });
 
   const v1 = new Hono();
   languageRoutes(v1, validate);
+  itemRoutes(v1, validate, body);
   skillRoutes(v1, validate);
   metaRoutes(v1, spec);
   app.route("/v1", v1);

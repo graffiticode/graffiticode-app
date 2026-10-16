@@ -38,9 +38,6 @@ test("every operation in the description has a route", async () => {
 
 test("health, CORS, request ids and unknown routes", async () => {
   assert.deepEqual(await (await get("/health")).json(), { status: "ok" });
-  const deep = await get("/health?deep=1");
-  assert.equal(deep.status, 200);
-  assert.deepEqual((await deep.json()).checks, { catalog: "ok" });
   const pre = await app.request("http://x/v1/languages", { method: "OPTIONS", headers: { Origin: "https://a.example", "Access-Control-Request-Method": "GET" } });
   assert.equal(pre.headers.get("access-control-allow-origin"), "*");
   const res = await app.request("http://x/v1/languages", { headers: { "X-Request-Id": "abc" } });

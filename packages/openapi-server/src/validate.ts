@@ -7,7 +7,7 @@ import type { ErrorObject, ValidateFunction } from "ajv";
 import { ApiProblem } from "./problems.js";
 
 type In = "path" | "query" | "header";
-type Compiled = Record<In, ValidateFunction | null>;
+type Compiled = Record<In, ValidateFunction | null> & { body: ValidateFunction | null };
 
 // Resolves local $refs ("#/components/...") so each compiled schema stands alone.
 export function deref(spec: any, node: any, seen = new Set<string>()): any {
@@ -36,7 +36,9 @@ export function compileValidators(spec: any) {
       const op = item[method];
       if (!op?.operationId) continue;
       const params = [...shared, ...(op.parameters ?? []).map((p: any) => deref(spec, p))];
-      const compiled: Compiled = { path: null, query: null, header: null };
+      const compiled: Compiled = { path: null, query: null, header: null, body: null };
+      const media = op.requestBody?.content?.["application/json"] ?? op.requestBody?.content?.["application/merge-patch+json"];
+      if (media?.schema) compiled.body = ajv.compile(deref(spec, media.schema));
       for (const where of ["path", "query", "header"] as In[]) {
         const ps = params.filter((p: any) => p.in === where);
         if (!ps.length) continue;
@@ -54,7 +56,8 @@ export function compileValidators(spec: any) {
 }
 
 const toPointer = (where: string, e: ErrorObject) => {
-  const missing = e.keyword === "required" ? `/${(e.params as any).missingProperty}` : "";
+  const missing = e.keyword === "required" ? `/${(e.params as any).missingProperty}`
+    : e.keyword === "additionalProperties" ? `/${(e.params as any).additionalProperty}` : "";
   return `/${where}${e.instancePath}${missing}`;
 };
 
@@ -84,4 +87,30 @@ export function validateRequest(
     });
   }
   return out;
+}
+
+// Request bodies: JSON, at most 64KB, matching the operation's schema
+// (additionalProperties: false, so unknown fields are refused).
+export const MAX_BODY_BYTES = 64 * 1024;
+
+export function validateBody(validators: Map<string, Compiled>, operationId: string, raw: string): any {
+  const v = validators.get(operationId)?.body;
+  if (!v) throw new Error(`no body schema for ${operationId}`);
+  if (Buffer.byteLength(raw) > MAX_BODY_BYTES) {
+    throw new ApiProblem(413, "payload_too_large", "Request body too large", { detail: `At most ${MAX_BODY_BYTES} bytes.` });
+  }
+  let body: unknown;
+  try {
+    body = raw ? JSON.parse(raw) : undefined;
+  } catch {
+    throw new ApiProblem(400, "invalid_json", "The request body isn't JSON");
+  }
+  if (!v(body)) {
+    const errors = (v.errors ?? []).map(e => ({ pointer: toPointer("body", e), message: e.message ?? "invalid" }));
+    throw new ApiProblem(400, "invalid_request", "The request doesn't match the API description", {
+      detail: errors.map(e => `${e.pointer}: ${e.message}`).join("; "),
+      errors,
+    });
+  }
+  return body;
 }
