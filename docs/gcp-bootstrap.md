@@ -2,7 +2,7 @@
 
 gc-deploy never creates services, service accounts or IAM bindings. These are
 the one-time steps, mirroring `graffiticode/docs/capability-policy-iam-review.md`
-(Step 2). Status as of 2026-10-13: done unless marked TODO.
+(Step 2). Status as of 2026-10-16: done unless marked TODO.
 
 ```bash
 P=graffiticode-app; R=us-central1
@@ -69,15 +69,19 @@ the deployer grants from the backend runbook, scoped to `deploy-build@`,
 | console | 1 / 10 | 1Gi | 900s |
 | mcp-service | 1 / – | 512Mi | 300s |
 | app | – / – | 1Gi | 300s |
+| openapi-service | – / 20 | 512Mi | 300s — TODO: raise to 900s. `GET /v1/items/{id}/events` keeps a stream open up to 10 minutes, so a 300s timeout cuts long streams before their closing `timeout` event (`gcloud run services update openapi-service --timeout=900`) |
 
 ## Generation protocol v2 (Phase 3.5)
 
-Set up before v2 is enabled (R1.1); harmless before, since the sweeper finds
-nothing to do while no v2 jobs exist.
+Done: v2 has been the production protocol since 2026-10-15 22:46Z (the
+Firestore floor; see "Enabling v2" below). The floor is one-way: never deploy a
+console older than R1 (`deploy.json` baselines refuse it).
 
 - `ACT_AS_GRANT_SECRET` (this project) holds the same value as
-  `act-as-grant-secret` in project `graffiticode`; only `console-run@` reads it
-  here (IAM review Step 12 in the backend repo). Mounted by `deploy.json`.
+  `act-as-grant-secret` in project `graffiticode`. Read by the producers that
+  sign grants: `console-run@`, `mcp-run@` (R2) and `openapi-run@` (Phase 4).
+  Only `console-run@` may exchange one at auth's `/internal/act-as` (IAM review
+  Step 12 in the backend repo). Mounted by `deploy.json`.
 - The sweeper: a Cloud Scheduler job calling the console's own origin every
   minute with the internal job secret (see
   `packages/console/src/pages/api/internal/sweep-generations.ts`):
@@ -114,6 +118,8 @@ nothing to do while no v2 jobs exist.
 
 ### MCP in core mode (R2)
 
+Done 2026-10-16 (`mcp-service-rmvba3aqz-c77591` and later).
+
 mcp runs `@graffiticode-app/core` in-process (`GRAFFITICODE_BACKEND=core`):
 it reserves v2 jobs and wakes the console's worker; it never calls an LLM
 (`get_spec` stays on the console over GraphQL, beside the generator and the
@@ -141,14 +147,54 @@ deploy (same image), or `npm run rollback -- mcp` to the previous release.
 
 ### REST API (Phase 4)
 
-Idempotency keys (`idempotency-keys/{hash}`) carry `expiresAt`; a TTL policy
-deletes them once past it (an expired key already reads as absent, so this
-only reclaims space). One-time, before the REST API takes traffic:
+Done 2026-10-16: Cloud Run `openapi-service`, served at
+https://openapi.graffiticode.org/v1. Like mcp in core mode, it runs core
+in-process, holds no model key (`get_spec` goes to the console over GraphQL)
+and calls no Policy route.
 
 ```
+P=graffiticode-app
+SA=openapi-run@$P.iam.gserviceaccount.com
+
+# Runtime SA, with what core needs here: Firestore (default database only), the
+# generation queue, and the four secrets core mounts. A new SA takes a few
+# seconds to be usable in IAM bindings; retry a "does not exist" refusal.
+gcloud iam service-accounts create openapi-run --project $P --display-name "Cloud Run runtime: openapi-service"
+gcloud projects add-iam-policy-binding $P --member serviceAccount:$SA --role roles/datastore.user \
+  --condition='expression=resource.name=="projects/graffiticode-app/databases/(default)",title=default-db-only'
+gcloud tasks queues add-iam-policy-binding generation-jobs --location=us-central1 --project=$P \
+  --member=serviceAccount:$SA --role=roles/cloudtasks.enqueuer
+for s in INTERNAL_JOB_SECRET FREE_PLAN_API_KEY FREE_PLAN_NAMESPACE_SALT ACT_AS_GRANT_SECRET; do
+  gcloud secrets add-iam-policy-binding $s --project=$P --member=serviceAccount:$SA \
+    --role=roles/secretmanager.secretAccessor --condition=None; done
+
+# Idempotency keys (idempotency-keys/{hash}) carry expiresAt; the TTL policy
+# deletes them once past it (an expired key already reads as absent, so this
+# only reclaims space).
 gcloud firestore fields ttls update expiresAt --collection-group=idempotency-keys \
-  --enable-ttl --project=graffiticode-app
+  --enable-ttl --project=$P
+
+# gc-deploy needs the service to exist, on its runtime SA: a placeholder first,
+# then `npm run deploy -- openapi` (verify/openapi.mjs checks core readiness,
+# the protocol floor and the served public URL before promotion).
+gcloud run deploy openapi-service --project $P --region us-central1 \
+  --image us-docker.pkg.dev/cloudrun/container/hello --service-account $SA \
+  --allow-unauthenticated --port 8080
+
+# The domain: a Cloud Run mapping, then in Cloudflare a CNAME
+# openapi -> ghs.googlehosted.com, DNS only until Google has issued the
+# certificate (15-60 min; then a few more minutes before every edge serves it),
+# optionally proxied after.
+gcloud beta run domain-mappings create --service openapi-service \
+  --domain openapi.graffiticode.org --project $P --region us-central1
 ```
+
+OAuth: the REST API is a second resource of mcp's authorization server
+(`OPENAPI_RESOURCE`, default https://openapi.graffiticode.org/v1). It checks
+access tokens at mcp's `POST /oauth/introspect`, which accepts only callers
+whose Cloud Run identity is in `OAUTH_INTROSPECTION_CALLERS` (default
+`openapi-run@` only), so this service never holds the internal API key. Deploy
+mcp before openapi when either side of that changes.
 
 ## Open items
 
