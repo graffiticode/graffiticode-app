@@ -1,5 +1,7 @@
-// Which generation protocol producers use, and the guards that keep v1 (legacy)
-// work from writing around a v2 job (app tier Phase 3.5).
+// The generation protocol floor, and the guard that keeps any content change
+// from writing around a running v2 job (app tier Phase 3.5). Protocol v1 was
+// retired 2026-10-17: every producer reserves v2 jobs; the floor stays as the
+// record (and the deploy check) that no image older than R1 may serve.
 //
 // v1: the producer marks the item "generating" and enqueues the whole job; the
 // worker claims a lease on the item and completes through updateItem.
@@ -52,18 +54,6 @@ export const GENERATION_IN_PROGRESS_MESSAGE =
 export function assertNoActiveGeneration(item: { generation?: GenerationPointer | null } | null | undefined) {
   if (isActiveGeneration(item)) {
     throw new ConflictError("generation_in_progress", GENERATION_IN_PROGRESS_MESSAGE);
-  }
-}
-
-// A v1 job may write only to an item that has never had a v2 job, and only
-// while it still holds the item's legacy lease.
-export const legacyMayComplete = (item: any, leaseOwner: string) =>
-  !item?.generation && item?.generationLeaseOwner === leaseOwner;
-
-export class LegacyJobRefused extends ConflictError {
-  constructor() {
-    super("legacy_job_refused", "A v1 generation job may not write to an item owned by the v2 protocol.");
-    this.name = "LegacyJobRefused";
   }
 }
 

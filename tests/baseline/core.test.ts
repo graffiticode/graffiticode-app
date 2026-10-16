@@ -33,6 +33,12 @@ const mcpCtx = { auth: { type: "firebase", token: userToken("alice"), source: "r
 const coreCtx = { token: userToken("alice") };
 const JOB_FIELDS = ["itemId", "lang", "prompt", "modification", "currentSrc", "currentData", "client"] as const;
 const pick = (job: any) => Object.fromEntries(JOB_FIELDS.map(k => [k, job[k] ?? null]));
+// The request fields of the i-th queued job: a v2 task names its job, whose
+// envelope holds them.
+const jobAt = async (i: number) => {
+  const p = h.jobPayloads.at(i);
+  return pick((await h.db.doc(`generation-jobs/${p.generationId}`).get()).data().envelope);
+};
 
 test("reviseItem builds the same generation job as MCP's update_item", async () => {
   const c = await tools.handleToolCall(mcpCtx, "create_item", { language: "L0175", description: PROMPT });
@@ -40,12 +46,12 @@ test("reviseItem builds the same generation job as MCP's update_item", async () 
   const MOD = "Make the lighthouse keeper older and wiser.";
   await tools.handleToolCall(mcpCtx, "update_item", { item_id: c.item_id, modification: MOD });
   await h.drainJobs();
-  const viaMcp = pick(h.jobPayloads.at(-1));
+  const viaMcp = await jobAt(-1);
   // The MCP revision changed the item's history; compare against a core
   // revision of the same state by revising again through both paths.
   const MOD2 = "Add a storm at sea.";
   await tools.handleToolCall(mcpCtx, "update_item", { item_id: c.item_id, modification: MOD2 });
-  const mcpJob = pick(h.jobPayloads.at(-1));
+  const mcpJob = await jobAt(-1);
   await h.drainJobs();
   // Roll the item back to the state MCP saw for MOD2, then revise through core.
   const ref = h.db.doc(`users/alice/items/${c.item_id}`);
@@ -54,7 +60,7 @@ test("reviseItem builds the same generation job as MCP's update_item", async () 
   const before = h.jobPayloads.length;
   const r = await core.reviseItem(coreCtx, { itemId: c.item_id, modification: MOD2, client: "mcp" });
   assert.equal(r.status, "generating");
-  const coreJob = pick(h.jobPayloads.at(before));
+  const coreJob = await jobAt(before);
   await h.drainJobs();
   assert.equal(viaMcp.modification, MOD);
   assert.deepEqual({ ...coreJob, currentSrc: null, currentData: null }, { ...mcpJob, currentSrc: null, currentData: null });
@@ -65,10 +71,10 @@ test("reviseItem builds the same generation job as MCP's update_item", async () 
 
 test("createFromDescription builds the same generation job as MCP's create_item", async () => {
   await tools.handleToolCall(mcpCtx, "create_item", { language: "L0175", description: PROMPT });
-  const mcpJob = pick(h.jobPayloads.at(-1));
+  const mcpJob = await jobAt(-1);
   await h.drainJobs();
   const r = await core.createFromDescription(coreCtx, { lang: "L0175", description: PROMPT, client: "mcp" });
-  const coreJob = pick(h.jobPayloads.at(-1));
+  const coreJob = await jobAt(-1);
   await h.drainJobs();
   assert.equal(r.status, "generating");
   assert.deepEqual({ ...coreJob, itemId: "x" }, { ...mcpJob, itemId: "x" });

@@ -11,7 +11,6 @@
 //   list_languages     GET /languages                  pagination
 //   get_language_info  GET /languages/{id}             user_guide_resource -> guide_url
 process.env.GRAFFITICODE_BACKEND = "core";
-process.env.GENERATION_PROTOCOL = "v2";
 import { test, before, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";

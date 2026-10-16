@@ -1,15 +1,13 @@
-// Cloud Tasks worker for async code generation. Enqueued by the
-// startCodeGeneration mutation (see src/lib/generation-queue.ts). Runs the same
-// generateCode service the synchronous mutation uses, then persists the result
-// and flips the item's generationStatus so clients polling get_item see it.
+// Cloud Tasks worker for async code generation (generation protocol v2): the
+// task carries only {v: 2, generationId}; the job itself — request, principal,
+// deadline, act-as grant — is in Firestore, and runJobV2 claims, runs and
+// commits it (core/generation-jobs.ts).
 //
-// Cloud Tasks holds this request open for the full 60-110s generation (CPU
-// allocated throughout) — the console already sustains requests this long via
-// the synchronous /api path, so no special runtime config is needed.
+// Protocol v1 tasks (the whole request in the payload) were retired on
+// 2026-10-17, after the queue had drained. One arriving now is acknowledged
+// with 200 and dropped: nothing in it can be acted on safely, and a non-2xx
+// would only make Cloud Tasks retry it.
 import type { NextApiRequest, NextApiResponse } from "next";
-import { GENERATION_JOB_VERSION } from "@graffiticode-app/core/lib/generation-queue";
-import type { GenerationJob } from "@graffiticode-app/core/lib/generation-queue";
-import { runJob } from "@graffiticode-app/core/generation";
 import { runJobV2 } from "@graffiticode-app/core/generation-jobs";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -21,30 +19,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  // v2: only the job id; the job itself is in Firestore (generation-jobs.ts).
-  if (req.body?.v === 2) {
-    const generationId = req.body.generationId;
-    if (typeof generationId !== "string" || !generationId) {
-      return res.status(400).json({ error: "Missing generationId" });
-    }
-    const r = await runJobV2(generationId);
-    return res.status(r.status).json(r.body);
+  if (req.body?.v !== 2) {
+    console.warn("[generate-job] retired v1 task dropped", req.body?.itemId ?? null);
+    return res.status(200).json({ status: "refused", reason: "protocol_v1_retired" });
   }
-
-  const job = req.body as GenerationJob;
-  const { v, itemId, lang, prompt, authReplay } = job || {};
-  if (!itemId || !lang || !prompt || !authReplay) {
-    return res.status(400).json({ error: "Missing required job fields" });
+  const generationId = req.body.generationId;
+  if (typeof generationId !== "string" || !generationId) {
+    return res.status(400).json({ error: "Missing generationId" });
   }
-  // Tasks enqueued before versioning carry no `v`; treat them as v1 since the
-  // required fields above are identical. A version we don't recognize is from a
-  // NEWER revision, so fail loudly rather than guessing at its shape — 400 keeps
-  // Cloud Tasks from retrying a payload this revision will never understand.
-  if (v !== undefined && v !== GENERATION_JOB_VERSION) {
-    console.error("[generate-job] unsupported payload version", v, itemId);
-    return res.status(400).json({ error: "unsupported_job_version", v });
-  }
-
-  const r = await runJob(job);
+  const r = await runJobV2(generationId);
   return res.status(r.status).json(r.body);
 }

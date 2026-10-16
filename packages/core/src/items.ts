@@ -23,7 +23,7 @@ import type { VersionSource } from "./versions.js";
 import { itemConnectionFields, writeThroughCurrentConnection } from "./writes.js";
 import { ConflictError, requireFullAccount } from "./errors.js";
 import { randomUUID } from "crypto";
-import { assertNoActiveGeneration, effectiveProtocol, legacyMayComplete, LegacyJobRefused } from "./generation-protocol.js";
+import { assertNoActiveGeneration, effectiveProtocol } from "./generation-protocol.js";
 import { connectionIntent, processEffectsFor, recordConnectionWrite } from "./effects.js";
 
 // A new item document before it has content. Shared by createItem and the v2
@@ -60,7 +60,6 @@ export async function createItem({
   isPublic,
   client,
   upstreamLangs,
-  deferGeneration,
   source,
   label,
 }: {
@@ -77,11 +76,6 @@ export async function createItem({
   // defaults to the client tag when the caller doesn't know.
   source?: VersionSource;
   label?: string;
-  // When true, create a fast "shell" item with no task and
-  // generationStatus="generating" — the caller (startCodeGeneration) runs the
-  // real generation asynchronously and fills in the taskId later. Skips the
-  // synchronous template generateCode below.
-  deferGeneration?: boolean;
 }) {
   try {
     // Gate item creation against the account's item budget BEFORE spending any
@@ -105,7 +99,7 @@ export async function createItem({
     // If no taskId provided, create a minimal template task
     let generatedHelp = help || "[]";
     let generatedRid: string | undefined;
-    if (!taskId && !deferGeneration) {
+    if (!taskId) {
       const result = await generateCodeForRequest({
         auth,
         prompt: "Create a minimal starting template",
@@ -142,10 +136,6 @@ export async function createItem({
     const item = newItemDoc({ auth, id, lang, name, mark, help: generatedHelp, isPublic, client, upstreamLangs, timestamp });
     if (taskId) {
       item.taskId = taskId;
-    }
-    if (deferGeneration) {
-      item.generationStatus = "generating";
-      item.generationStartedAt = timestamp;
     }
     if (code !== null) {
       item.code = code;
@@ -237,7 +227,6 @@ export async function updateItem({
   label,
   onRenderable,
   taskCode,
-  legacyLeaseOwner,
 }: {
   auth: AuthArg;
   id: string;
@@ -287,11 +276,6 @@ export async function updateItem({
    * the fetch.
    */
   taskCode?: unknown;
-  /**
-   * Set by the v1 generation worker: the lease it claimed. Its write lands only
-   * if it still holds that lease and the item has never had a v2 job (Phase 3.5).
-   */
-  legacyLeaseOwner?: string;
 }) {
   // Step timings for the one caller that waits on them: the generation worker,
   // whose whole post-generation path is round trips (see generate-job.ts). Logged
@@ -447,12 +431,10 @@ export async function updateItem({
     const saveId = taskIdChanged && (await effectiveProtocol()).effective >= 2 ? `save-${randomUUID()}` : null;
     const saveConnection = saveId ? await connectionIntent(auth, updates.lang ?? itemData.lang, updates.code) : null;
     const tWrite = Date.now();
-    if (taskIdChanged || legacyLeaseOwner) {
-      // Content changes commit only if no v2 job owns the item; a v1 worker's
-      // only while it holds its lease on a pointer-free item.
+    if (taskIdChanged) {
+      // Content changes commit only if no v2 job owns the item.
       await db().runTransaction(async (tx) => {
         const fresh = (await tx.get(itemRef)).data();
-        if (legacyLeaseOwner && !legacyMayComplete(fresh, legacyLeaseOwner)) throw new LegacyJobRefused();
         assertNoActiveGeneration(fresh);
         tx.update(itemRef, updates);
         if (saveId) {

@@ -1511,24 +1511,6 @@ export function pollNapMs(
   if (remainingMs < minRemainingMs) return null;
   return Math.min(intervalMs, remainingMs);
 }
-/**
- * Worker-died guard. MUST stay above the console's generation ceiling, or it
- * reports a RUNNING generation as a failed one.
- *
- * The console gives a generation 900s on both sides of the queue — Cloud Run's
- * `timeoutSeconds` and the Cloud Tasks `dispatchDeadline` (console commit
- * e7b9dd0, `src/lib/generation-queue.ts`). This constant was 4 minutes, so every
- * generation that ran between 240s and 900s was told to the agent as
- * `status:"failed", error:"Generation timed out"` while the worker was still
- * working — and the item then flipped to `ready` behind the user's back. Saying
- * "it failed" about work that succeeds is worse than waiting: the agent stops
- * polling and the user is told to start over.
- *
- * 960s = the console's 900s ceiling plus a minute for the queue hop and the
- * item write. Lower this only in lockstep with that ceiling; the two numbers are
- * a pair and neither is meaningful alone.
- */
-const GENERATION_STALE_MS = 16 * 60_000;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -1676,20 +1658,8 @@ async function handleItemResult(
       const startedAt = item.generationStartedAt ? Number(item.generationStartedAt) : 0;
       pendingStartedAt = startedAt;
       pendingChars = typeof item.generationChars === "number" ? item.generationChars : 0;
-      // Legacy (v1) jobs only: a v2 job is failed by the console, durably, at
-      // its deadline at the latest, so MCP and REST always agree.
-      const v2 = item.generationDeadlineAt != null;
-      const stale = !v2 && startedAt > 0 && Date.now() - startedAt > GENERATION_STALE_MS;
-      if (stale) {
-        return {
-          item_id: item.id,
-          status: "failed",
-          error: "Generation timed out",
-          language: `L${item.lang}`,
-          name: item.name,
-          summary: buildFailedSummary(item.name, `L${item.lang}`, "Generation timed out", item.id),
-        };
-      }
+      // No staleness guess: a generation is failed only by the console, durably
+      // (a v2 job fails at its deadline at the latest), so MCP and REST agree.
       if (await napBeforeRetry()) {
         continue;
       }

@@ -398,8 +398,8 @@ export interface Item {
   generationStatus?: "generating" | "ready" | "failed" | null;
   generationError?: string | null;
   generationStartedAt?: string | null;
-  // Set while a v2 generation job runs (Phase 3.5). Such an item is failed only
-  // by the console's durable state, so the stale guard must not fire for it.
+  // Set while a v2 generation job runs (Phase 3.5): its absolute deadline. An
+  // item is reported failed only by the console's durable state.
   generationDeadlineAt?: string | null;
   // Characters a RUNNING generation has emitted so far, published by the console
   // every ~2s. Null once terminal. Characters rather than tokens because that is

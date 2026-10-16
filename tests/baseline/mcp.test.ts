@@ -3,7 +3,7 @@
 import { test, before, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { start, userToken, type Harness } from "./harness";
-import { PROMPT, generate, getItem, ok, lastJob, protocolV2 } from "./helpers";
+import { PROMPT, generate, getItem, ok, lastJob } from "./helpers";
 
 let h: Harness;
 let tools: any;
@@ -117,7 +117,7 @@ test("a free-plan MCP session creates in its own workspace and gets claim links"
   assert.match(String(g.claim_url), /\/claim\?token=/);
 });
 
-test("a second revision while one is generating is acknowledged but dropped", async () => {
+test("a second revision while one is generating is refused", async () => {
   const alice = { token: userToken("alice") };
   const first = ok(await generate(h, alice, {})).startCodeGeneration;
   // Slow the LLM so the first revision is still running when the second arrives.
@@ -129,19 +129,14 @@ test("a second revision while one is generating is acknowledged but dropped", as
     { id: first.itemId, m: "Second revision: add a second line." }, alice);
   const [r1, r2] = await Promise.all([one, two]);
   assert.equal(ok(r1).startCodeGeneration.status, "generating");
-  if (protocolV2()) {
-    // CHANGED in Phase 3.5 (v2): the second revision is refused up front
-    // (generation_in_progress) instead of being acknowledged and silently
-    // dropped. Exactly one revision still lands.
-    assert.match(r2.body.errors?.[0]?.message ?? "", /still generating/);
-  } else {
-    assert.equal(ok(r2).startCodeGeneration.status, "generating");
-  }
+  // CHANGED in Phase 3.5 (v2): the second revision is refused up front
+  // (generation_in_progress) instead of being acknowledged and silently
+  // dropped. Exactly one revision still lands.
+  assert.match(r2.body.errors?.[0]?.message ?? "", /still generating/);
   await h.drainJobs();
   const item = ok(await getItem(h, alice, first.itemId)).item;
   const help = JSON.parse(item.help || "[]").map((e: any) => e.user);
-  // v1: both are accepted, one generation runs, the other's job finds the
-  // lease busy and is acked as a duplicate. Exactly one revision lands.
+  // Exactly one revision lands.
   const revisions = help.filter((u: string) => /revision/.test(u));
   assert.deepEqual(revisions, ["First revision: retitle it Revised."], JSON.stringify(help));
   assert.equal(item.generationStatus, "ready");
