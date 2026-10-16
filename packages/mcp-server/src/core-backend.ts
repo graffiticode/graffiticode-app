@@ -6,7 +6,6 @@
 import { admitRequest, resolveAuth, type RequestCredentials } from "@graffiticode-app/core/auth";
 import { getItem } from "@graffiticode-app/core/items";
 import { getTask, readItemData } from "@graffiticode-app/core/tasks";
-import { getSpec } from "@graffiticode-app/core/spec";
 import { startGeneration } from "@graffiticode-app/core/generation";
 import { createFromDescription, reviseItem } from "@graffiticode-app/core/revise";
 import { NotFoundError } from "@graffiticode-app/core/errors";
@@ -15,6 +14,13 @@ import type { AuthContext } from "./api.js";
 import { parseFreePlanError, parseFreePlanErrorBody } from "./free-plan-limit.js";
 
 export const coreBackendEnabled = () => process.env.GRAFFITICODE_BACKEND === "core";
+
+// Operations that call an LLM stay on the console, the one service that holds
+// the model key, beside the generator they share it with: in core mode they
+// still go over GraphQL. (Generation already does: this server only reserves
+// the job, and the console's worker runs it.)
+const CONSOLE_ONLY = new Set(["GetSpec"]);
+export const coreHandles = (query: string) => !CONSOLE_ONLY.has(/(?:query|mutation)\s+(\w+)/.exec(query)?.[1] ?? "");
 
 type Ctx = RequestCredentials & { clientKind?: string; geoCountry?: string };
 
@@ -135,24 +141,11 @@ async function run(op: string, ctx: Ctx, v: Record<string, any>): Promise<Record
     }
     case "GetTask":
       return { task: task(await getTask({ auth: await resolveAuth(ctx), id: v.id })) };
+    // MCP shows no connection fields, so the Policy lookup behind them is skipped.
     case "GetItem":
-      return { item: await item(await getItem({ auth: await resolveAuth(ctx), id: v.id }), ctx, false, false) };
+      return { item: await item(await getItem({ auth: await resolveAuth(ctx), id: v.id, connectionFields: false }), ctx, false, false) };
     case "GetItemWithTask":
-      return { item: await item(await getItem({ auth: await resolveAuth(ctx), id: v.id }), ctx, true, true) };
-    case "GetSpec": {
-      const s: any = nonNull(await getSpec({ auth: await resolveAuth(ctx), id: v.id }), "Query.spec");
-      return {
-        spec: {
-          spec: nonNull(str(s.spec), "ItemSpec.spec"),
-          lang: nonNull(str(s.lang), "ItemSpec.lang"),
-          itemId: nonNull(str(s.itemId), "ItemSpec.itemId"),
-          coverage: {
-            checked: nonNull(int(s.coverage?.checked), "SpecCoverage.checked"),
-            missing: nonNull(strs(s.coverage?.missing), "SpecCoverage.missing"),
-          },
-        },
-      };
-    }
+      return { item: await item(await getItem({ auth: await resolveAuth(ctx), id: v.id, connectionFields: false }), ctx, true, true) };
     case "ListLanguages": {
       // As the languages resolver: internal dialects never reach the catalog.
       const all = await listLanguages({ search: v.search, domain: v.domain });

@@ -123,9 +123,21 @@
         }
       ],
       "env": {
-        "GRAFFITICODE_BACKEND": "graphql"
+        "GRAFFITICODE_BACKEND": "core",
+        "GENERATION_PROTOCOL": "v2",
+        "GENERATION_JOB_URL": "https://console-cfdwwd7ega-uc.a.run.app/api/generate-job",
+        "GENERATION_QUEUE_PROJECT": "graffiticode-app",
+        "GENERATION_QUEUE_LOCATION": "us-central1",
+        "GENERATION_QUEUE_NAME": "generation-jobs",
+        "CONSOLE_URL": "https://console.graffiticode.org",
+        "NEXT_PUBLIC_FIREBASE_API_KEY": "AIzaSyAoVuUNi8ElnS7cn6wc3D8XExML-URLw0I"
       },
-      "secrets": {},
+      "secrets": {
+        "INTERNAL_JOB_SECRET": "INTERNAL_JOB_SECRET:1",
+        "FREE_PLAN_API_KEY": "FREE_PLAN_API_KEY:4",
+        "FREE_PLAN_NAMESPACE_SALT": "FREE_PLAN_NAMESPACE_SALT:2",
+        "ACT_AS_GRANT_SECRET": "ACT_AS_GRANT_SECRET:1"
+      },
       "smoke": [
         {
           "path": "/health",
@@ -133,6 +145,10 @@
         },
         {
           "path": "/widget/lang/L0180.mjs",
+          "status": 200
+        },
+        {
+          "path": "/health?deep=1",
           "status": 200
         }
       ],
@@ -142,7 +158,10 @@
           "milestone": "R1",
           "commit": "7b904bb9577b301b3ee35d715bba117dab13be2b"
         }
-      ]
+      ],
+      "verify": {
+        "module": "verify/mcp.mjs"
+      }
     },
     "app": {
       "image": "us-central1-docker.pkg.dev/graffiticode-app/services/app",

@@ -4,7 +4,7 @@
 
 import { AsyncLocalStorage } from "async_hooks";
 import { FreePlanLimitError, parseFreePlanError, parseFreePlanErrorBody } from "./free-plan-limit.js";
-import { coreBackendEnabled, coreExecute } from "./core-backend.js";
+import { coreBackendEnabled, coreHandles, coreExecute } from "./core-backend.js";
 
 const CONSOLE_API_URL = process.env.GRAFFITICODE_CONSOLE_URL || "https://console.graffiticode.org/api";
 
@@ -114,7 +114,7 @@ async function graphqlRequest<T>(
   const startedAt = Date.now();
 
   // GRAFFITICODE_BACKEND=core: the same operation, answered by core in-process.
-  if (coreBackendEnabled()) {
+  if (coreBackendEnabled() && coreHandles(query)) {
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       const work = coreExecute(auth, query, variables);

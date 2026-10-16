@@ -23,6 +23,8 @@
  */
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { coreReadiness } from "@graffiticode-app/core/readiness";
+import { coreBackendEnabled } from "./core-backend.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
   CallToolRequestSchema,
@@ -1073,6 +1075,17 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
 
   // Health check
   if (url.pathname === "/health") {
+    // ?deep=1 (gc-deploy smoke and verify): in core mode, can this instance do
+    // core's work — Firestore, the generation queue, its secrets, free-plan
+    // credentials? A short service account or config fails here, before traffic.
+    if (url.searchParams.get("deep") === "1") {
+      const backend = coreBackendEnabled() ? "core" : "graphql";
+      const readiness = backend === "core" ? await coreReadiness() : null;
+      const ok = readiness ? readiness.ok : true;
+      res.writeHead(ok ? 200 : 503, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+      res.end(JSON.stringify({ status: ok ? "ok" : "unready", backend, ...(readiness ?? {}) }));
+      return;
+    }
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ status: "ok" }));
     return;

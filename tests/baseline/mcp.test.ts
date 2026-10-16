@@ -3,7 +3,7 @@
 import { test, before, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { start, userToken, type Harness } from "./harness";
-import { PROMPT, generate, getItem, ok } from "./helpers";
+import { PROMPT, generate, getItem, ok, lastJob, protocolV2 } from "./helpers";
 
 let h: Harness;
 let tools: any;
@@ -33,7 +33,7 @@ test("create_item starts a generation and returns status generating", async () =
   assert.ok(r.item_id);
   await h.drainJobs();
   // The worker received the description as both prompt and modification.
-  const job = h.jobPayloads.at(-1);
+  const job = await lastJob(h);
   assert.equal(job.itemId, r.item_id);
   assert.equal(job.modification, PROMPT);
   assert.ok(String(job.prompt).includes(PROMPT));
@@ -62,7 +62,7 @@ test("update_item sends history and the new request as the prompt, and the sourc
   assert.equal(u.status, "generating");
   assert.equal(u.operation, "update");
   await h.drainJobs();
-  const job = h.jobPayloads.at(-1);
+  const job = await lastJob(h);
   assert.equal(job.itemId, c.item_id);
   assert.equal(job.modification, MOD);
   assert.match(job.prompt, /^Previous conversation:/);
@@ -129,11 +129,18 @@ test("a second revision while one is generating is acknowledged but dropped", as
     { id: first.itemId, m: "Second revision: add a second line." }, alice);
   const [r1, r2] = await Promise.all([one, two]);
   assert.equal(ok(r1).startCodeGeneration.status, "generating");
-  assert.equal(ok(r2).startCodeGeneration.status, "generating");
+  if (protocolV2()) {
+    // CHANGED in Phase 3.5 (v2): the second revision is refused up front
+    // (generation_in_progress) instead of being acknowledged and silently
+    // dropped. Exactly one revision still lands.
+    assert.match(r2.body.errors?.[0]?.message ?? "", /still generating/);
+  } else {
+    assert.equal(ok(r2).startCodeGeneration.status, "generating");
+  }
   await h.drainJobs();
   const item = ok(await getItem(h, alice, first.itemId)).item;
   const help = JSON.parse(item.help || "[]").map((e: any) => e.user);
-  // Today: both are accepted, one generation runs, the other's job finds the
+  // v1: both are accepted, one generation runs, the other's job finds the
   // lease busy and is acked as a duplicate. Exactly one revision lands.
   const revisions = help.filter((u: string) => /revision/.test(u));
   assert.deepEqual(revisions, ["First revision: retitle it Revised."], JSON.stringify(help));

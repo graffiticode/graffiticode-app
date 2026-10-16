@@ -137,7 +137,7 @@ export async function reviseItem(
   { itemId, modification, client, clientKind, geoCountry }: { itemId: string; modification: string } & Hints,
 ) {
   const auth = await resolveAuth(ctx);
-  const item: any = await getItem({ auth, id: itemId });
+  const item: any = await getItem({ auth, id: itemId, connectionFields: false });
   if (!item) throw new NotFoundError(`Item not found: ${itemId}`);
   const currentSrc = item.taskId ? ((await getTask({ auth, id: item.taskId }))?.src ?? null) : null;
   const prompt = buildContextualPrompt(parseHelp(item.help), modification);
