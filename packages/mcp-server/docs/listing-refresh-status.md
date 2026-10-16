@@ -41,7 +41,7 @@ changes**; a status doc that has gone stale is worse than none, as §11 records 
 
 5. ✅ **ZIP verified:**
    ```
-   graffiticode-skills/dist/graffiticode-plugin-2.1.0.zip
+   packages/skills/dist/graffiticode-plugin-2.1.0.zip
      ref    f2c3035 (2026-09-19)
      sha256 7c7ae8527b36c6edec9be7ecbcb8372fb518e4c18077b4662d2f2eac0dc4faa2
    ```
@@ -78,11 +78,11 @@ gcloud run services describe mcp-service --project graffiticode-app --region us-
 
 ```bash
 # Confirm SHA matches recorded artifact
-shasum -a 256 ../graffiticode-skills/dist/graffiticode-plugin-2.1.0.zip
+shasum -a 256 ../skills/dist/graffiticode-plugin-2.1.0.zip
 # Expected: a428f4155024df1272c65377c6bd9a1b9e74880d447a16d01700004a9f88fd97
 
 # Spot-check contents
-cd ../graffiticode-skills && unzip -l dist/graffiticode-plugin-2.1.0.zip
+cd ../skills && unzip -l dist/graffiticode-plugin-2.1.0.zip
 # Expected: plugin.json, mcp.json, .app.json, skills/{render,assessments,learnosity}/SKILL.md
 ```
 
@@ -90,7 +90,7 @@ cd ../graffiticode-skills && unzip -l dist/graffiticode-plugin-2.1.0.zip
 
 1. Open the **v2 draft** at platform.openai.com
 2. Set version to **2.1.0**
-3. Upload `graffiticode-skills/dist/graffiticode-plugin-2.1.0.zip`
+3. Upload `packages/skills/dist/graffiticode-plugin-2.1.0.zip`
 4. Click **Scan Tools**
 5. **Wait for scan to complete**, then verify:
 
@@ -166,7 +166,7 @@ Submitting as **v2.1.0**, rescanned in the still-editable v2 draft.
    live: a 3-question quiz now returns all three questions with ✓ answer keys. The widget hash
    moved to **`2656b7bd`** as expected, so every client's cached build is one behind again.
 2. ~~**Build the plugin ZIP**~~ — **done 2026-09-17**, `npm run package` in
-   `graffiticode-skills`. The build refuses an uncommitted or stale ref, so it always describes
+   `packages/skills`. The build refuses an uncommitted or stale ref, so it always describes
    a pushed commit. Record the artifact SHA-256 in `openai-submission.md` §2.
 3. ~~**Refresh §6's 5+3 test cases**~~ — **done 2026-09-17.** Rewritten around the current
    catalog, every positive executed against production that day with its outcome recorded.
@@ -297,7 +297,7 @@ According to that advice, OpenAI uses the two words for different layers:
 - **The Plugin Directory is said to be the main discovery surface since 2026-07-09.** A plugin
   bundles apps, skills and app templates. Apps still exist, as the integration layer underneath.
 - **What this means for us:** it's the same structure we already submit as
-  "app-plus-skills" (runbook §2). The MCP server is the app. The `graffiticode-skills` ZIP is
+  "app-plus-skills" (runbook §2). The MCP server is the app. The `packages/skills` ZIP is
   the behavioural layer: when to call Graffiticode, which language to pick, how to read the
   result.
 - **Why ChatGPT doesn't reliably use a registered server:** the app gives ChatGPT the

@@ -125,7 +125,7 @@ paths:
       operationId: list_skills
       tags: [skills]
       summary: List agent skills
-      description: Guidance for agents working with Graffiticode, read from the public graffiticode-skills repository.
+      description: Guidance for agents working with Graffiticode, read from the public graffiticode-app repository (packages/skills).
       responses:
         "200":
           description: The skills.

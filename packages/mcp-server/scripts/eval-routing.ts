@@ -41,7 +41,8 @@ import { listLanguages as apiListLanguages, type AuthContext } from "../src/api.
 
 const MODEL = "claude-opus-4-8";
 const RUNS_PER_CASE = Number(process.env.EVAL_RUNS ?? 3);
-const SKILLS_REPO = process.env.GRAFFITICODE_SKILLS_PATH ?? "../graffiticode-skills";
+// A local checkout of the skills: graffiticode-app's packages/skills, run from packages/mcp-server.
+const SKILLS_REPO = process.env.GRAFFITICODE_SKILLS_PATH ?? "../skills";
 
 const catalogOnly = process.argv.includes("--catalog-only");
 

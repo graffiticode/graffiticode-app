@@ -1,0 +1,110 @@
+---
+name: forms
+description: Author working, hosted web forms whose submissions POST to a webhook — contact forms, RSVPs, surveys, intake and signup forms — from a natural-language description plus a structured webhook binding (the L0174 language). Use whenever the user wants a real, shareable form with a live backend that collects responses and delivers them to an endpoint, not just a static list of fields. For tabular data entry or grading use the spreadsheet/assessment languages; to chart collected responses use the charts language.
+---
+
+# Forms
+
+Author hosted web forms via Graffiticode (the `L0174` language). This is the backend-operational sibling to the plain authoring skills: a form is more than a rendered artifact — it has a **live submission pipe** to a developer's webhook, and that pipe is what this skill exists to drive correctly.
+
+You never write DSL or form JSON. You describe the form's **shape** in natural language and supply the webhook **binding** as structured data. The backend compiles the form, hosts it, and — when an end user submits — signs and POSTs the submission to the bound URL.
+
+## Prerequisite
+
+The Graffiticode MCP connector must be installed and connected. If `list_languages` is unavailable, tell the user to connect it before proceeding.
+
+## The one rule that defines this skill: shape from intent, binding from config
+
+- The form **shape** (fields, types, validation, layout, theme, submit affordance) is compiled from the natural-language `description`.
+- The webhook **binding** (callback URL, signing secret reference, redirect) is **verbatim data, never inferred from prose**, and is supplied as a structured `config` object.
+
+Never read a callback URL, secret, or redirect out of the user's sentence and put it in the description. The URL the user means is data; pass it in `config`, not in `description`.
+
+## Workflow
+
+**1. Discover the language.**
+
+Call `list_languages(domain: "forms")` (fall back to `list_languages(search: "form")` if the domain is empty). Today this resolves to a single form language; the discovery step stays correct if more are added. Read the returned `description` — don't hardcode the ID.
+
+**2. Read the language info.**
+
+Call `get_language_info(language)`. Its `supported_item_types`, `example_prompts`, and authoring guidance are the authoritative source of what the form can express. For the field/validation vocabulary, read the `user_guide_resource` via `ReadResource`.
+
+**3. Create the form.**
+
+Call `create_item(language, description, config)`. Write the `description` the way you'd brief a designer; supply the binding as `config`:
+
+```
+create_item(
+  language: "<form language id>",
+  description: "Create a contact form titled 'Get in touch' with fields:
+    Name (text, required), Email (email, required), Company (text), and
+    Message (textarea, required, at least 20 characters). Submit button reads
+    'Send'. Light theme. After submit, show a thank-you message.",
+  config: {
+    webhook: {
+      url: "https://app.example.com/hooks/contact",   // required to bind; verbatim, never inferred
+      secret_ref: "whsec_main",                          // optional; names a console secret → signed delivery
+      redirect_url: "https://example.com/thanks"         // optional; post-submit redirect
+    }
+  }
+)
+```
+
+A good `description` is specific about: field labels and types (text, email, number, tel, url, textarea, select, radio, checkbox, date), which fields are `required`, validation (min/max, min-length/max-length, regex pattern), grouping/order, theme, and the submit affordance (button label, redirect vs inline thank-you).
+
+**4. Iterate — shape in natural language, binding in config.**
+
+```
+update_item(item_id, "Add a Phone field (tel, optional) after Email, and make Company required.")
+update_item(item_id, { config: { webhook: { url: "https://app.example.com/hooks/contact-v2" } } })
+```
+
+Prefer iteration over recreation — history is lost on a fresh create.
+
+## The webhook binding (the side-effectful part)
+
+This is the operational knowledge the create/iterate loop doesn't carry. Read the `webhook` object on every create/update response and report its state:
+
+```json
+{ "submit_url": "https://app.graffiticode.org/form", "webhook": { "status": "pending", "signed": false } }
+```
+
+- **`status`** — `pending` until the endpoint completes a verification handshake, then `verified`. **Submissions are not delivered while `pending`.** Tell the user delivery starts once their endpoint confirms; do not report the form as "live and delivering" until `verified`.
+- **`signed`** — whether a console-held signing secret is bound. **Signed delivery (the only kind a production consumer should trust) requires a Graffiticode account.** When `signed: false`, tell the user that secure/verifiable delivery requires signing in, and surface the `signin_url`. Unsigned delivery is the valid anonymous/free-plan fallback for trying it out.
+- **`submit_url`** is informational — the rendered form wires it automatically. The user does not POST to it; the end user submits through the rendered form.
+- **The signing secret is never returned over MCP.** It lives in the console. Do not ask the user to paste it into chat, and never fabricate or echo one. `secret_ref` is only a *name* that points at a console-stored secret.
+
+### Attribution / conversion note
+
+The signing boundary is the identification boundary: to get a webhook a production system can trust, the developer must have an account. When a user wants reliable, verifiable delivery, surfacing sign-in is the right move, not a sales push — it's the step that makes their form production-grade.
+
+## Errors
+
+All errors return a structured JSON body; distinguish by `code`, not HTTP status:
+
+- **`webhook_url_rejected`** — the callback URL failed SSRF validation (private/loopback/metadata host, or a non-`https` scheme). Do not retry; tell the user the URL isn't allowed and why. Don't try to work around it with a redirect or proxy.
+- **`webhook_verification_pending`** — binding accepted, not yet verified. Not a failure; tell the user deliveries begin once their endpoint confirms.
+- **`webhook_signing_requires_account`** — a `secret_ref` was supplied (or signed delivery requested) without an account. Surface `signin_url`; offer unsigned delivery as the anonymous fallback.
+- **`invalid_webhook_config`** — malformed `config.webhook` (missing `url`, bad shape). Fix the `config` object and retry.
+
+## Saving the form item (free plan)
+
+Like every Graffiticode item, the form has a **`view_url`** in each response — surface it so the user can open and share the rendered form. On a **free-plan** (no-credential) call the response also carries `claim_url`/`claim_message`, and the `view_url` embeds the claim token so its footer offers a one-click **"Claim it in Graffiticode →"** link; free-plan items expire after 48 hours unless claimed. Note the connection: claiming (an account) is also what unlocks **signed** delivery. Only surface the URLs the server returned.
+
+## Output
+
+The form renders as an interactive widget inline where supported. **The widget is the rendering. Your reply is a one-line summary plus the delivery state** — e.g., *"Built a 4-field contact form; webhook bound, pending endpoint verification."* Prefer the response's `description`/`change_summary` for the summary.
+
+**Do not preview or simulate the form in chat** — no mock field layouts, no reproduced inputs, no JSON dumps. If asked "what does it look like," point at the rendered widget/`view_url`.
+
+## Guardrails
+
+- **Never hand-write form JSON or Graffiticode DSL.** The backend compiles both from your description.
+- **Never infer the webhook URL, secret, or redirect from prose.** Bindings are verbatim `config` data.
+- **Never handle the signing secret in chat.** It lives in the console; `secret_ref` is a name, not the secret. Don't request, echo, or fabricate it.
+- **Don't improvise out-of-band delivery.** Submissions are delivered by the compiler's terminal POST to the bound URL. Don't offer to POST the webhook yourself, "test" it by hitting the endpoint, or route delivery through a workaround. If delivery is `pending`, the fix is endpoint verification, not a side channel.
+- **Don't claim delivery before `verified`.** Report `status` honestly.
+- **Never hardcode a language ID.** Call `list_languages(domain: "forms")` each session.
+- **Iterate, don't recreate.** Edit the existing `item_id`; fresh creates lose history.
+- **Stay in lane.** For tabular entry/grading use the spreadsheet/assessment languages; for charts use the charts language. Suggest the better skill rather than forcing a form.
