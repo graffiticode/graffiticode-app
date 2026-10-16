@@ -10,7 +10,7 @@ Companion to `openai-submission.md` (the operational runbook). Required by Phase
 **Rule:** change the portal and this file in the same sitting. A field that exists only in
 the portal is a field nobody can review.
 
-**Machine copy:** `graffiticode-skills/plugin.meta.json` is what `npm run package` generates
+**Machine copy:** `packages/skills/plugin.meta.json` is what `npm run package` generates
 `plugin.json` from — the same fields, minus the rationale. It and this file are a matched
 pair: **change both in the same sitting**, the same discipline the rule above imposes on the
 portal. The build prints that file's SHA-256 on every run, so drift is provable rather than
@@ -58,7 +58,7 @@ L0178 invisible on the listing — is the reason to touch the copy at all.
 **Starter prompt 1: changed**, see the table below; it now asks for the currency formatting the
 old record wrongly assumed.
 
-The machine copy is `graffiticode-skills/plugin.meta.json`; both shipped in the 2.1.0 artifact
+The machine copy is `packages/skills/plugin.meta.json`; both shipped in the 2.1.0 artifact
 recorded in `openai-submission.md` §2.
 
 ---

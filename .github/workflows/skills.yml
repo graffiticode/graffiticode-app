@@ -1,14 +1,24 @@
 name: skills
 
-# main is a live deploy: the MCP server reads this repo's default branch at
-# request time, so an edit reaches every connected client within ~60s with no
-# build step. There is no staging environment to catch a bad skill — these two
-# jobs are it.
+# packages/skills is live content: the MCP server and the REST API read it from
+# this repository's default branch at request time, so a merged skill edit
+# reaches every connected client within minutes, with no build or deploy. There
+# is no staging environment to catch a bad skill — these jobs are it. (Moved
+# from the graffiticode-skills repository with the skills, 2026-10-16.)
 on:
   push:
     branches: [main]
+    paths: ["packages/skills/**", ".github/workflows/skills.yml"]
   pull_request:
+    paths: ["packages/skills/**", ".github/workflows/skills.yml"]
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: packages/skills
 
 jobs:
   validate:
@@ -20,6 +30,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: packages/skills/package-lock.json
       - run: npm ci
       - run: npm run validate
 
@@ -38,6 +49,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: packages/skills/package-lock.json
       - run: npm ci
       # Two independent processes must agree on the artifact hash. Separate
       # processes are the point: an in-process double build would hide
@@ -47,12 +59,12 @@ jobs:
           a=$(npm run --silent package -- --dry-run --no-fetch --ref ${{ github.sha }} | grep -o 'sha256  [0-9a-f]*')
           b=$(npm run --silent package -- --dry-run --no-fetch --ref ${{ github.sha }} | grep -o 'sha256  [0-9a-f]*')
           echo "$a"
-          [ "$a" = "$b" ] || { echo "NOT DETERMINISTIC: $a vs $b"; exit 1; }
+          [ -n "$a" ] && [ "$a" = "$b" ] || { echo "NOT DETERMINISTIC: $a vs $b"; exit 1; }
 
   smoke:
     name: smoke (post-deploy)
     # Only meaningful once the commit is on the default branch — that is what the
-    # server serves. On a PR there is nothing deployed to compare against.
+    # servers serve. On a PR there is nothing deployed to compare against.
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     needs: validate
     runs-on: ubuntu-latest
@@ -62,6 +74,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: packages/skills/package-lock.json
       - run: npm ci
       # Polls until the live server matches this commit. Measured propagation is
       # ~3.5 min — the ~60s cache TTL is the small term, raw-CDN is the big one.

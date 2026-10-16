@@ -44,7 +44,7 @@ widget, and the expected tool-call path is shorter).
 - **Legal:** privacy `https://mcp.graffiticode.org/privacy`, terms
   `https://mcp.graffiticode.org/terms`, support `support@graffiticode.org` (the plugin
   manifest's `supportURL` is `mailto:support@graffiticode.org`, set in
-  `graffiticode-skills/plugin.meta.json`).
+  `packages/skills/plugin.meta.json`).
 - **Listing copy:** [`openai-listing-copy.md`](./openai-listing-copy.md) is the canonical,
   versioned source for every public publisher field (category, tagline, description, starter
   prompts). The portal is **not** the source of truth — change both in the same sitting.
@@ -83,7 +83,7 @@ content **requires sign-in**, and OAuth (when enabled) associates later work wit
 
 ## 2. Plugin package (the ZIP is built, not assembled by hand)
 
-Source: the public `graffiticode/graffiticode-skills` repo (same skills served as MCP
+Source: the public `graffiticode/graffiticode-app` repo's `packages/skills` (same skills served as MCP
 resources). Built with **`npm run package`** there — `scripts/build-plugin.mjs`. Served
 skills as of 2026-09-17: **`render`** (broad default-rendering preference — the primary),
 **`assessments`**, **`learnosity`**. `forms` is held (`SKILL.md.draft`) and the build excludes
@@ -97,7 +97,7 @@ description, category, starter prompts); it is generated from `plugin.meta.json`
 whose human-readable counterpart is `openai-listing-copy.md`.
 
 ```bash
-cd ../graffiticode-skills
+cd ../skills
 npm run package -- --dry-run    # build and hash, write nothing
 npm run package                 # dist/graffiticode-plugin-<version>.zip
 ```

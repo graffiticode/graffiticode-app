@@ -33,10 +33,10 @@ routes.set(/\/L0180\/usage-guide\.md/, () => ok("# L0180 guide\n\nWrite question
 routes.set(/\/L0180\/scope\.json/, () => ok({ summary: "quizzes", in_scope: ["quizzes"], out_of_scope: ["spreadsheets"] }));
 routes.set(/\/L0184\/(language-info\.json|usage-guide\.md|user-guide\.md|scope\.json)/, () => new Response("", { status: 404 }));
 
-// graffiticode-skills on GitHub.
-routes.set(/api\.github\.com\/repos\/graffiticode\/graffiticode-skills\/contents/, () =>
+// The skills, in graffiticode-app's packages/skills on GitHub.
+routes.set(/api\.github\.com\/repos\/graffiticode\/graffiticode-app\/contents\/packages\/skills\?/, () =>
   ok([{ type: "dir", name: "graffiticode-render" }, { type: "file", name: "README.md" }]));
-routes.set(/raw\.githubusercontent\.com\/.*\/graffiticode-render\/SKILL\.md/, () =>
+routes.set(/raw\.githubusercontent\.com\/graffiticode\/graffiticode-app\/main\/packages\/skills\/graffiticode-render\/SKILL\.md/, () =>
   ok("---\nname: Rendering items\ndescription: >\n  How to show an item\n  to the user.\n---\n# Rendering\n", "text/markdown"));
 
 export const spec = loadSpec();

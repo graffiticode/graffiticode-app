@@ -1,6 +1,9 @@
-# graffiticode-skills
+# Graffiticode skills (`packages/skills`)
 
-Source-of-truth repository for Graffiticode agent **skills** — self-contained
+> Moved here from the `graffiticode/graffiticode-skills` repository on
+> 2026-10-16, with its history. That repository is archived.
+
+The source of truth for Graffiticode agent **skills** — self-contained
 markdown files (`SKILL.md`) that teach AI agents how and when to use
 Graffiticode. Each skill lives in its own directory and is consumed in two
 ways: installed manually into a Claude Code skills directory, or served at
@@ -9,7 +12,7 @@ runtime by the Graffiticode MCP server as an MCP resource.
 ## Layout
 
 ```
-graffiticode-skills/
+packages/skills/
 ├── README.md
 ├── render/
 │   └── SKILL.md
@@ -41,8 +44,9 @@ followed by the skill body.
 
 ## Validating a change
 
-A push to the default branch is a live deploy (see below) — there is no staging
-step and no build to fail. These two checks stand in for one:
+Merging to `graffiticode-app`'s default branch is a live deploy (see below) —
+there is no staging step and no build to fail. These two checks stand in for
+one (run them from `packages/skills`):
 
 ```bash
 npm install
@@ -64,7 +68,9 @@ bearing one: a skill whose frontmatter fails to parse still *reads* back fine,
 but stops updating in the listing that agents route on. It polls for a few
 minutes, since the server's cache TTL means a fresh push is not instantly live.
 
-Both run in CI on every push and pull request (`.github/workflows/skills.yml`).
+CI runs `validate` and the packaging check on every pull request that touches
+`packages/skills`, and `smoke` after each merge to `main`
+(`.github/workflows/skills.yml` at the repository root).
 
 ## Packaging the plugin for OpenAI
 
@@ -83,9 +89,10 @@ every shipped byte out of git — never off your disk. So an uncommitted edit
 cannot ship, and rebuilding a ref reproduces its artifact exactly. The output is
 byte-identical across machines, timezones and locales, which is what makes the
 printed SHA-256 worth recording next to the upload: it answers "is the ZIP the
-portal holds the ZIP this repo produces?"
+portal holds the ZIP these skills produce?" (Built here or from the old
+repository's last commit, the same skills give the same SHA-256.)
 
-The shipped tree is **not** this repo's tree. Skills live at the top level here
+The shipped tree is **not** this directory's tree. Skills live at the top level here
 because the MCP server discovers them there at request time; the plugin format
 wants `skills/<id>/SKILL.md`, so the build restages them. A held draft
 (`SKILL.md.draft`) is excluded by the same rule that keeps the server from
@@ -95,7 +102,7 @@ serving it, and the build prints what it left out on every run.
 the only place a subtitle, description or starter prompt should be edited (the
 version lives in `package.json`). Its human-readable counterpart, carrying the
 rationale for every field, is
-`graffiticode-mcp-server/docs/openai-listing-copy.md`; **change both in the same
+`packages/mcp-server/docs/openai-listing-copy.md`; **change both in the same
 sitting.**
 
 ## Installing a skill manually
@@ -115,17 +122,19 @@ directory over the existing one. To remove it, delete the directory from
 
 ## How the MCP server serves skills as resources
 
-The [`graffiticode-mcp-server`](../graffiticode-mcp-server) repo discovers this
-repo **at request time** over GitHub and exposes each skill as an **MCP
-resource**, so any client connected to the Graffiticode MCP can read a skill
-without installing it locally — and **new skills appear with no rebuild or
-redeploy of the server**.
+The MCP server ([`packages/mcp-server`](../mcp-server)), and the REST API's
+`GET /v1/skills`, discover this directory **at request time** over GitHub
+(`packages/core/src/skills.ts`) and expose each skill as an **MCP resource**,
+so any client connected to the Graffiticode MCP can read a skill without
+installing it locally — and **new skills appear with no rebuild or redeploy of
+the server**.
 
 The flow:
 
 1. **Discover.** On a `resources/list` request the server calls the GitHub
-   contents API for this repo's default branch and treats each top-level
-   directory as a skill (`<id>/SKILL.md`). The directory name is the skill id.
+   contents API for `packages/skills` on `graffiticode-app`'s default branch and
+   treats each directory in it as a skill (`<id>/SKILL.md`). The directory name
+   is the skill id.
 2. **List.** Each skill is advertised as a resource built from its `SKILL.md`
    frontmatter:
    - **URI:** `graffiticode://skills/<id>` (e.g. `graffiticode://skills/render`)
@@ -141,8 +150,9 @@ within GitHub's unauthenticated rate limits. **In practice a pushed edit takes
 around 3–4 minutes to go live** — the 60s TTL is the small term; GitHub's raw-CDN
 propagation is the dominant one. (Measured with `npm run smoke`, which polls until
 the served content matches.) The server config is overridable via
-`GRAFFITICODE_SKILLS_REPO`, `GRAFFITICODE_SKILLS_REF`, and
-`GRAFFITICODE_SKILLS_TTL_MS` — a consumer that needs insulation from a bad push
+`GRAFFITICODE_SKILLS_REPO` (default `graffiticode/graffiticode-app`),
+`GRAFFITICODE_SKILLS_SUBDIR` (default `packages/skills`),
+`GRAFFITICODE_SKILLS_REF`, and `GRAFFITICODE_SKILLS_TTL_MS` — a consumer that needs insulation from a bad push
 can pin `GRAFFITICODE_SKILLS_REF` to a tag rather than tracking the default branch.
 
 This repo is the source of truth; nothing is copied into the server and there is

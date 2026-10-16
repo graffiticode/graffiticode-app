@@ -372,7 +372,7 @@ const ABOUT_HTML = `<!DOCTYPE html>
 <p>Alongside the tools, the server exposes MCP resources:</p>
 <ul>
   <li><strong>Language user guides</strong> &mdash; <code>graffiticode://language/{id}/user-guide</code>, the full authoring reference for a language.</li>
-  <li><strong>Agent skills</strong> &mdash; <code>graffiticode://skills/&lt;id&gt;</code>, discovered at request time from the public <a href="https://github.com/graffiticode/graffiticode-skills">graffiticode-skills</a> repo, so new skills appear without a redeploy.</li>
+  <li><strong>Agent skills</strong> &mdash; <code>graffiticode://skills/&lt;id&gt;</code>, discovered at request time from the public <a href="https://github.com/graffiticode/graffiticode-app/tree/main/packages/skills">graffiticode skills</a>, so new skills appear without a redeploy.</li>
   <li><strong>Inline widget</strong> &mdash; in Claude (MCP Apps), items render as interactive widgets directly in the chat. In ChatGPT the result is shown as a text summary with an &ldquo;Open in Graffiticode&rdquo; link.</li>
 </ul>
 
@@ -877,7 +877,7 @@ function createMcpServer(authProvider: AuthProvider, sessionMeta: SessionMeta = 
   });
 
   // List available resources (the Claude MCP App widget, plus skills
-  // discovered at request time from the public graffiticode-skills repo).
+  // discovered at request time from the public graffiticode-app repo's packages/skills).
   server.setRequestHandler(ListResourcesRequestSchema, async () => {
     const resources: Array<Record<string, unknown>> = [];
     // Advertise the widget resource ONLY to widget hosts (Claude). Non-widget hosts

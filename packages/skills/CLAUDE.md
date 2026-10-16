@@ -2,7 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## What this repo is
+## What this directory is
+
+Moved here from the `graffiticode/graffiticode-skills` repository on 2026-10-16
+(history kept; that repository is archived).
 
 There is no source code, no build, no test suite, and no lint step. The repo is
 the source of truth for Graffiticode's agent **skills**: each top-level directory
@@ -16,21 +19,25 @@ fire at all* (see Routing below).
 
 ## Editing a skill = deploying it
 
-`graffiticode-mcp-server` discovers this repo **at request time** over the GitHub
-contents API against the **default branch**, and serves each skill as an MCP
-resource at `graffiticode://skills/<dir-name>`. Nothing is copied into the
-server; there is no generated artifact and no redeploy.
+The MCP server (and the REST API's `GET /v1/skills`) discovers this directory
+**at request time** over the GitHub contents API — `packages/skills` on
+`graffiticode-app`'s **default branch** (`packages/core/src/skills.ts`) — and
+serves each skill as an MCP resource at `graffiticode://skills/<dir-name>`.
+Nothing is copied into the server; there is no generated artifact and no
+redeploy.
 
 Consequences to hold in mind:
 
-- **A push to `main` is a production deploy**, and that is the intended workflow —
-  push to `main`, don't open a PR for a skill edit. **Measured: ~3.5 minutes to go
-  live**, not the ~60s you would guess from the cache TTL — GitHub's raw-CDN
-  propagation is the dominant term. Rollback is a revert and a push, live again on
-  the same timescale.
-- **Because there is no review gate, the checks are the gate.** Run
-  `npm run validate` before pushing and `npm run smoke` after (see Validation
-  below). CI runs both.
+- **A merge to `graffiticode-app`'s `main` is a production deploy.** Skill edits
+  go through a pull request like the rest of the monorepo: CI runs `validate` and
+  the packaging check on the PR, and `smoke` after the merge. (In the old
+  repository a push to `main` was the deploy, with no PR; the PR is the one step
+  the move adds.) **Measured: ~3.5 minutes to go live**, not the ~60s you would
+  guess from the cache TTL — GitHub's raw-CDN propagation is the dominant term.
+  Rollback is a revert merged to `main`, live again on the same timescale.
+- **The checks are the gate.** Run `npm run validate` (from `packages/skills`)
+  before opening the PR and `npm run smoke` after it merges (see Validation
+  below).
 - **The directory name is the skill id** — renaming a directory changes the
   resource URI and breaks anyone referencing the old one.
 - **A directory with no `SKILL.md` is skipped by the server.** This is the

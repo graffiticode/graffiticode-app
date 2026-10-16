@@ -200,7 +200,7 @@ Beyond tools, the server exposes MCP resources:
 | Resource | URI | What it is |
 |---|---|---|
 | Language user guide | `graffiticode://language/{id}/user-guide` | The full authoring reference for a language (markdown). |
-| Agent skills | `graffiticode://skills/<id>` | Task-oriented skills for agents, discovered at request time from the public [graffiticode-skills](https://github.com/graffiticode/graffiticode-skills) repo — new skills appear without a redeploy. |
+| Agent skills | `graffiticode://skills/<id>` | Task-oriented skills for agents, discovered at request time from the public [packages/skills](https://github.com/graffiticode/graffiticode-app/tree/main/packages/skills) repo — new skills appear without a redeploy. |
 | Widget | `ui://graffiticode/claude-form-widget.html` | The MCP Apps widget that renders items inline in Claude. ChatGPT gets no widget — it shows the tool result's text summary and an "Open in Graffiticode" link. |
 
 ---
@@ -264,7 +264,8 @@ npm start          # Streamable HTTP server on PORT (default 3001)
 | `GRAFFITICODE_API_URL` | `https://api.graffiticode.org` | API host: language templates and code generation |
 | `GRAFFITICODE_APP_URL` | `https://app.graffiticode.org` | App host, used to build item view links |
 | `GRAFFITICODE_AUTH_URL` | `https://auth.graffiticode.org` | Auth endpoint |
-| `GRAFFITICODE_SKILLS_REPO` | `graffiticode/graffiticode-skills` | Public GitHub repo serving agent skills |
+| `GRAFFITICODE_SKILLS_REPO` | `graffiticode/graffiticode-app` | Public GitHub repo serving agent skills |
+| `GRAFFITICODE_SKILLS_SUBDIR` | `packages/skills` | Directory in that repo holding one directory per skill |
 | `GRAFFITICODE_SKILLS_REF` | `main` | Git ref for skill discovery |
 | `GRAFFITICODE_SKILLS_TTL_MS` | `60000` | Skill catalog cache TTL |
 | `FREE_PLAN_NAMESPACE_SALT` | — | HS256 secret for trial-claim JWTs. Must match the console's value. If unset, trial responses still work but omit claim links. |
@@ -299,6 +300,6 @@ npm run gcp:logs     # tail logs
 The MCP server is open source under the MIT license, copyright Artcompiler.
 
 - **Repository:** [github.com/graffiticode/graffiticode-mcp-server](https://github.com/graffiticode/graffiticode-mcp-server)
-- **Skills:** [github.com/graffiticode/graffiticode-skills](https://github.com/graffiticode/graffiticode-skills)
+- **Skills:** [graffiticode-app/packages/skills](https://github.com/graffiticode/graffiticode-app/tree/main/packages/skills)
 
 All Graffiticode languages are accessed through the natural language interface provided by this MCP server or the Graffiticode console at [console.graffiticode.org](https://console.graffiticode.org). Direct code authoring is neither required nor recommended.
