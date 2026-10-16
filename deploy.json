@@ -57,7 +57,9 @@
           ]
         }
       ],
-      "env": {},
+      "env": {
+        "GENERATION_PROTOCOL": "v2"
+      },
       "secrets": {
         "ACT_AS_GRANT_SECRET": "ACT_AS_GRANT_SECRET:1"
       },
@@ -73,6 +75,13 @@
         {
           "path": "/api/health?deep=1",
           "status": 200
+        }
+      ],
+      "retireTags": true,
+      "baselines": [
+        {
+          "milestone": "R1",
+          "commit": "7b904bb9577b301b3ee35d715bba117dab13be2b"
         }
       ]
     },
@@ -125,6 +134,13 @@
         {
           "path": "/widget/lang/L0180.mjs",
           "status": 200
+        }
+      ],
+      "retireTags": true,
+      "baselines": [
+        {
+          "milestone": "R1",
+          "commit": "7b904bb9577b301b3ee35d715bba117dab13be2b"
         }
       ]
     },
