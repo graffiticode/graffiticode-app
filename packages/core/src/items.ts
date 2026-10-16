@@ -8,6 +8,8 @@ import { FREE_PLAN_ITEM_TTL_MS } from "./lib/free-plan-context.js";
 import { adoptWorkspace } from "./lib/workspace-adoption.js";
 import { emitEvent, actor } from "./lib/funnel-events.js";
 import { buildItemExpiredError } from "./lib/free-plan-quota.js";
+import { FreePlanError } from "./lib/free-plan-context.js";
+import { itemWriteFields } from "./lib/write-errors.js";
 import { createPublication, deletePublication, PublicationError } from "./lib/publications.js";
 import { isConnectableLang } from "./lib/connectable.js";
 import { resolveCurrentConnection } from "./lib/current-connection.js";
@@ -794,10 +796,11 @@ export async function getItemClientTags({ auth, lang }) {
 // `includeSpec` is server-internal and defaults off on purpose: /api/item dumps this return
 // value straight to JSON (`res.status(200).json(item)`), so unconditionally projecting the
 // cached spec would bloat that response for every caller. Only getSpec asks for it.
-export async function getItem({ auth, id, includeSpec = false, connectionFields = true }: {
+export async function getItem({ auth, id, includeSpec = false, connectionFields = true, typedErrors = false }: {
   auth: AuthArg;
   id: string;
   includeSpec?: boolean;
+  typedErrors?: boolean;
   // The current connection is looked up through Policy, which only the console
   // may call; callers that don't show it (MCP, revision preparation) skip it.
   connectionFields?: boolean;
@@ -890,7 +893,11 @@ export async function getItem({ auth, id, includeSpec = false, connectionFields 
       generationChars: typeof data.generationChars === "number" ? data.generationChars : null,
       publicationId: data.publicationId ?? null,
       publishedTaskId: data.publishedTaskId ?? null,
-      ...(connectionFields ? await itemConnectionFields(auth, data) : {}),
+      // Without connection fields, only the Policy-backed current connection is
+      // skipped: the last write is the item's own (Firestore) record.
+      ...(connectionFields ? await itemConnectionFields(auth, data) : { lastWrite: itemWriteFields(data.lastWrite) }),
+      // The v2 job pointer (Phase 3.5); transports that report failure details read the job.
+      generation: data.generation ?? null,
       // Claim token only — a read must be able to offer "save this item" for the
       // workspace the item actually lives in (this retrieval path is where the
       // claim link is surfaced, after the agent polls a create to "ready"), but
@@ -902,6 +909,9 @@ export async function getItem({ auth, id, includeSpec = false, connectionFields 
     };
   } catch (error) {
     console.error("getItem()", "ERROR", error);
+    // REST reports a free-plan refusal (an expired item) by its code; GraphQL
+    // and MCP have always seen it wrapped, and still do.
+    if (typedErrors && error instanceof FreePlanError) throw error;
     throw new Error(`Failed to get item: ${error.message}`);
   }
 }
@@ -1017,4 +1027,48 @@ export async function shareItem({ auth, itemId, targetUserId }) {
       newItemId: null,
     };
   }
+}
+
+// A page of an account's items across languages, newest first, for the REST
+// API's GET /items. Equality filters only, sorted in memory like getItems, so
+// no composite index is needed. Free-plan listing is limited to the caller's
+// workspace (by-id reads stay open, per isItemVisibleToFreePlan); archived
+// items (mark 5) are left out.
+export async function listItemSummaries({ auth, lang, offset = 0, limit = 25, now = Date.now() }: {
+  auth: AuthArg;
+  lang?: string;
+  offset?: number;
+  limit?: number;
+  now?: number;
+}) {
+  let query = db().collection(`users/${auth.uid}/items`) as FirebaseFirestore.Query;
+  if (auth.freePlan) query = query.where("sessionNamespace", "==", auth.sessionNamespace ?? "");
+  if (lang) query = query.where("lang", "==", lang);
+  const snap = await query.select(
+    "name", "lang", "mark", "taskId", "created", "updated", "generationStatus", "generationError",
+    "generationStartedAt", "generationDeadlineAt", "generationChars", "generation", "lastWrite",
+    "sessionNamespace", "expiresAt", "freePlan",
+  ).get();
+  const rows = snap.docs
+    .map(d => ({ id: d.id, ...d.data() } as any))
+    .filter(d => d.mark !== 5 && isItemVisibleToFreePlan(d, auth, {}, now))
+    .sort((a, b) => (Number(b.updated || b.created) || 0) - (Number(a.updated || a.created) || 0));
+  return {
+    total: rows.length,
+    items: rows.slice(offset, offset + limit).map(d => ({
+      id: d.id,
+      name: d.name ?? null,
+      lang: d.lang,
+      taskId: d.taskId ?? null,
+      created: d.created != null ? String(d.created) : null,
+      updated: d.updated != null ? String(d.updated) : null,
+      generationStatus: d.generationStatus ?? null,
+      generationError: d.generationError ?? null,
+      generationStartedAt: d.generationStartedAt ? String(d.generationStartedAt) : null,
+      generationDeadlineAt: d.generationDeadlineAt ? String(d.generationDeadlineAt) : null,
+      generationChars: typeof d.generationChars === "number" ? d.generationChars : null,
+      generation: d.generation ?? null,
+      lastWrite: itemWriteFields(d.lastWrite),
+    })),
+  };
 }

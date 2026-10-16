@@ -661,3 +661,51 @@ export async function redispatchJob(generationId: string, now = Date.now()): Pro
   await wakeJob(generationId, slot);
   return "dispatched";
 }
+
+// --- explicit recovery ----------------------------------------------------------
+
+/**
+ * Retries an item whose last generation failed with `retryable: true` (the
+ * sweeper gave up, the deadline passed, act-as was refused): a NEW job through
+ * the same reservation, reusing the failed job's work inputs — request,
+ * prompt, source, data, client, workspace — with a fresh id, deadline and
+ * grant. Refused as item_changed if the item has moved on since, and as
+ * not_retryable when its last job isn't a retryable failure.
+ */
+export async function retryGeneration({ auth, itemId, now = Date.now() }: { auth: Principal; itemId: string; now?: number }) {
+  const item = (await db().doc(`users/${auth.uid}/items/${itemId}`).get()).data();
+  if (!item) throw new NotFoundError(`Item not found: ${itemId}`);
+  const pointer = item.generation as GenerationPointer | undefined;
+  if (!pointer || pointer.state !== "failed") {
+    throw new ConflictError("not_retryable", "Only a failed generation can be retried.");
+  }
+  const failed = (await jobRef(pointer.id).get()).data() as GenerationJobDoc | undefined;
+  if (!failed || !failed.dispatch.failure?.retryable) {
+    throw new ConflictError("not_retryable", "This generation's failure can't be retried; revise the item instead.");
+  }
+  const env = failed.envelope;
+  if (env.uid !== auth.uid) throw new NotFoundError(`Item not found: ${itemId}`);
+  return reserveGeneration({
+    auth: env.principal.kind === "freePlan"
+      ? { ...auth, sessionNamespace: env.effectiveWorkspace ?? auth.sessionNamespace }
+      : auth,
+    itemId,
+    lang: env.lang,
+    client: env.client ?? undefined,
+    prompt: env.prompt,
+    modification: env.modification,
+    currentSrc: env.currentSrc,
+    currentData: env.currentData,
+    // The failed job's base: retry only redoes the same change to the same version.
+    baseTaskId: env.baseTaskId,
+    sessionUuid: env.principal.kind === "freePlan" ? env.principal.sessionUuid : null,
+    workspaceKey: env.workspaceKey,
+    now,
+  });
+}
+
+// How a job failed ({code, retryable, message}), for transports that report it.
+export async function jobFailure(generationId: string): Promise<JobFailure | null> {
+  const job = (await jobRef(generationId).get()).data() as GenerationJobDoc | undefined;
+  return job?.dispatch?.state === "failed" ? job.dispatch.failure ?? null : null;
+}

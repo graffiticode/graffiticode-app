@@ -36,6 +36,8 @@ security:
 tags:
   - name: languages
     description: The catalog of Graffiticode languages.
+  - name: items
+    description: The content you make.
   - name: skills
     description: Agent skills — guidance for working with Graffiticode well.
   - name: meta
@@ -161,6 +163,310 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "503": { $ref: "#/components/responses/Unavailable" }
 
+  /items:
+    get:
+      operationId: list_items
+      tags: [items]
+      summary: List your items
+      description: Newest first. On the free plan, the items in your workspace.
+      security: [{ bearerAuth: [] }, { workspaceToken: [] }]
+      parameters:
+        - name: language
+          in: query
+          schema: { $ref: "#/components/schemas/LanguageIdParam" }
+        - name: status
+          in: query
+          schema: { $ref: "#/components/schemas/ItemStatus" }
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      responses:
+        "200":
+          description: A page of items.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ItemPage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      operationId: create_item
+      tags: [items]
+      summary: Create an item
+      description: |
+        Starts generating an item from a description. Returns `202` at once,
+        with the item (`status: generating`) and its `Location`; poll that
+        (`Prefer: wait=N`) or follow its events until `ready`.
+
+        To put several items in the same free-plan workspace, pass the previous
+        item's id as `source_item_id`. When that moves you to another
+        workspace, the new handle is in the `Graffiticode-Workspace` header.
+      security: [{ bearerAuth: [] }, { workspaceToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateItemRequest" }
+      responses:
+        "202": { $ref: "#/components/responses/Generating" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "402": { $ref: "#/components/responses/LimitReached" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /items/{id}:
+    parameters:
+      - $ref: "#/components/parameters/itemId"
+    get:
+      operationId: get_item
+      tags: [items]
+      summary: Get an item
+      description: |
+        `status` is `generating`, `ready` or `failed`. While generating, send
+        `Prefer: wait=N` (N ≤ 45) to wait up to N seconds for it to finish.
+      security: [{ bearerAuth: [] }, { workspaceToken: [] }]
+      parameters:
+        - name: Prefer
+          in: header
+          description: "`wait=N`, N seconds (0–45), per RFC 7240."
+          schema: { type: string, maxLength: 200 }
+        - name: include
+          in: query
+          description: Also return the item's `src` and/or compiled `data` (comma-separated).
+          schema: { type: string, pattern: "^(src|data)(,(src|data))?$" }
+      responses:
+        "200":
+          description: The item.
+          headers:
+            Retry-After: { $ref: "#/components/headers/Retry-After" }
+            Preference-Applied: { $ref: "#/components/headers/Preference-Applied" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Item" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "410": { $ref: "#/components/responses/Gone" }
+    patch:
+      operationId: rename_item
+      tags: [items]
+      summary: Rename an item
+      security: [{ bearerAuth: [] }, { workspaceToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema: { $ref: "#/components/schemas/ItemPatch" }
+          application/json:
+            schema: { $ref: "#/components/schemas/ItemPatch" }
+      responses:
+        "200":
+          description: The renamed item.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Item" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: archive_item
+      tags: [items]
+      summary: Archive an item
+      description: A soft delete — the item leaves your listings; its id keeps working.
+      security: [{ bearerAuth: [] }, { workspaceToken: [] }]
+      responses:
+        "204": { description: "Archived." }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /items/{id}/revisions:
+    parameters:
+      - $ref: "#/components/parameters/itemId"
+    post:
+      operationId: update_item
+      tags: [items]
+      summary: Revise an item
+      description: |
+        Changes an item by describing the change. Returns `202`; follow the
+        item as for a create. Refused with `409` while it is still generating.
+      security: [{ bearerAuth: [] }, { workspaceToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RevisionRequest" }
+      responses:
+        "202": { $ref: "#/components/responses/Generating" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "402": { $ref: "#/components/responses/LimitReached" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "410": { $ref: "#/components/responses/Gone" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+    get:
+      operationId: list_revisions
+      tags: [items]
+      summary: List an item's versions
+      description: Each content state the item has had, newest first. Needs a full account.
+      security: [{ bearerAuth: [] }, { workspaceToken: [] }]
+      parameters:
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: The versions.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Revision" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /items/{id}/retry:
+    parameters:
+      - $ref: "#/components/parameters/itemId"
+    post:
+      operationId: retry_item
+      tags: [items]
+      summary: Retry a failed generation
+      description: For an item whose `error.retryable` is true. Starts the same change again.
+      security: [{ bearerAuth: [] }, { workspaceToken: [] }]
+      responses:
+        "202": { $ref: "#/components/responses/Generating" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /items/{id}/src:
+    parameters:
+      - $ref: "#/components/parameters/itemId"
+    get:
+      operationId: get_item_src
+      tags: [items]
+      summary: Get an item's source
+      description: The program, in the item's language. Private to that language — to move content to another language, use `/spec`.
+      security: [{ bearerAuth: [] }, { workspaceToken: [] }]
+      responses:
+        "200":
+          description: The source.
+          content:
+            text/plain:
+              schema: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /items/{id}/data:
+    parameters:
+      - $ref: "#/components/parameters/itemId"
+    get:
+      operationId: get_item_data
+      tags: [items]
+      summary: Get an item's compiled data
+      security: [{ bearerAuth: [] }, { workspaceToken: [] }]
+      responses:
+        "200":
+          description: The compiled data.
+          content:
+            application/json:
+              schema: {}
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /items/{id}/spec:
+    parameters:
+      - $ref: "#/components/parameters/itemId"
+    get:
+      operationId: get_spec
+      tags: [items]
+      summary: Get an item's platform-neutral spec
+      description: |
+        A plain-English description of the item's content. To make it into
+        another language, pass this text (plus your intent) as a new item's
+        description.
+      security: [{ bearerAuth: [] }, { workspaceToken: [] }]
+      responses:
+        "200":
+          description: The spec.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Spec" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "503": { $ref: "#/components/responses/Unavailable" }
+
+  /items/{id}/view:
+    parameters:
+      - $ref: "#/components/parameters/itemId"
+    get:
+      operationId: render_item
+      tags: [items]
+      summary: Open an item
+      description: Redirects to the item's interactive view.
+      security: [{ bearerAuth: [] }, { workspaceToken: [] }]
+      responses:
+        "303":
+          description: See the view.
+          headers:
+            Location: { schema: { type: string, format: uri } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /items/{id}/embed:
+    parameters:
+      - $ref: "#/components/parameters/itemId"
+    get:
+      operationId: embed_item
+      tags: [items]
+      summary: Embed an item
+      description: An oEmbed (`rich`) response with an iframe for the item's view.
+      security: [{ bearerAuth: [] }, { workspaceToken: [] }]
+      parameters:
+        - name: maxwidth
+          in: query
+          schema: { type: integer, minimum: 200, maximum: 4000 }
+        - name: maxheight
+          in: query
+          schema: { type: integer, minimum: 200, maximum: 4000 }
+      responses:
+        "200":
+          description: The embed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Embed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /items/{id}/events:
+    parameters:
+      - $ref: "#/components/parameters/itemId"
+    get:
+      operationId: item_events
+      tags: [items]
+      summary: Follow an item's generation
+      description: |
+        Server-sent events: `progress` while generating, then one `ready`
+        (with the item) or `failed` (with the error), after which the stream
+        ends. A comment is sent every 15 seconds to keep the connection open.
+      security: [{ bearerAuth: [] }, { workspaceToken: [] }]
+      responses:
+        "200":
+          description: The event stream.
+          content:
+            text/event-stream:
+              schema: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /openapi.json:
     get:
       operationId: get_openapi_json
@@ -233,6 +539,11 @@ components:
       in: query
       description: Page size.
       schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+    itemId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, pattern: "^[A-Za-z0-9_-]{1,64}$" }
     cursor:
       name: cursor
       in: query
@@ -245,10 +556,65 @@ components:
       schema: { type: string }
     Cache-Control:
       schema: { type: string }
+    Retry-After:
+      description: Seconds to wait before checking again.
+      schema: { type: integer }
+    Preference-Applied:
+      schema: { type: string }
+    Graffiticode-Workspace:
+      description: Your free-plan workspace handle, when it changed. Send it as `X-Graffiticode-Workspace` from now on.
+      schema: { type: string }
 
   responses:
     NotModified:
       description: Unchanged since the `If-None-Match` tag.
+    Generating:
+      description: Accepted; generating. Follow `Location`.
+      headers:
+        Location: { schema: { type: string } }
+        Retry-After: { $ref: "#/components/headers/Retry-After" }
+        Graffiticode-Workspace: { $ref: "#/components/headers/Graffiticode-Workspace" }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Item" }
+    Unauthorized:
+      description: Credentials are missing or not valid.
+      headers:
+        WWW-Authenticate: { schema: { type: string } }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Forbidden:
+      description: Not allowed for this account (for example, a full-account feature on the free plan).
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    LimitReached:
+      description: A plan limit was reached; `upgrade_url` says how to go on.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    TooManyRequests:
+      description: Too many requests; retry after `Retry-After` seconds.
+      headers:
+        Retry-After: { $ref: "#/components/headers/Retry-After" }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Conflict:
+      description: |
+        The item can't take this now: `generation_in_progress` (retry after
+        `Retry-After`), `item_changed`, `not_ready`, or `not_retryable`.
+      headers:
+        Retry-After: { $ref: "#/components/headers/Retry-After" }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Gone:
+      description: A free-plan item past its time limit.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
     BadRequest:
       description: The request doesn't match this description.
       content:
@@ -279,7 +645,7 @@ components:
         status: { type: integer }
         detail: { type: string }
         instance: { type: string }
-        code: { type: string, description: Stable machine-readable reason. }
+        code: { type: string, description: "Stable machine-readable reason." }
         errors:
           type: array
           description: For validation problems, where the request failed.
@@ -287,7 +653,7 @@ components:
             type: object
             required: [pointer, message]
             properties:
-              pointer: { type: string, description: JSON pointer into the request. }
+              pointer: { type: string, description: "JSON pointer into the request." }
               message: { type: string }
       additionalProperties: true
 
@@ -347,7 +713,7 @@ components:
         example_prompts:
           type: array
           items: { $ref: "#/components/schemas/ExamplePrompt" }
-        guide_url: { type: string, format: uri, description: The full user guide (markdown). }
+        guide_url: { type: string, format: uri, description: "The full user guide (markdown)." }
         spec_url: { type: string, format: uri }
 
     Skill:
@@ -359,3 +725,155 @@ components:
         name: { type: string }
         description: { type: string }
         url: { type: string, format: uri }
+
+    LanguageIdParam:
+      type: string
+      pattern: "^[Ll]?[0-9]{4}$"
+
+    ItemStatus:
+      type: string
+      enum: [generating, ready, failed]
+
+    CreateItemRequest:
+      type: object
+      required: [language, description]
+      additionalProperties: false
+      properties:
+        language:
+          $ref: "#/components/schemas/LanguageIdParam"
+        description:
+          type: string
+          minLength: 1
+          maxLength: 20000
+          description: What to make, in English. Be specific about content, structure and look.
+        name: { type: string, minLength: 1, maxLength: 200 }
+        source_item_id:
+          type: string
+          pattern: "^[A-Za-z0-9_-]{1,64}$"
+          description: An item you made earlier, so this one joins its free-plan workspace.
+
+    RevisionRequest:
+      type: object
+      required: [modification]
+      additionalProperties: false
+      properties:
+        modification:
+          type: string
+          minLength: 1
+          maxLength: 20000
+          description: What to change, in English.
+
+    ItemPatch:
+      type: object
+      required: [name]
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+
+    ItemError:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+        code: { type: [string, "null"] }
+        retryable: { type: boolean, description: "True when `POST /items/{id}/retry` can start it again." }
+
+    LastWrite:
+      type: object
+      description: The latest write of this item's content to your connected item bank (read-only).
+      required: [task_id, connection_id, status, at, checkable]
+      properties:
+        task_id: { type: string }
+        connection_id: { type: [string, "null"] }
+        status: { type: string, enum: [ok, failed, skipped] }
+        message: { type: [string, "null"] }
+        at: { type: string, format: date-time }
+        confirmed: { type: [boolean, "null"] }
+        checkable: { type: boolean }
+        reconcile:
+          type: [object, "null"]
+          properties:
+            verdict: { type: string }
+            text: { type: string }
+            at: { type: string, format: date-time }
+
+    Item:
+      type: object
+      required: [id, name, language, status, created, updated, view_url, links]
+      properties:
+        id: { type: string }
+        name: { type: [string, "null"] }
+        language: { type: string, pattern: "^L[0-9]{4}$" }
+        status: { $ref: "#/components/schemas/ItemStatus" }
+        error: { $ref: "#/components/schemas/ItemError" }
+        progress:
+          type: object
+          description: While generating.
+          properties:
+            chars: { type: integer }
+            elapsed_s: { type: integer }
+        created: { type: [string, "null"], format: date-time }
+        updated: { type: [string, "null"], format: date-time }
+        view_url: { type: [string, "null"], format: uri, description: "Where to open the item, once ready." }
+        claim_url:
+          type: string
+          format: uri
+          description: Free plan — sign up and keep this workspace's items.
+        last_write: { $ref: "#/components/schemas/LastWrite" }
+        src: { type: string, description: "With `include=src`." }
+        data: { description: "With `include=data`." }
+        links:
+          type: object
+          required: [self, view, spec, events, revisions]
+          properties:
+            self: { type: string, format: uri }
+            view: { type: string, format: uri }
+            spec: { type: string, format: uri }
+            events: { type: string, format: uri }
+            revisions: { type: string, format: uri }
+
+    ItemPage:
+      type: object
+      required: [data, next_cursor]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/Item" }
+        next_cursor: { type: [string, "null"] }
+
+    Revision:
+      type: object
+      required: [task_id, created, source]
+      properties:
+        task_id: { type: string }
+        created: { type: string, format: date-time }
+        source: { type: string }
+        label: { type: [string, "null"] }
+
+    Spec:
+      type: object
+      required: [item_id, language, spec, coverage_checked, coverage_missing]
+      additionalProperties: false
+      properties:
+        item_id: { type: string }
+        language: { type: string, pattern: "^L[0-9]{4}$" }
+        spec: { type: string }
+        coverage_checked: { type: integer, description: "Source strings checked for in the spec." }
+        coverage_missing:
+          type: array
+          description: Source strings the spec left out.
+          items: { type: string }
+
+    Embed:
+      type: object
+      required: [version, type, html, width, height]
+      properties:
+        version: { const: "1.0" }
+        type: { const: rich }
+        title: { type: string }
+        provider_name: { type: string }
+        provider_url: { type: string }
+        html: { type: string }
+        width: { type: integer }
+        height: { type: integer }

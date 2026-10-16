@@ -242,9 +242,22 @@
         }
       ],
       "env": {
-        "OPENAPI_PUBLIC_URL": "https://openapi.graffiticode.org/v1"
+        "OPENAPI_PUBLIC_URL": "https://openapi.graffiticode.org/v1",
+        "GENERATION_PROTOCOL": "v2",
+        "GRAFFITICODE_CONSOLE_URL": "https://console-cfdwwd7ega-uc.a.run.app/api",
+        "GENERATION_JOB_URL": "https://console-cfdwwd7ega-uc.a.run.app/api/generate-job",
+        "GENERATION_QUEUE_PROJECT": "graffiticode-app",
+        "GENERATION_QUEUE_LOCATION": "us-central1",
+        "GENERATION_QUEUE_NAME": "generation-jobs",
+        "CONSOLE_URL": "https://console.graffiticode.org",
+        "NEXT_PUBLIC_FIREBASE_API_KEY": "AIzaSyAoVuUNi8ElnS7cn6wc3D8XExML-URLw0I"
       },
-      "secrets": {},
+      "secrets": {
+        "INTERNAL_JOB_SECRET": "INTERNAL_JOB_SECRET:1",
+        "FREE_PLAN_API_KEY": "FREE_PLAN_API_KEY:4",
+        "FREE_PLAN_NAMESPACE_SALT": "FREE_PLAN_NAMESPACE_SALT:2",
+        "ACT_AS_GRANT_SECRET": "ACT_AS_GRANT_SECRET:1"
+      },
       "smoke": [
         {
           "path": "/health",
@@ -259,7 +272,10 @@
           "status": 200
         }
       ],
-      "retireTags": true
+      "retireTags": true,
+      "verify": {
+        "module": "verify/openapi.mjs"
+      }
     }
   }
 }
