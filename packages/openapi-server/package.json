@@ -1,0 +1,28 @@
+{
+  "name": "@graffiticode-app/openapi-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Graffiticode REST API (OpenAPI 3.1), beside the MCP server, over @graffiticode-app/core",
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "lint:spec": "npx --yes @redocly/cli@2 lint openapi.yaml",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@graffiticode-app/core": "*",
+    "@hono/node-server": "1.19.11",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "hono": "4.12.7",
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
