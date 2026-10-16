@@ -184,7 +184,10 @@ function readBlob(sha, path) {
     // stderr is swallowed on purpose: a missing blob is a case this script
     // reports itself, and git's own "exists on disk, but not in <sha>" line
     // printed above our message reads like a second, unrelated failure.
-    return execFileSync("git", ["cat-file", "blob", `${sha}:${path}`], {
+    // `./` makes the path relative to this directory, not the repository's
+    // root, so a blob reads the same here as in graffiticode-app's
+    // packages/skills (archive and ls-tree already scope to the cwd).
+    return execFileSync("git", ["cat-file", "blob", `${sha}:./${path}`], {
       cwd: ROOT,
       maxBuffer: 64 * 1024 * 1024,
       stdio: ["ignore", "pipe", "ignore"],
