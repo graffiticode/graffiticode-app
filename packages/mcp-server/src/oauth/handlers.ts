@@ -26,8 +26,14 @@ const FIREBASE_API_KEY = "AIzaSyAoVuUNi8ElnS7cn6wc3D8XExML-URLw0I";
 // Token expiration (55 minutes to match Firebase token lifetime with buffer)
 const TOKEN_EXPIRES_IN = 55 * 60;
 
-// The single audience this authorization server issues tokens for.
+// The resources (audiences) this authorization server issues tokens for: this
+// MCP server, and the Graffiticode REST API, which validates its tokens through
+// /oauth/introspect (oauth/introspection.ts). A token is bound to the one it was
+// authorized for.
 const RESOURCE = `${MCP_SERVER_URL}/mcp`;
+export const OPENAPI_RESOURCE = (process.env.OPENAPI_RESOURCE || "https://openapi.graffiticode.org/v1").replace(/\/$/, "");
+const ALLOWED_RESOURCES = [RESOURCE, OPENAPI_RESOURCE];
+export const isAllowedResource = (resource: string) => ALLOWED_RESOURCES.includes(resource);
 // The single scope we grant. Requests may only ask for this (or nothing).
 const SUPPORTED_SCOPE = "graffiticode";
 
@@ -327,10 +333,10 @@ export async function handleAuthorize(
     return;
   }
 
-  // The resource (audience) must be exactly this MCP server. OpenAI flows the
-  // resource through authorization; anything else is a misconfigured/hostile client.
-  if (resource !== RESOURCE) {
-    sendError(res, 400, { error: "invalid_target", error_description: `resource must be ${RESOURCE}` });
+  // The resource (audience) must be one we issue for. OpenAI flows the resource
+  // through authorization; anything else is a misconfigured/hostile client.
+  if (!isAllowedResource(resource)) {
+    sendError(res, 400, { error: "invalid_target", error_description: `resource must be one of ${ALLOWED_RESOURCES.join(", ")}` });
     return;
   }
 
@@ -962,6 +968,9 @@ export function evaluateTokenValidity(
   entry: Pick<TokenEntry, "access_token_expires_at" | "resource" | "scope" | "created_at">,
   expectedResource: string,
   now: number,
+  // Strict: the entry must name this resource. Entries from before resources
+  // were recorded carry none and stay valid for /mcp only (the default).
+  strictResource = false,
 ): OAuthInvalidReason | null {
   // Enforce the advertised OAuth access-token expiry.
   const expiresAt = accessTokenExpiry(entry);
@@ -969,7 +978,7 @@ export function evaluateTokenValidity(
     return "expired";
   }
   // Audience binding: the token must have been issued for this resource.
-  if (entry.resource && entry.resource !== expectedResource) {
+  if ((entry.resource || strictResource) && entry.resource !== expectedResource) {
     return "resource";
   }
   // Scope: must include the one scope we grant.
@@ -983,13 +992,14 @@ export function evaluateTokenValidity(
 export async function resolveOAuthAccessToken(
   accessToken: string,
   expectedResource: string = RESOURCE,
+  strictResource = false,
 ): Promise<OAuthResolution> {
   const tokenEntry = await oauthStore.getTokenByAccessToken(accessToken);
   if (!tokenEntry) {
     return { status: "invalid", reason: "revoked" };
   }
 
-  const reason = evaluateTokenValidity(tokenEntry, expectedResource, Date.now());
+  const reason = evaluateTokenValidity(tokenEntry, expectedResource, Date.now(), strictResource);
   if (reason) {
     return { status: "invalid", reason };
   }

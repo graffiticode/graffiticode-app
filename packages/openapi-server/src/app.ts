@@ -15,6 +15,7 @@ import { skillRoutes } from "./routes/skills.js";
 import { metaRoutes } from "./routes/meta.js";
 import { itemRoutes } from "./routes/items.js";
 import { accountRoutes } from "./routes/account.js";
+import { oauthRoutes } from "./oauth.js";
 import { coreReadiness } from "@graffiticode-app/core/readiness";
 
 export type Validate = (c: Context, operationId: string) => { path: Record<string, any>; query: Record<string, any>; header: Record<string, any> };
@@ -51,6 +52,8 @@ export function createApp({ spec = loadSpec() }: { spec?: any } = {}) {
     const r = await coreReadiness();
     return c.json({ status: r.ok ? "ok" : "unready", effectiveProtocol: r.effectiveProtocol, minProtocol: r.minProtocol, checks: r.checks }, r.ok ? 200 : 503);
   });
+
+  oauthRoutes(app);
 
   const v1 = new Hono();
   languageRoutes(v1, validate);

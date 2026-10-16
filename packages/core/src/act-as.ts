@@ -60,6 +60,10 @@ export function setIdentityTokenProvider(provider: IdentityTokenProvider | null)
   identityTokenProvider = provider ?? metadataIdentityToken;
 }
 
+// This service's Google ID token for `audience` (also used by the REST API to
+// call mcp's OAuth introspection).
+export const identityToken = (audience: string) => identityTokenProvider(audience);
+
 // `status` is the auth service's: 4xx means this grant will never be honoured
 // (a definite refusal); anything else is worth trying again later.
 export class ActAsError extends Error {

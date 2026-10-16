@@ -1,14 +1,18 @@
-// Who is calling. Two kinds of credential, as MCP has:
+// Who is calling. The credentials MCP accepts:
 //   Authorization: Bearer <Graffiticode API key or Firebase ID token>
+//   Authorization: Bearer gcmcp_at_… (OAuth, issued for this API's resource)
 //   X-Graffiticode-Workspace: <free-plan workspace token>
-// resolved by core exactly as the console resolves them. OAuth access tokens
-// (gcmcp_at_…) come with P4c, once the authorization server accepts this API
-// as a resource. Credentials are also what's forwarded to the console for the
-// one call that runs there (get_spec).
+// API keys and workspace tokens are resolved by core exactly as the console
+// resolves them. An OAuth access token is checked by the authorization server
+// that issued it (mcp's POST /oauth/introspect, called with this service's own
+// Cloud Run identity) and stands for the user's Firebase ID token. Credentials
+// are also what's forwarded to the console for the one call that runs there
+// (get_spec).
 import type { Context } from "hono";
 import { admitRequest, resolveAuth, type Principal, type RequestCredentials } from "@graffiticode-app/core/auth";
 import { mintSessionToken } from "@graffiticode-app/core/lib/free-plan-session-token";
 import { ApiProblem } from "./problems.js";
+import { introspectOAuthToken, isOAuthToken, oauthChallenge } from "./oauth.js";
 import { fromCoreError } from "./errors.js";
 
 export type Caller = {
@@ -30,7 +34,12 @@ export async function callerFor(c: Context): Promise<Caller> {
   const clientKind = c.req.header("user-agent")?.slice(0, 100);
   let ctx: Caller["ctx"];
   let forward: Record<string, string>;
-  if (bearer) {
+  if (bearer && isOAuthToken(bearer)) {
+    const firebaseToken = await introspectOAuthToken(bearer);
+    if (!firebaseToken) throw oauthChallenge();
+    ctx = { token: firebaseToken, clientKind };
+    forward = { Authorization: firebaseToken };
+  } else if (bearer) {
     ctx = { token: bearer, clientKind };
     forward = { Authorization: bearer };
   } else if (workspace) {
