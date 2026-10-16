@@ -69,7 +69,7 @@ the deployer grants from the backend runbook, scoped to `deploy-build@`,
 | console | 1 / 10 | 1Gi | 900s |
 | mcp-service | 1 / – | 512Mi | 300s |
 | app | – / – | 1Gi | 300s |
-| openapi-service | – / 20 | 512Mi | 300s — TODO: raise to 900s. `GET /v1/items/{id}/events` keeps a stream open up to 10 minutes, so a 300s timeout cuts long streams before their closing `timeout` event (`gcloud run services update openapi-service --timeout=900`) |
+| openapi-service | – / 20 | 512Mi | 900s (set 2026-10-16): `GET /v1/items/{id}/events` keeps a stream open up to 10 minutes. An out-of-band update makes a new revision with no traffic, since gc-deploy pins traffic by revision; move it with `update-traffic --to-revisions <rev>=100` |
 
 ## Generation protocol v2 (Phase 3.5)
 
