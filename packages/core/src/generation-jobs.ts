@@ -53,9 +53,6 @@ export const GENERATION_GRANT_MS = 60 * 60_000;
 // currentSrc travels in the envelope up to this size; beyond it the worker
 // re-reads the source from baseTaskId.
 const MAX_INLINE_SRC = 200_000;
-// A legacy (v1) job queued but not yet claimed has no lease; its "generating"
-// status is trusted for as long as MCP's stale guard would.
-const LEGACY_STALE_MS = 16 * 60_000;
 
 export const jobRef = (generationId: string) => db().doc(`generation-jobs/${generationId}`);
 
@@ -139,14 +136,6 @@ export function parseCurrentData(raw: unknown): unknown {
 
 // --- reservation ------------------------------------------------------------
 
-// A legacy (v1) job still owns the item: it marked the item generating and
-// either holds a live lease or hasn't been claimed yet.
-function legacyJobActive(item: any, now: number) {
-  if (item?.generation || item?.generationStatus !== "generating") return false;
-  if (item.generationLeaseOwner) return Number(item.generationLeaseExpires) > now;
-  return Number(item.generationStartedAt) > 0 && now - Number(item.generationStartedAt) < LEGACY_STALE_MS;
-}
-
 function pointerFields(generationId: string, state: GenerationPointer["state"], deadlineAt: number, now: number) {
   return {
     generation: { id: generationId, state },
@@ -154,8 +143,8 @@ function pointerFields(generationId: string, state: GenerationPointer["state"], 
     generationError: null,
     generationStartedAt: now,
     generationChars: 0,
-    // Present while a v2 job runs: MCP reports such an item failed only from
-    // durable state, never from its 16-minute stale guard.
+    // Present while a v2 job runs: its absolute deadline. Clients report the
+    // item failed only from durable state.
     generationDeadlineAt: deadlineAt,
   };
 }
@@ -246,9 +235,6 @@ export async function reserveGeneration({
     if (!snap.exists) throw new NotFoundError(`Item not found: ${itemId}`);
     const item = snap.data();
     assertNoActiveGeneration(item);
-    if (legacyJobActive(item, now)) {
-      throw new ConflictError("generation_in_progress", "This item is still generating. Wait for it to finish (get_item / render_item), then try again.");
-    }
     const current = item.taskId ?? null;
     if (baseTaskId !== undefined && (baseTaskId ?? null) !== current) {
       throw new ConflictError("item_changed", "This item changed since the revision was prepared. Read it again (get_item), then retry.");

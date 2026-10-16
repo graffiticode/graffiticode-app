@@ -40,13 +40,9 @@ export async function generate(h: Harness, auth: Auth, vars: Record<string, unkn
   return r;
 }
 
-// The request fields of the last generation job, whichever protocol queued it:
-// a v1 task carries them; a v2 task carries only the job id, and they are in
-// the job's envelope (generation-jobs/{id}, Phase 3.5).
+// The request fields of the last generation job: the task carries only the job
+// id, and they are in its envelope (generation-jobs/{id}, Phase 3.5).
 export async function lastJob(h: Harness): Promise<Record<string, any>> {
   const payload = h.jobPayloads.at(-1);
-  if (payload?.v !== 2) return payload;
   return (await h.db.doc(`generation-jobs/${payload.generationId}`).get()).data().envelope;
 }
-
-export const protocolV2 = () => process.env.GENERATION_PROTOCOL === "v2";

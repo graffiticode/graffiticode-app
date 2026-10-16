@@ -5,7 +5,6 @@ import { coreConfig } from "./config.js";
 import { getCredentialsForApiKey } from "./lib/api-credentials.js";
 import { getFreePlanCredentials, isFreePlanRequest } from "./lib/free-plan-context.js";
 import { checkBurstLimit, BURST } from "./lib/free-plan-throttle.js";
-import type { AuthReplay } from "./lib/generation-queue.js";
 
 // The auth service client, created on first use from the configured URL (and
 // again if it changes), so importing core has no side effect.
@@ -75,12 +74,4 @@ export async function admitRequest(req: { headers: Record<string, unknown> }) {
     await checkBurstLimit(freePlan.sessionNamespace, BURST.API);
   }
   return freePlan;
-}
-
-// The generation worker acts as the caller from the credential replayed in its
-// job payload, resolved exactly as a live request's would be.
-export function principalFromReplay(replay: AuthReplay): Promise<Principal> {
-  return replay.kind === "freePlan"
-    ? resolveAuth({ freePlan: true, sessionNamespace: replay.sessionNamespace })
-    : resolveAuth({ token: replay.token });
 }

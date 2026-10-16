@@ -26,18 +26,12 @@ const CONSOLE_URL = () => process.env.GRAFFITICODE_CONSOLE_BASE_URL || "https://
 const CLIENT = "openapi";
 const MAX_WAIT_S = 45;
 const POLL_MS = 1000;
-// A legacy (v1) job with no v2 deadline is reported failed past this, as MCP does.
-const LEGACY_STALE_MS = 16 * 60_000;
 
 const iso = (ms: unknown) => (ms != null && Number.isFinite(Number(ms)) ? new Date(Number(ms)).toISOString() : null);
 
-function statusOf(g: any, now = Date.now()): "generating" | "ready" | "failed" {
+function statusOf(g: any): "generating" | "ready" | "failed" {
   if (g.generationStatus === "failed") return "failed";
-  if (g.generationStatus === "generating") {
-    const started = Number(g.generationStartedAt) || 0;
-    if (g.generationDeadlineAt == null && started && now - started > LEGACY_STALE_MS) return "failed";
-    return "generating";
-  }
+  if (g.generationStatus === "generating") return "generating";
   return g.taskId ? "ready" : "generating";
 }
 
@@ -62,7 +56,7 @@ async function representation(g: any, caller: Caller, extra: Record<string, unkn
   if (status === "failed") {
     const failure = g.generation?.id ? await jobFailure(g.generation.id).catch(() => null) : null;
     item.error = {
-      message: g.generationError || failure?.message || "Generation timed out",
+      message: g.generationError || failure?.message || "Generation failed",
       code: failure?.code ?? null,
       retryable: failure?.retryable ?? false,
     };

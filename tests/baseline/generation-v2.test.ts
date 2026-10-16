@@ -191,14 +191,6 @@ test("a revision prepared against an older taskId is refused as item_changed", a
   assert.equal((await item(base.id)).generation, undefined, "nothing reserved");
 });
 
-test("a legacy job still holding its lease blocks a v2 reservation", async () => {
-  const base = await createItem(h, alice);
-  await h.db.doc(`users/alice/items/${base.id}`).update({
-    generationStatus: "generating", generationLeaseOwner: "legacy", generationLeaseExpires: Date.now() + 60_000,
-  });
-  assert.match(errorOf(await h.gql(START, { itemId: base.id, lang: "0175", prompt: PROMPT, modification: PROMPT }, alice)).message, /still generating/);
-});
-
 test("an act-as refusal fails the job, retryably, without generating", async () => {
   h.setActAs(() => ({ status: 403, body: { status: "error", error: { message: "grant-expired" } } }));
   const g = ok(await generate(h, alice, {})).startCodeGeneration;
@@ -237,23 +229,18 @@ test("a connectable item's completion records its connection write with a fixed 
   assert.equal(sent[0].body.idempotencyKey, effect.payload.idempotencyKey);
 });
 
-test("GraphQL and MCP: a v2 job is never failed by MCP's stale guard", async () => {
+test("GraphQL and MCP: a long generation is never reported failed by a guess", async () => {
   const base = await createItem(h, alice);
   const ref = h.db.doc(`users/alice/items/${base.id}`);
   const old = Date.now() - 20 * 60_000;
-  // A legacy job that old reads as failed straight away.
-  await ref.update({ generationStatus: "generating", generationStartedAt: old });
-  const ctx = { auth: { type: "firebase", token: userToken("alice"), source: "raw" }, clientKind: "baseline" };
-  const legacy = await tools.handleToolCall(ctx, "get_item", { item_id: base.id });
-  assert.match(JSON.stringify(legacy), /Generation timed out/);
-
-  // A v2 job of the same age keeps generating until its durable state ends it.
+  // Generating for 20 minutes: MCP keeps waiting until durable state ends it.
   await ref.update({ generationStatus: "generating", generationStartedAt: old, generationDeadlineAt: Date.now() + 60_000, generation: { id: "g", state: "running" } });
   const gql = ok(await h.gql(`query($id:String!){ item(id:$id){ generationDeadlineAt } }`, { id: base.id }, alice));
   assert.ok(gql.item.generationDeadlineAt);
+  const ctx = { auth: { type: "firebase", token: userToken("alice"), source: "raw" }, clientKind: "baseline" };
   setTimeout(() => { void ref.update({ generationStatus: "ready", generationDeadlineAt: null, generationStartedAt: null }); }, 1500);
-  const v2 = await tools.handleToolCall(ctx, "get_item", { item_id: base.id });
-  assert.doesNotMatch(JSON.stringify(v2), /timed out/);
+  const r = await tools.handleToolCall(ctx, "get_item", { item_id: base.id });
+  assert.doesNotMatch(JSON.stringify(r), /timed out/);
 });
 
 test("act-as grants match the backend's format byte for byte", async () => {
