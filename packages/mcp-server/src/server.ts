@@ -23,6 +23,7 @@
  */
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { handleIntrospect } from "./oauth/introspection.js";
 import { coreReadiness } from "@graffiticode-app/core/readiness";
 import { coreBackendEnabled } from "./core-backend.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -1193,6 +1194,11 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
   }
 
   // Token Endpoint
+  if (url.pathname === "/oauth/introspect" && req.method === "POST") {
+    await handleIntrospect(req, res);
+    return;
+  }
+
   if (url.pathname === "/oauth/token" && req.method === "POST") {
     await handleToken(req, res);
     return;

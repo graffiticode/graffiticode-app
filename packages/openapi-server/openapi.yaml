@@ -171,7 +171,7 @@ paths:
       tags: [items]
       summary: List your items
       description: Newest first. On the free plan, the items in your workspace.
-      security: [{ bearerAuth: [] }, { workspaceToken: [] }]
+      security: [{ bearerAuth: [] }, { oauth2: [graffiticode] }, { workspaceToken: [] }]
       parameters:
         - name: language
           in: query
@@ -201,7 +201,7 @@ paths:
         To put several items in the same free-plan workspace, pass the previous
         item's id as `source_item_id`. When that moves you to another
         workspace, the new handle is in the `Graffiticode-Workspace` header.
-      security: [{ bearerAuth: [] }, { workspaceToken: [] }]
+      security: [{ bearerAuth: [] }, { oauth2: [graffiticode] }, { workspaceToken: [] }]
       requestBody:
         required: true
         content:
@@ -229,7 +229,7 @@ paths:
       description: |
         `status` is `generating`, `ready` or `failed`. While generating, send
         `Prefer: wait=N` (N ≤ 45) to wait up to N seconds for it to finish.
-      security: [{ bearerAuth: [] }, { workspaceToken: [] }]
+      security: [{ bearerAuth: [] }, { oauth2: [graffiticode] }, { workspaceToken: [] }]
       parameters:
         - name: Prefer
           in: header
@@ -256,7 +256,7 @@ paths:
       operationId: rename_item
       tags: [items]
       summary: Rename an item
-      security: [{ bearerAuth: [] }, { workspaceToken: [] }]
+      security: [{ bearerAuth: [] }, { oauth2: [graffiticode] }, { workspaceToken: [] }]
       requestBody:
         required: true
         content:
@@ -278,7 +278,7 @@ paths:
       tags: [items]
       summary: Archive an item
       description: A soft delete — the item leaves your listings; its id keeps working.
-      security: [{ bearerAuth: [] }, { workspaceToken: [] }]
+      security: [{ bearerAuth: [] }, { oauth2: [graffiticode] }, { workspaceToken: [] }]
       responses:
         "204": { description: "Archived." }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -294,7 +294,7 @@ paths:
       description: |
         Changes an item by describing the change. Returns `202`; follow the
         item as for a create. Refused with `409` while it is still generating.
-      security: [{ bearerAuth: [] }, { workspaceToken: [] }]
+      security: [{ bearerAuth: [] }, { oauth2: [graffiticode] }, { workspaceToken: [] }]
       requestBody:
         required: true
         content:
@@ -316,7 +316,7 @@ paths:
       tags: [items]
       summary: List an item's versions
       description: Each content state the item has had, newest first. Needs a full account.
-      security: [{ bearerAuth: [] }, { workspaceToken: [] }]
+      security: [{ bearerAuth: [] }, { oauth2: [graffiticode] }, { workspaceToken: [] }]
       parameters:
         - $ref: "#/components/parameters/limit"
       responses:
@@ -345,7 +345,7 @@ paths:
       tags: [items]
       summary: Retry a failed generation
       description: For an item whose `error.retryable` is true. Starts the same change again.
-      security: [{ bearerAuth: [] }, { workspaceToken: [] }]
+      security: [{ bearerAuth: [] }, { oauth2: [graffiticode] }, { workspaceToken: [] }]
       parameters:
         - $ref: "#/components/parameters/idempotencyKey"
       responses:
@@ -363,7 +363,7 @@ paths:
       tags: [items]
       summary: Get an item's source
       description: The program, in the item's language. Private to that language — to move content to another language, use `/spec`.
-      security: [{ bearerAuth: [] }, { workspaceToken: [] }]
+      security: [{ bearerAuth: [] }, { oauth2: [graffiticode] }, { workspaceToken: [] }]
       responses:
         "200":
           description: The source.
@@ -381,7 +381,7 @@ paths:
       operationId: get_item_data
       tags: [items]
       summary: Get an item's compiled data
-      security: [{ bearerAuth: [] }, { workspaceToken: [] }]
+      security: [{ bearerAuth: [] }, { oauth2: [graffiticode] }, { workspaceToken: [] }]
       responses:
         "200":
           description: The compiled data.
@@ -404,7 +404,7 @@ paths:
         another language, pass this text after one line of intent as a new
         item's description. It starts with a blank line on purpose: that keeps
         the content separate from your request however you join them.
-      security: [{ bearerAuth: [] }, { workspaceToken: [] }]
+      security: [{ bearerAuth: [] }, { oauth2: [graffiticode] }, { workspaceToken: [] }]
       responses:
         "200":
           description: The spec.
@@ -424,7 +424,7 @@ paths:
       tags: [items]
       summary: Open an item
       description: Redirects to the item's interactive view.
-      security: [{ bearerAuth: [] }, { workspaceToken: [] }]
+      security: [{ bearerAuth: [] }, { oauth2: [graffiticode] }, { workspaceToken: [] }]
       responses:
         "303":
           description: See the view.
@@ -441,7 +441,7 @@ paths:
       tags: [items]
       summary: Embed an item
       description: An oEmbed (`rich`) response with an iframe for the item's view.
-      security: [{ bearerAuth: [] }, { workspaceToken: [] }]
+      security: [{ bearerAuth: [] }, { oauth2: [graffiticode] }, { workspaceToken: [] }]
       parameters:
         - name: maxwidth
           in: query
@@ -470,7 +470,7 @@ paths:
         Server-sent events: `progress` while generating, then one `ready`
         (with the item) or `failed` (with the error), after which the stream
         ends. A comment is sent every 15 seconds to keep the connection open.
-      security: [{ bearerAuth: [] }, { workspaceToken: [] }]
+      security: [{ bearerAuth: [] }, { oauth2: [graffiticode] }, { workspaceToken: [] }]
       responses:
         "200":
           description: The event stream.
@@ -502,7 +502,7 @@ paths:
       operationId: get_me
       tags: [account]
       summary: Who you are, and what you have left
-      security: [{ bearerAuth: [] }, { workspaceToken: [] }]
+      security: [{ bearerAuth: [] }, { oauth2: [graffiticode] }, { workspaceToken: [] }]
       responses:
         "200":
           description: Your account.
@@ -555,11 +555,16 @@ components:
       description: A Graffiticode API key, created in the console under Settings.
     oauth2:
       type: oauth2
-      description: Sign in with a Graffiticode account (authorization code with PKCE).
+      description: |
+        Sign in with a Graffiticode account (authorization code with PKCE).
+        Clients register at https://mcp.graffiticode.org/oauth/register
+        (RFC 7591); tokens are issued for the resource
+        https://openapi.graffiticode.org/v1, named in the authorization URL.
       flows:
         authorizationCode:
-          authorizationUrl: https://mcp.graffiticode.org/oauth/authorize
+          authorizationUrl: https://mcp.graffiticode.org/oauth/authorize?resource=https%3A%2F%2Fopenapi.graffiticode.org%2Fv1
           tokenUrl: https://mcp.graffiticode.org/oauth/token
+          refreshUrl: https://mcp.graffiticode.org/oauth/token
           scopes:
             graffiticode: Create and edit your items.
     workspaceToken:
