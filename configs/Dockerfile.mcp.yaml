@@ -16,6 +16,7 @@ ENV NODE_ENV=production
 COPY package.json package-lock.json .npmrc ./
 COPY packages/console/package.json packages/console/package.json
 COPY packages/core/package.json packages/core/package.json
+COPY packages/openapi-server/package.json packages/openapi-server/package.json
 COPY packages/mcp-server packages/mcp-server
 COPY --from=build /usr/src/app/packages/core/dist packages/core/dist
 COPY --from=build /usr/src/app/packages/mcp-server/dist packages/mcp-server/dist

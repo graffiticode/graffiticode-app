@@ -5,24 +5,26 @@
   "workspaces": [
     "packages/core",
     "packages/console",
-    "packages/mcp-server"
+    "packages/mcp-server",
+    "packages/openapi-server"
   ],
   "engines": {
     "node": "22.x"
   },
   "scripts": {
-    "build": "npm run build:core && npm run build:mcp && npm run build -w packages/console && npm run build:app",
+    "build": "npm run build:core && npm run build:mcp && npm run build:openapi && npm run build -w packages/console && npm run build:app",
     "build:console": "npm run build:core && npm run build -w packages/console",
     "build:mcp": "npm run build -w packages/mcp-server",
     "lint": "npm run lint -w packages/console",
-    "typecheck": "npm run build:core && npm run typecheck -w packages/console && npm run typecheck -w packages/mcp-server && npm --prefix packages/app run typecheck",
-    "test": "npm run build:core && npm test -w packages/console && npm test -w packages/mcp-server",
+    "typecheck": "npm run build:core && npm run typecheck -w packages/console && npm run typecheck -w packages/mcp-server && npm run typecheck -w packages/openapi-server && npm --prefix packages/app run typecheck",
+    "test": "npm run build:core && npm test -w packages/console && npm test -w packages/mcp-server && npm test -w packages/openapi-server",
     "deploy": "gc-deploy",
     "rollback": "gc-deploy rollback",
     "install:app": "npm ci --prefix packages/app",
     "build:app": "npm --prefix packages/app run build",
     "test:baseline": "npm run build:core && npx --yes firebase-tools@15.32.0 emulators:exec --config tests/baseline/firebase.json --only firestore --project demo-baseline \"cd packages/console && tsx --test --test-concurrency=1 ../../tests/baseline/*.test.ts\"",
-    "build:core": "npm run build -w packages/core"
+    "build:core": "npm run build -w packages/core",
+    "build:openapi": "npm run build -w packages/openapi-server"
   },
   "devDependencies": {
     "@graffiticode/deploy": "file:vendor/graffiticode-deploy-0.1.0.tgz"

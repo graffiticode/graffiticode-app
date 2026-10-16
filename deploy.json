@@ -203,6 +203,63 @@
           "status": 200
         }
       ]
+    },
+    "openapi": {
+      "service": "openapi-service",
+      "image": "us-central1-docker.pkg.dev/graffiticode-app/services/openapi",
+      "dockerfile": "configs/Dockerfile.openapi.yaml",
+      "port": 8080,
+      "access": "public",
+      "runtimeServiceAccount": "openapi-run@graffiticode-app.iam.gserviceaccount.com",
+      "steps": [
+        {
+          "name": "node:22.23.3@sha256:363e1587494626837fa7f9a23bdb453d13b0ff3c67c705c2805cfc69c2d2fad7",
+          "entrypoint": "npm",
+          "args": [
+            "ci",
+            "-w",
+            "packages/openapi-server",
+            "-w",
+            "packages/core"
+          ]
+        },
+        {
+          "name": "node:22.23.3@sha256:363e1587494626837fa7f9a23bdb453d13b0ff3c67c705c2805cfc69c2d2fad7",
+          "entrypoint": "npm",
+          "args": [
+            "run",
+            "build:core"
+          ]
+        },
+        {
+          "name": "node:22.23.3@sha256:363e1587494626837fa7f9a23bdb453d13b0ff3c67c705c2805cfc69c2d2fad7",
+          "entrypoint": "npm",
+          "args": [
+            "test",
+            "-w",
+            "packages/openapi-server"
+          ]
+        }
+      ],
+      "env": {
+        "OPENAPI_PUBLIC_URL": "https://openapi.graffiticode.org/v1"
+      },
+      "secrets": {},
+      "smoke": [
+        {
+          "path": "/health",
+          "status": 200
+        },
+        {
+          "path": "/health?deep=1",
+          "status": 200
+        },
+        {
+          "path": "/v1/openapi.json",
+          "status": 200
+        }
+      ],
+      "retireTags": true
     }
   }
 }

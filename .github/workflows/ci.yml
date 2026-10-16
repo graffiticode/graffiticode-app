@@ -82,6 +82,9 @@ jobs:
           - service: mcp
             port: 3001
             paths: /health /widget/lang/L0180.mjs /favicon.ico
+          - service: openapi
+            port: 8080
+            paths: /health /health?deep=1 /v1/languages /v1/openapi.json /v1/docs
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - name: Build ${{ matrix.service }} image

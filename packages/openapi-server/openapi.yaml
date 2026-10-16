@@ -1,0 +1,361 @@
+openapi: 3.1.0
+info:
+  title: Graffiticode API
+  version: 1.0.0
+  summary: Make interactive content from a plain-English description.
+  description: |
+    Graffiticode turns a natural-language description into interactive
+    content — quizzes and assessment items, flashcards, spreadsheets, charts,
+    surveys, concept webs and more — each made by a specialist language.
+
+    The usual flow:
+
+    1. `GET /languages` to find the language for the job (or pass your best
+       guess: the platform re-routes a request another language fits better).
+    2. `POST /items` with a description. Generation runs asynchronously: the
+       response is `202 Accepted` with a `Location`.
+    3. `GET /items/{id}` (with `Prefer: wait=N` to long-poll) until `status` is
+       `ready`, then open its `view_url`.
+    4. `POST /items/{id}/revisions` to change it by describing the change.
+
+    Descriptions must be written in English; content inside an item may be in
+    any language.
+
+    Errors are `application/problem+json` (RFC 9457). A problem's `type` is
+    `https://openapi.graffiticode.org/problems/<code>`.
+  contact:
+    name: Graffiticode
+    url: https://graffiticode.org
+servers:
+  - url: https://openapi.graffiticode.org/v1
+security:
+  - {}
+  - bearerAuth: []
+  - oauth2: [graffiticode]
+  - workspaceToken: []
+tags:
+  - name: languages
+    description: The catalog of Graffiticode languages.
+  - name: skills
+    description: Agent skills — guidance for working with Graffiticode well.
+  - name: meta
+    description: This API's own description and health.
+
+paths:
+  /languages:
+    get:
+      operationId: list_languages
+      tags: [languages]
+      summary: List languages
+      description: |
+        The languages an agent should choose from, most relevant first when
+        `search` is given. Internal and retired languages are not listed, but
+        remain usable by id.
+      parameters:
+        - name: search
+          in: query
+          description: Words describing what you want to make.
+          schema: { type: string, minLength: 1, maxLength: 200 }
+        - name: domain
+          in: query
+          description: Only languages in this domain (e.g. `assessment`).
+          schema: { type: string, minLength: 1, maxLength: 64 }
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      responses:
+        "200":
+          description: A page of languages.
+          headers:
+            ETag: { $ref: "#/components/headers/ETag" }
+            Cache-Control: { $ref: "#/components/headers/Cache-Control" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LanguagePage" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /languages/{id}:
+    parameters:
+      - $ref: "#/components/parameters/languageId"
+    get:
+      operationId: get_language_info
+      tags: [languages]
+      summary: Get a language
+      description: How to author for a language, what it is for, and what it is not for.
+      responses:
+        "200":
+          description: The language.
+          headers:
+            ETag: { $ref: "#/components/headers/ETag" }
+            Cache-Control: { $ref: "#/components/headers/Cache-Control" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LanguageInfo" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /languages/{id}/guide:
+    parameters:
+      - $ref: "#/components/parameters/languageId"
+    get:
+      operationId: get_language_guide
+      tags: [languages]
+      summary: Get a language's user guide
+      description: The full authoring reference for a language, as markdown.
+      responses:
+        "200":
+          description: The guide.
+          headers:
+            ETag: { $ref: "#/components/headers/ETag" }
+            Cache-Control: { $ref: "#/components/headers/Cache-Control" }
+          content:
+            text/markdown:
+              schema: { type: string }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /skills:
+    get:
+      operationId: list_skills
+      tags: [skills]
+      summary: List agent skills
+      description: Guidance for agents working with Graffiticode, read from the public graffiticode-skills repository.
+      responses:
+        "200":
+          description: The skills.
+          headers:
+            Cache-Control: { $ref: "#/components/headers/Cache-Control" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Skill" }
+        "503": { $ref: "#/components/responses/Unavailable" }
+
+  /skills/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, pattern: "^[A-Za-z0-9._-]{1,100}$" }
+    get:
+      operationId: get_skill
+      tags: [skills]
+      summary: Get an agent skill
+      responses:
+        "200":
+          description: The skill, as markdown.
+          headers:
+            Cache-Control: { $ref: "#/components/headers/Cache-Control" }
+          content:
+            text/markdown:
+              schema: { type: string }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/Unavailable" }
+
+  /openapi.json:
+    get:
+      operationId: get_openapi_json
+      tags: [meta]
+      summary: This description, as JSON
+      responses:
+        "200":
+          description: The OpenAPI document.
+          content:
+            application/json:
+              schema: { type: object }
+
+  /openapi.yaml:
+    get:
+      operationId: get_openapi_yaml
+      tags: [meta]
+      summary: This description, as YAML
+      responses:
+        "200":
+          description: The OpenAPI document.
+          content:
+            application/yaml:
+              schema: { type: string }
+
+  /docs:
+    get:
+      operationId: get_docs
+      tags: [meta]
+      summary: Interactive documentation
+      responses:
+        "200":
+          description: An HTML page rendering this description.
+          content:
+            text/html:
+              schema: { type: string }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: A Graffiticode API key, created in the console under Settings.
+    oauth2:
+      type: oauth2
+      description: Sign in with a Graffiticode account (authorization code with PKCE).
+      flows:
+        authorizationCode:
+          authorizationUrl: https://mcp.graffiticode.org/oauth/authorize
+          tokenUrl: https://mcp.graffiticode.org/oauth/token
+          scopes:
+            graffiticode: Create and edit your items.
+    workspaceToken:
+      type: apiKey
+      in: header
+      name: X-Graffiticode-Workspace
+      description: |
+        A free-plan workspace, from `POST /workspaces`. Send it back on every
+        request; when the platform moves you to another workspace the new
+        handle comes back in the `Graffiticode-Workspace` response header.
+
+  parameters:
+    languageId:
+      name: id
+      in: path
+      required: true
+      description: A language id such as `L0180` (the `L` is optional).
+      schema: { type: string, pattern: "^[Ll]?[0-9]{4}$" }
+    limit:
+      name: limit
+      in: query
+      description: Page size.
+      schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+    cursor:
+      name: cursor
+      in: query
+      description: Opaque; from a previous page's `next_cursor`.
+      schema: { type: string, pattern: "^[A-Za-z0-9_-]{1,512}$" }
+
+  headers:
+    ETag:
+      description: Entity tag for conditional requests (`If-None-Match`).
+      schema: { type: string }
+    Cache-Control:
+      schema: { type: string }
+
+  responses:
+    NotModified:
+      description: Unchanged since the `If-None-Match` tag.
+    BadRequest:
+      description: The request doesn't match this description.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    NotFound:
+      description: Not found.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Unavailable:
+      description: Temporarily unavailable; retry after `Retry-After` seconds.
+      headers:
+        Retry-After:
+          schema: { type: integer }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+
+  schemas:
+    Problem:
+      type: object
+      description: RFC 9457 problem details.
+      required: [type, title, status]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        code: { type: string, description: Stable machine-readable reason. }
+        errors:
+          type: array
+          description: For validation problems, where the request failed.
+          items:
+            type: object
+            required: [pointer, message]
+            properties:
+              pointer: { type: string, description: JSON pointer into the request. }
+              message: { type: string }
+      additionalProperties: true
+
+    Language:
+      type: object
+      required: [id, name, description, domains]
+      additionalProperties: false
+      properties:
+        id: { type: string, pattern: "^L[0-9]{4}$", examples: [L0180] }
+        name: { type: string }
+        description: { type: string }
+        when_to_use: { type: string }
+        domains:
+          type: array
+          items: { type: string }
+
+    LanguagePage:
+      type: object
+      required: [data, next_cursor]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/Language" }
+        next_cursor:
+          type: [string, "null"]
+          description: Pass as `cursor` for the next page; null on the last.
+
+    ExamplePrompt:
+      type: object
+      required: [prompt]
+      properties:
+        prompt: { type: string }
+        produces: { type: string }
+        notes: { type: string }
+
+    LanguageInfo:
+      type: object
+      required: [id, name, description, domains, authoring_guide, supported_item_types, not_for, example_prompts, guide_url, spec_url]
+      additionalProperties: false
+      properties:
+        id: { type: string, pattern: "^L[0-9]{4}$" }
+        name: { type: string }
+        description: { type: string }
+        when_to_use: { type: string }
+        domains:
+          type: array
+          items: { type: string }
+        authoring_guide: { type: [string, "null"] }
+        supported_item_types:
+          type: array
+          items: { type: string }
+        not_for:
+          type: array
+          description: What this language is not for — the strongest signal to pick another.
+          items: { type: string }
+        example_prompts:
+          type: array
+          items: { $ref: "#/components/schemas/ExamplePrompt" }
+        guide_url: { type: string, format: uri, description: The full user guide (markdown). }
+        spec_url: { type: string, format: uri }
+
+    Skill:
+      type: object
+      required: [id, name, description, url]
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        url: { type: string, format: uri }
