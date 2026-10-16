@@ -38,6 +38,8 @@ tags:
     description: The catalog of Graffiticode languages.
   - name: items
     description: The content you make.
+  - name: account
+    description: Workspaces and your account.
   - name: skills
     description: Agent skills — guidance for working with Graffiticode well.
   - name: meta
@@ -205,6 +207,8 @@ paths:
         content:
           application/json:
             schema: { $ref: "#/components/schemas/CreateItemRequest" }
+      parameters:
+        - $ref: "#/components/parameters/idempotencyKey"
       responses:
         "202": { $ref: "#/components/responses/Generating" }
         "400": { $ref: "#/components/responses/BadRequest" }
@@ -212,6 +216,8 @@ paths:
         "402": { $ref: "#/components/responses/LimitReached" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/IdempotencyKeyReused" }
 
   /items/{id}:
     parameters:
@@ -294,6 +300,8 @@ paths:
         content:
           application/json:
             schema: { $ref: "#/components/schemas/RevisionRequest" }
+      parameters:
+        - $ref: "#/components/parameters/idempotencyKey"
       responses:
         "202": { $ref: "#/components/responses/Generating" }
         "400": { $ref: "#/components/responses/BadRequest" }
@@ -327,6 +335,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/IdempotencyKeyReused" }
 
   /items/{id}/retry:
     parameters:
@@ -337,11 +346,14 @@ paths:
       summary: Retry a failed generation
       description: For an item whose `error.retryable` is true. Starts the same change again.
       security: [{ bearerAuth: [] }, { workspaceToken: [] }]
+      parameters:
+        - $ref: "#/components/parameters/idempotencyKey"
       responses:
         "202": { $ref: "#/components/responses/Generating" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/IdempotencyKeyReused" }
 
   /items/{id}/src:
     parameters:
@@ -389,8 +401,9 @@ paths:
       summary: Get an item's platform-neutral spec
       description: |
         A plain-English description of the item's content. To make it into
-        another language, pass this text (plus your intent) as a new item's
-        description.
+        another language, pass this text after one line of intent as a new
+        item's description. It starts with a blank line on purpose: that keeps
+        the content separate from your request however you join them.
       security: [{ bearerAuth: [] }, { workspaceToken: [] }]
       responses:
         "200":
@@ -467,6 +480,37 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /workspaces:
+    post:
+      operationId: create_workspace
+      tags: [account]
+      summary: Start a free-plan workspace
+      description: |
+        No account needed. Returns a workspace token to send as
+        `X-Graffiticode-Workspace`; items you make with it are kept for 48
+        hours, and its `claim_url`s let you keep them by signing up.
+      security: [{}]
+      responses:
+        "201":
+          description: A new workspace.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Workspace" }
+
+  /me:
+    get:
+      operationId: get_me
+      tags: [account]
+      summary: Who you are, and what you have left
+      security: [{ bearerAuth: [] }, { workspaceToken: [] }]
+      responses:
+        "200":
+          description: Your account.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Me" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
   /openapi.json:
     get:
       operationId: get_openapi_json
@@ -539,6 +583,14 @@ components:
       in: query
       description: Page size.
       schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+    idempotencyKey:
+      name: Idempotency-Key
+      in: header
+      description: |
+        Makes retrying this request safe: the same key (within 24 hours) gets
+        the original response — marked `Idempotent-Replayed: true` — and never
+        a second item or generation.
+      schema: { type: string, pattern: "^[\\x21-\\x7e]{1,255}$" }
     itemId:
       name: id
       in: path
@@ -571,6 +623,9 @@ components:
     Generating:
       description: Accepted; generating. Follow `Location`.
       headers:
+        Idempotent-Replayed:
+          description: Present (`true`) when this is the stored response to an earlier request with the same `Idempotency-Key`.
+          schema: { type: string }
         Location: { schema: { type: string } }
         Retry-After: { $ref: "#/components/headers/Retry-After" }
         Graffiticode-Workspace: { $ref: "#/components/headers/Graffiticode-Workspace" }
@@ -607,6 +662,11 @@ components:
         `Retry-After`), `item_changed`, `not_ready`, or `not_retryable`.
       headers:
         Retry-After: { $ref: "#/components/headers/Retry-After" }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    IdempotencyKeyReused:
+      description: This `Idempotency-Key` was already used for a different request.
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
@@ -877,3 +937,38 @@ components:
         html: { type: string }
         width: { type: integer }
         height: { type: integer }
+
+    Workspace:
+      type: object
+      required: [workspace, expires_at]
+      properties:
+        workspace: { type: string, description: "Send as `X-Graffiticode-Workspace`." }
+        expires_at: { type: string, format: date-time }
+        usage: { type: string }
+
+    Me:
+      type: object
+      required: [account]
+      properties:
+        account: { type: string, enum: [user, free_plan] }
+        plan:
+          type: object
+          required: [id, name]
+          properties:
+            id: { type: string }
+            name: { type: string }
+        usage:
+          type: object
+          properties:
+            items_this_period: { type: integer }
+            included_items: { type: [integer, "null"] }
+            available_items: { type: [integer, "null"], description: "Null when uncapped." }
+            period_ends_at: { type: [string, "null"], format: date-time }
+        free_plan:
+          type: object
+          properties:
+            item_ttl_hours: { type: integer }
+            languages:
+              type: array
+              items: { type: string }
+            signup_url: { type: string, format: uri }

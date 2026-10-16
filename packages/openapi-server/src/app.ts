@@ -14,6 +14,7 @@ import { languageRoutes } from "./routes/languages.js";
 import { skillRoutes } from "./routes/skills.js";
 import { metaRoutes } from "./routes/meta.js";
 import { itemRoutes } from "./routes/items.js";
+import { accountRoutes } from "./routes/account.js";
 import { coreReadiness } from "@graffiticode-app/core/readiness";
 
 export type Validate = (c: Context, operationId: string) => { path: Record<string, any>; query: Record<string, any>; header: Record<string, any> };
@@ -54,6 +55,7 @@ export function createApp({ spec = loadSpec() }: { spec?: any } = {}) {
   const v1 = new Hono();
   languageRoutes(v1, validate);
   itemRoutes(v1, validate, body);
+  accountRoutes(v1);
   skillRoutes(v1, validate);
   metaRoutes(v1, spec);
   app.route("/v1", v1);
