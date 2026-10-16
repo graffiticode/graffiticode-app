@@ -112,6 +112,33 @@ nothing to do while no v2 jobs exist.
    below the floor.
 4. Watch `generation_sweep` log lines and `npm run billing-uncertain`.
 
+### MCP in core mode (R2)
+
+mcp runs `@graffiticode-app/core` in-process (`GRAFFITICODE_BACKEND=core`):
+it reserves v2 jobs and wakes the console's worker; it never calls an LLM
+(`get_spec` stays on the console over GraphQL, beside the generator and the
+model key) and never calls Policy (core skips the connection lookup for it).
+Grants for `mcp-run@`, all in this project, before the core-mode deploy:
+
+```
+SA=serviceAccount:mcp-run@graffiticode-app.iam.gserviceaccount.com
+gcloud projects add-iam-policy-binding graffiticode-app --member=$SA --role=roles/datastore.user --condition=None
+gcloud tasks queues add-iam-policy-binding generation-jobs --location=us-central1 --project=graffiticode-app \
+  --member=$SA --role=roles/cloudtasks.enqueuer
+for s in INTERNAL_JOB_SECRET FREE_PLAN_API_KEY ACT_AS_GRANT_SECRET; do
+  gcloud secrets add-iam-policy-binding $s --project=graffiticode-app --member=$SA \
+    --role=roles/secretmanager.secretAccessor --condition=None; done
+```
+
+(`FREE_PLAN_NAMESPACE_SALT` it already reads.) No Stripe key: core's only use
+on this path repairs an empty subscription cache, which the console still does.
+`npm run deploy -- mcp` then refuses the candidate unless `/health?deep=1`
+reports core ready (Firestore, `cloudtasks.tasks.create` on the queue, secrets,
+free-plan credentials) and protocol ≥ the floor (`verify/mcp.mjs`).
+
+Rollback: set `GRAFFITICODE_BACKEND` back to `graphql` in `deploy.json` and
+deploy (same image), or `npm run rollback -- mcp` to the previous release.
+
 ## Open items
 
 - TODO: existing secret mounts use `:latest`, which gc-deploy rejects. Pin them

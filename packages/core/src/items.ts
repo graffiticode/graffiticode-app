@@ -794,10 +794,13 @@ export async function getItemClientTags({ auth, lang }) {
 // `includeSpec` is server-internal and defaults off on purpose: /api/item dumps this return
 // value straight to JSON (`res.status(200).json(item)`), so unconditionally projecting the
 // cached spec would bloat that response for every caller. Only getSpec asks for it.
-export async function getItem({ auth, id, includeSpec = false }: {
+export async function getItem({ auth, id, includeSpec = false, connectionFields = true }: {
   auth: AuthArg;
   id: string;
   includeSpec?: boolean;
+  // The current connection is looked up through Policy, which only the console
+  // may call; callers that don't show it (MCP, revision preparation) skip it.
+  connectionFields?: boolean;
 }) {
   try {
     const itemRef = db().doc(`users/${auth.uid}/items/${id}`);
@@ -887,7 +890,7 @@ export async function getItem({ auth, id, includeSpec = false }: {
       generationChars: typeof data.generationChars === "number" ? data.generationChars : null,
       publicationId: data.publicationId ?? null,
       publishedTaskId: data.publishedTaskId ?? null,
-      ...(await itemConnectionFields(auth, data)),
+      ...(connectionFields ? await itemConnectionFields(auth, data) : {}),
       // Claim token only — a read must be able to offer "save this item" for the
       // workspace the item actually lives in (this retrieval path is where the
       // claim link is surfaced, after the agent polls a create to "ready"), but
