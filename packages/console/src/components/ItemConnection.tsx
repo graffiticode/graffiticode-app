@@ -120,7 +120,7 @@ export default function ItemConnection({ user, itemId, lang, taskId, connectionI
         write?.status === 'ok' ? (
           <div className="text-xs text-green-700 mt-1">Saved to {service}.{write.confirmed ? ' Confirmed in the item bank.' : ''}</div>
         ) : (
-          <div className="text-xs text-gray-500 mt-1">Not written through this connection yet. Recompile writes it.</div>
+          <div className="text-xs text-gray-500 mt-1">Not written through this connection yet. Recompile writes it as new draft items.</div>
         )
       )}
       {publicationId && !staleVersion && !staleConnection && (

@@ -383,7 +383,7 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
                   disabled={isRecompiling || !taskId}
                   className="flex items-center w-full px-3 py-2 text-xs text-gray-700 hover:bg-gray-100 rounded-none disabled:opacity-50 disabled:cursor-not-allowed"
                   title={isConnectableLang(lang) && connectionId
-                    ? "Compile this version again instead of using the cached result. It writes through your connection again."
+                    ? "Compile this version again instead of using the cached result. It writes through your connection again: a save to the item bank adds new draft items and leaves earlier ones as they are."
                     : "Compile this version again instead of using the cached result"}
                 >
                   <ArrowPathIcon className={classNames('h-4 w-4 mr-2', isRecompiling && 'animate-spin')} />

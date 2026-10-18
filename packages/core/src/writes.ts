@@ -275,7 +275,9 @@ export async function reconcileItemWrite({ auth, id }: { auth: AuthArg; id: stri
 // Compiles an item's current version again instead of using the cached
 // result, for any language. An item that writes through a connection runs
 // through it again with a fresh idempotency key, so its protected calls (item-bank
-// saves included) repeat; stable references make that an update, not a copy.
+// saves included) repeat. Each item-bank save writes new draft records under
+// references of its own (registry v8, AT-10 B1), so a recompile adds new drafts
+// and never changes earlier ones, or anything published from them.
 // Anything else recompiles with the api's refresh. Either way the stored result
 // is replaced, and the caller reloads the preview.
 export async function recompileItem({ auth, id }: { auth: AuthArg; id: string }) {
