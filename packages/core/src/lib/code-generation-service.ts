@@ -922,11 +922,13 @@ async function verifyCode(code, authToken, lang, rid = null, isPublic = false) {
     if (rid) {
       ragLog(rid, "verification.complete", {
         status: compileResponse.status,
-        hasErrors:
-          !!compileResponse.errors || compileResponse.status === "error",
-        errorSummary: compileResponse.errors
-          ? JSON.stringify(compileResponse.errors).substring(0, 300)
-          : null,
+        // Same test as the repair loop. A clean compile returns `errors: []`,
+        // which `!!errors` read as a failure — every success logged
+        // `hasErrors=true errorSummary=[]`.
+        hasErrors: !verificationSucceeded(compileResponse),
+        errorSummary: verificationSucceeded(compileResponse)
+          ? null
+          : JSON.stringify(compileResponse.errors ?? compileResponse.error ?? null).substring(0, 300),
         latency: Date.now() - startTime,
       });
     }
