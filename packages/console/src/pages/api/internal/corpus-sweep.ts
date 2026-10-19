@@ -7,7 +7,7 @@
 //     --headers="X-Internal-Job-Secret=<INTERNAL_JOB_SECRET>" \
 //     --attempt-deadline=1800s --max-retry-attempts=0
 //
-// Samples 10 prompts per language by rotation (~110 generations, ~8 min at concurrency 4) and
+// Samples 10 prompts per language by rotation (~130 generations, ~6 min at concurrency 4, L0176 paced to its signing limit) and
 // compares each against the corpus entry it came from. Fits a request, so no Cloud Tasks.
 //
 // THE ALARM IS THE PRODUCT HERE. Full sweeps are manual by design, so this SMS is the only thing

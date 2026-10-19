@@ -28,9 +28,10 @@
 import { getFirestore } from "@graffiticode-app/core/utils/db/index";
 import { generateCodeForRequest } from "@graffiticode-app/core/lib/code-generation/generate-for-request";
 import { getCredentialsForApiKey } from "@graffiticode-app/core/lib/api-credentials";
-import { getBaseUrlForApi, getApiTask, getLanguageLexicon } from "@graffiticode-app/core/lib/api";
+import { getApiTask, getLanguageLexicon } from "@graffiticode-app/core/lib/api";
 import { compareShape, type ShapeLevel } from "./code-shape";
 import { harnessItemId } from "./harness-item-ids";
+import { fetchTaskData } from "./fetch-task-data";
 import { PING_LANGUAGES } from "./corpus-ping";
 import { unparse } from "@graffiticode/parser";
 
@@ -39,6 +40,14 @@ export const SWEEP_LANGUAGES = PING_LANGUAGES;
 
 export const SAMPLE_SIZE = 10;
 const CONCURRENCY = 4;
+
+// L0176 stages are signed under the system preview session, and the api allows each client 10
+// signing stages a minute, burst 10 (SYSTEM_SIGNING_STAGES_PER_CLIENT_PER_MINUTE, graffiticode
+// packages/api/src/signing-limit.js). A sweep prompt costs ~2: the /data the generator compiles
+// with, then taskCompiles. Four at once drained the burst in ~10s and wk2963 lost 5 of 10 L0176
+// prompts to 429s. Starting them 15s apart is ~8 stages a minute — under the limit with margin —
+// and adds ~2.5 min to a sweep that runs ~340s inside a 900s request.
+const MIN_START_GAP_MS: Record<string, number> = { "0176": 15_000 };
 const STEP_TIMEOUT_MS = 180_000;
 
 export type SweepVerdict =
@@ -150,17 +159,8 @@ export async function sweepSize(lang: string, mode: "sample" | "full"): Promise<
 
 async function taskCompiles(taskId: string, accessToken: string): Promise<{ compiled: boolean; error?: string }> {
   try {
-    // ?refresh=1 recompiles rather than answering from the compile cache. A
-    // taskId is content-addressed over {lang, code} and carries no compiler
-    // version, so a verdict cached before a language shipped a breaking change
-    // keeps returning a clean 200 — a program the checker now rejects reads as
-    // a PASS. This check exists to assert "this compiles", so it must reach the
-    // compiler, not the record. (L0172, 2026-09-04: three regenerated programs
-    // came out byte-identical to April ones and inherited their April verdicts.)
-    const resp = await fetch(`${getBaseUrlForApi()}/data?id=${encodeURIComponent(taskId)}&refresh=1`, {
-      headers: { Authorization: accessToken },
-      signal: AbortSignal.timeout(STEP_TIMEOUT_MS),
-    });
+    // ?refresh=1 — see fetch-task-data.ts.
+    const resp = await fetchTaskData(taskId, accessToken, STEP_TIMEOUT_MS);
     if (resp.status !== 200) return { compiled: false, error: `/data returned ${resp.status}` };
     const body: any = await resp.json();
     const obj = body?.data;
@@ -268,13 +268,18 @@ async function sweepOne(
   }
 }
 
-async function pool<T>(tasks: Array<() => Promise<T>>, limit: number): Promise<T[]> {
+/** Runs `tasks` at most `limit` at a time, starting no two within `minStartGapMs` of each other. */
+async function pool<T>(tasks: Array<() => Promise<T>>, limit: number, minStartGapMs = 0): Promise<T[]> {
   const out: T[] = new Array(tasks.length);
   let next = 0;
+  let nextStartAt = 0;
   const workers = Array.from({ length: Math.min(limit, tasks.length) }, async () => {
     for (;;) {
       const i = next++;
       if (i >= tasks.length) return;
+      const startAt = Math.max(Date.now(), nextStartAt);
+      nextStartAt = startAt + minStartGapMs;
+      if (startAt > Date.now()) await new Promise((resolve) => setTimeout(resolve, startAt - Date.now()));
       out[i] = await tasks[i]();
     }
   });
@@ -305,7 +310,7 @@ export async function runSweep(opts: SweepOptions = {}): Promise<SweepRun> {
   const results: SweepResult[] = [];
   for (const lang of langs) {
     const entries = await corpusFor(lang, week);
-    const got = await pool(entries.map((e) => () => sweepOne(lang, e, auth)), CONCURRENCY);
+    const got = await pool(entries.map((e) => () => sweepOne(lang, e, auth)), CONCURRENCY, MIN_START_GAP_MS[lang] ?? 0);
     results.push(...got);
     opts.onLangDone?.(lang, got);
   }
