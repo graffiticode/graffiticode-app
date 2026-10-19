@@ -29,8 +29,8 @@ import { getFirestore } from "@graffiticode-app/core/utils/db/index";
 import { generateCodeForRequest } from "@graffiticode-app/core/lib/code-generation/generate-for-request";
 import { vectorSearch } from "@graffiticode-app/core/lib/embedding-service";
 import { getCredentialsForApiKey } from "@graffiticode-app/core/lib/api-credentials";
-import { getBaseUrlForApi } from "@graffiticode-app/core/lib/api";
 import { harnessItemId } from "./harness-item-ids";
+import { fetchTaskData } from "./fetch-task-data";
 
 /**
  * The pinged set: registered in LANGUAGES *and* carrying a RAG corpus, minus the
@@ -215,17 +215,8 @@ async function promptForLang(lang: string, day: number): Promise<{ turns: string
  */
 async function taskCompiles(taskId: string, accessToken: string): Promise<{ compiled: boolean; error?: string; data?: unknown }> {
   try {
-    // ?refresh=1 recompiles rather than answering from the compile cache. A
-    // taskId is content-addressed over {lang, code} and carries no compiler
-    // version, so a verdict cached before a language shipped a breaking change
-    // keeps returning a clean 200 — a program the checker now rejects reads as
-    // a PASS. This check exists to assert "this compiles", so it must reach the
-    // compiler, not the record. (L0172, 2026-09-04: three regenerated programs
-    // came out byte-identical to April ones and inherited their April verdicts.)
-    const resp = await fetch(`${getBaseUrlForApi()}/data?id=${encodeURIComponent(taskId)}&refresh=1`, {
-      headers: { Authorization: accessToken },
-      signal: AbortSignal.timeout(STEP_TIMEOUT_MS),
-    });
+    // ?refresh=1 — see fetch-task-data.ts.
+    const resp = await fetchTaskData(taskId, accessToken, STEP_TIMEOUT_MS);
     if (resp.status !== 200) return { compiled: false, error: `/data returned ${resp.status}` };
     const body: any = await resp.json();
     const obj = body?.data;
