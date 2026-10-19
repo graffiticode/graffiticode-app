@@ -550,10 +550,16 @@ export class RAGAnalyticsService {
       await this.db
         .collection(this.collection)
         .doc(requestId)
+        // Nested, not `"metadata.success": success`: set() does not expand dotted
+        // keys, so that wrote a top-level field literally named "metadata.success"
+        // that neither the where() below nor `r.metadata?.success` ever matched.
         .set({
           ...cleanedRecord,
-          "metadata.success": success,
-          "metadata.completedAt": FieldValue.serverTimestamp(),
+          metadata: {
+            ...cleanedRecord.metadata,
+            success,
+            completedAt: FieldValue.serverTimestamp(),
+          },
         });
 
       // Clean up

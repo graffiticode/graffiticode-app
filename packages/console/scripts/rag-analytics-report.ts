@@ -73,6 +73,51 @@ interface AnalyticsDoc {
   metadata?: Record<string, any>;
 }
 
+// The request's verdict. `response.success` only says the model returned text — a
+// run whose output never parsed still had it — so it is the last resort, for
+// records that predate the others. completeRequest's verdict comes first: nested
+// `metadata.success`, or the literal top-level "metadata.success" key that set()
+// wrote before it was nested. A recorded compilation failure overrides both.
+function isSuccess(d: AnalyticsDoc): boolean {
+  if (d.compilation?.success === false) return false;
+  const verdict = d.metadata?.success ?? (d as any)['metadata.success'];
+  if (typeof verdict === 'boolean') return verdict;
+  return !!d.response?.success;
+}
+
+// A record with no compilation entry was never verified — an empty program, or a
+// run past MAX_UNITS_FOR_FIXES — and until the generator started parsing those
+// itself, it was recorded as a success whatever it returned. Parse the code the
+// pipeline would have returned, and record a failure on the doc so isSuccess
+// sees it. Records written since carry their own compilation verdict.
+async function reparseUnverified(docs: AnalyticsDoc[]): Promise<{ checked: number; failed: number }> {
+  // Imported here, not at the top: core initializes the default Firebase app at
+  // module load, and a static import would run before ours and take its place.
+  const { processGeneratedCode } = await import('@graffiticode-app/core/lib/code-generation-service');
+  const { parseCode } = await import('@graffiticode-app/core/lib/task-api');
+  const { languageOfflineMessage } = await import('@graffiticode-app/core/lib/api');
+  let checked = 0;
+  let failed = 0;
+  for (const d of docs) {
+    if (d.compilation || !d.response?.code) continue;
+    const lang = getLanguage(d).replace(/^L/, '');
+    if (!/^\d+$/.test(lang)) continue;
+    checked++;
+    const src = await processGeneratedCode(d.response.code, lang);
+    const parsed = src?.trim() ? await parseCode({ lang, src }) : { errors: [{ message: 'no code' }] };
+    const offline = parsed.errors?.length === 1 && parsed.errors[0].message === languageOfflineMessage(lang);
+    if (parsed.errors && !offline) {
+      failed++;
+      d.compilation = {
+        success: false,
+        errorMessage: `Unverified, does not parse: ${parsed.errors.map((e: { message: string }) => e.message).join('; ')}`,
+        retryCount: 0,
+      };
+    }
+  }
+  return { checked, failed };
+}
+
 function getLanguage(d: AnalyticsDoc): string {
   const raw = (d.metadata?.lang || d.query?.language || 'unknown').toString();
   // Normalize to L-prefixed uppercase form (e.g. "0166" -> "L0166")
@@ -232,7 +277,7 @@ async function fetchDocs(period: string, language?: string): Promise<AnalyticsDo
 
 function computeMetrics(docs: AnalyticsDoc[], usageInfo?: Map<string, UsageInfo>) {
   const total = docs.length;
-  const successful = docs.filter(d => d.response?.success || d.metadata?.success).length;
+  const successful = docs.filter(isSuccess).length;
   const successRate = total > 0 ? successful / total : 0;
 
   const latencies = docs.map(d => d.performance?.totalLatencyMs).filter((v): v is number => v != null);
@@ -295,7 +340,7 @@ function computeMetrics(docs: AnalyticsDoc[], usageInfo?: Map<string, UsageInfo>
     const lang = getLanguage(d);
     const entry = langMap.get(lang) || { total: 0, successful: 0, totalLatency: 0, latencyCount: 0, judgeSum: 0, judgeCount: 0 };
     entry.total++;
-    if (d.response?.success || d.metadata?.success) entry.successful++;
+    if (isSuccess(d)) entry.successful++;
     if (d.performance?.totalLatencyMs != null) {
       entry.totalLatency += d.performance.totalLatencyMs;
       entry.latencyCount++;
@@ -320,7 +365,7 @@ function computeMetrics(docs: AnalyticsDoc[], usageInfo?: Map<string, UsageInfo>
     const model = getModel(d);
     const entry = modelMap.get(model) || { total: 0, successful: 0, totalLatency: 0, latencyCount: 0, retrySum: 0, firstPass: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0 };
     entry.total++;
-    const ok = !!(d.response?.success || d.metadata?.success);
+    const ok = isSuccess(d);
     if (ok) entry.successful++;
     const retries = d.compilation?.retryCount ?? 0;
     entry.retrySum += retries;
@@ -421,7 +466,7 @@ function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMe
     const lang = getLanguage(d);
     const model = getModel(d);
     const query = escapeHtml((d.query?.text || '—').substring(0, 60));
-    const success = d.response?.success ? 'Yes' : 'No';
+    const success = isSuccess(d) ? 'Yes' : 'No';
     const latency = d.performance?.totalLatencyMs != null ? `${Math.round(d.performance.totalLatencyMs)}ms` : '—';
     const best = topMatchOf(d);
     // Flagged inline so a row reading 1.000 is not mistaken for a good retrieval.
@@ -433,7 +478,7 @@ function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMe
     const unitsStr = info != null ? info.units.toLocaleString() : '—';
     const inputTokensStr = info?.inputTokens ? info.inputTokens.toLocaleString() : '—';
     const outputTokensStr = info?.outputTokens ? info.outputTokens.toLocaleString() : '—';
-    const successClass = d.response?.success ? 'success' : 'failure';
+    const successClass = isSuccess(d) ? 'success' : 'failure';
 
     // Build expandable detail content
     const fullQuery = escapeHtml(d.query?.text || '—');
@@ -629,6 +674,9 @@ async function main() {
   console.log(`Fetching RAG analytics for the last ${period}${language ? ` (lang: ${language})` : ''}...`);
   const docs = await fetchDocs(period, language);
   console.log(`Found ${docs.length} records`);
+
+  const reparsed = await reparseUnverified(docs);
+  console.log(`Re-parsed ${reparsed.checked} unverified records: ${reparsed.failed} do not parse`);
 
   const usageInfo = await fetchUsageInfo(docs.map(d => d.requestId));
   const metrics = computeMetrics(docs, usageInfo);

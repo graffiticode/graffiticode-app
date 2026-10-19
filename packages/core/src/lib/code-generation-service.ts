@@ -1180,7 +1180,7 @@ function unescapeJsonStyle(text: string): string {
   return text.replace(/\\\\/g, "\\").replace(/\\n/g, "\n");
 }
 
-async function processGeneratedCode(content, lang = "0000", rid = null, accessToken?: string) {
+export async function processGeneratedCode(content, lang = "0000", rid = null, accessToken?: string) {
   if (!content) return content;
 
   const originalLength = content.length;
@@ -2396,8 +2396,30 @@ export async function generateCode({
       });
     }
 
+    // Verification is skipped for an empty program, a missing token, and a run
+    // already past MAX_UNITS_FOR_FIXES — and a skipped run used to count as a
+    // success. rid ca59e2a2 was one: 356s, prose before the program, unparseable,
+    // recorded "Success: Yes". Parse what is being returned instead. An offline
+    // language service says nothing about the program, so it isn't held against it.
+    let unverifiedOk = true;
+    if (!verificationResult) {
+      const parsed = finalProcessedCode?.trim()
+        ? await parseCode({ lang, src: finalProcessedCode, publicValues: { itemId: VERIFY_ITEM_ID }, accessToken })
+        : { errors: [{ message: "The generator produced no code" }] };
+      const offline = parsed.errors?.length === 1 && parsed.errors[0].message === languageOfflineMessage(lang);
+      if (parsed.errors && !offline) {
+        unverifiedOk = false;
+        safeRAGAnalytics.trackCompilation(requestId, {
+          success: false,
+          errorMessage: `Unverified, does not parse: ${parsed.errors.map((e) => e.message).join("; ")}`.substring(0, 500),
+          retryCount: fixAttempts,
+          finalCode: finalProcessedCode,
+        });
+      }
+    }
+
     // Complete analytics tracking — mark as failed if compilation had errors
-    const compilationSucceeded = verificationResult ? verificationSucceeded(verificationResult) : true;
+    const compilationSucceeded = verificationResult ? verificationSucceeded(verificationResult) : unverifiedOk;
     await safeRAGAnalytics.completeRequest(requestId, compilationSucceeded);
 
     // Return formatted response with the language name
