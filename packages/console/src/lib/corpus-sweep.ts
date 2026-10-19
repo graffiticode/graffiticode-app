@@ -40,6 +40,14 @@ export const SWEEP_LANGUAGES = PING_LANGUAGES;
 
 export const SAMPLE_SIZE = 10;
 const CONCURRENCY = 4;
+
+// L0176 stages are signed under the system preview session, and the api allows each client 10
+// signing stages a minute, burst 10 (SYSTEM_SIGNING_STAGES_PER_CLIENT_PER_MINUTE, graffiticode
+// packages/api/src/signing-limit.js). A sweep prompt costs ~2: the /data the generator compiles
+// with, then taskCompiles. Four at once drained the burst in ~10s and wk2963 lost 5 of 10 L0176
+// prompts to 429s. Starting them 15s apart is ~8 stages a minute — under the limit with margin —
+// and adds ~2.5 min to a sweep that runs ~340s inside a 900s request.
+const MIN_START_GAP_MS: Record<string, number> = { "0176": 15_000 };
 const STEP_TIMEOUT_MS = 180_000;
 
 export type SweepVerdict =
@@ -260,13 +268,18 @@ async function sweepOne(
   }
 }
 
-async function pool<T>(tasks: Array<() => Promise<T>>, limit: number): Promise<T[]> {
+/** Runs `tasks` at most `limit` at a time, starting no two within `minStartGapMs` of each other. */
+async function pool<T>(tasks: Array<() => Promise<T>>, limit: number, minStartGapMs = 0): Promise<T[]> {
   const out: T[] = new Array(tasks.length);
   let next = 0;
+  let nextStartAt = 0;
   const workers = Array.from({ length: Math.min(limit, tasks.length) }, async () => {
     for (;;) {
       const i = next++;
       if (i >= tasks.length) return;
+      const startAt = Math.max(Date.now(), nextStartAt);
+      nextStartAt = startAt + minStartGapMs;
+      if (startAt > Date.now()) await new Promise((resolve) => setTimeout(resolve, startAt - Date.now()));
       out[i] = await tasks[i]();
     }
   });
@@ -297,7 +310,7 @@ export async function runSweep(opts: SweepOptions = {}): Promise<SweepRun> {
   const results: SweepResult[] = [];
   for (const lang of langs) {
     const entries = await corpusFor(lang, week);
-    const got = await pool(entries.map((e) => () => sweepOne(lang, e, auth)), CONCURRENCY);
+    const got = await pool(entries.map((e) => () => sweepOne(lang, e, auth)), CONCURRENCY, MIN_START_GAP_MS[lang] ?? 0);
     results.push(...got);
     opts.onLangDone?.(lang, got);
   }
