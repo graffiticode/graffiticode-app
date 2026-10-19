@@ -9,10 +9,22 @@ npm run build         # Compile TS to dist/ (tsc) + bundle the MCP Apps widget (
 npm run build:widget  # Bundle only the widget (src/widget/browser → dist/widget/widget.bundle.js + per-language dist/widget/lang/<id>.mjs)
 npm run clean         # Remove dist/ directory
 npm run start         # Run Streamable HTTP server (reads PORT env, defaults to 3001)
-npm run gcp:build     # Deploy to Google Cloud Run via Cloud Build
-npm run gcp:deploy    # Deploy from source to Cloud Run (mcp-service, us-central1)
 npm run gcp:logs      # View Cloud Run logs
 ```
+
+## Deploy
+
+**Deploys are manual and go through gc-deploy**, using the `mcp` entry in the root `deploy.json` (Cloud Run service `mcp-service`, us-central1). Run from the **repo root** on a clean, merged `main`:
+
+```bash
+npm run deploy -- deploy mcp --plan   # preview the release; no cloud calls
+npm run deploy -- deploy mcp          # build → candidate revision → verify → promote
+npm run rollback -- mcp --env production --release <id>   # printed at the end of every deploy
+```
+
+A release deploys a tagged revision with **no traffic**. Then it runs `verify/mcp.mjs` and the smoke paths (`/health`, `/widget/lang/L0180.mjs`, `/health?deep=1`) against that revision. Only then does it move 100% of traffic to it. It refuses a revision below the R1 baseline in `deploy.json`. **`npm run gcp:build` and `gcp:deploy` are legacy — don't use them.** They deploy straight to traffic, which skips verification and bypasses gc-deploy's pinned-revision traffic, `deploy.json` env and secret versions.
+
+`deploy.json` owns this service's protocol/queue env (`GRAFFITICODE_BACKEND`, `GENERATION_*`, `CONSOLE_URL`, …) and its secret mounts at **pinned versions** (`INTERNAL_JOB_SECRET`, `FREE_PLAN_API_KEY`, `FREE_PLAN_NAMESPACE_SALT`, `ACT_AS_GRANT_SECRET`). To change one of these, edit `deploy.json` and deploy; an out-of-band change is overwritten by the next release. Anything set out-of-band must use `--update-env-vars`/`--update-secrets` (additive), and creates a revision with **no traffic**, because gc-deploy pins traffic by revision. Move traffic to it with `gcloud run services update-traffic mcp-service --to-revisions <rev>=100`.
 
 ## Testing / debugging
 
@@ -134,8 +146,8 @@ places: `ABOUT_HTML`, `MCP_DISCOVERY`, and `README.md`.
 - `GRAFFITICODE_SKILLS_SUBDIR` - The directory in that repo holding one directory per skill (default: `packages/skills`; empty for a repo of skills alone).
 - `GRAFFITICODE_SKILLS_REF` - Git ref/branch for skill discovery (default: `main`).
 - `GRAFFITICODE_SKILLS_TTL_MS` - Skill catalog cache TTL in ms (default: `60000`).
-- `FREE_PLAN_NAMESPACE_SALT` - Shared HS256 secret used to mint trial-claim JWTs. **Must be the identical value the console deploys with** — both come from the same Secret Manager entry populated by the console's `scripts/set-free-plan-secrets.sh`. Mount on Cloud Run with `gcloud run services update mcp-service --update-secrets=FREE_PLAN_NAMESPACE_SALT=FREE_PLAN_NAMESPACE_SALT:latest`. If unset, trial responses still succeed but omit `claim_url`/`claim_message` (single warning logged at startup).
-- `OPENAI_APPS_CHALLENGE_TOKEN` - Token served **verbatim** (exact bytes, no JSON/prefix) as `text/plain` with `Cache-Control: no-store` at `/.well-known/openai-apps-challenge`, for OpenAI app-directory domain verification. OpenAI fetches it from the **root of the registered host** (`mcp.graffiticode.org`; the `/mcp` path is ignored). Set it on the **already-tested image** at submission time — `gcloud run services update mcp-service --update-env-vars=OPENAI_APPS_CHALLENGE_TOKEN=<token>` — then verify in the portal. The route **404s while unset**, so it's inert until submission. Pure seam in `src/challenge.ts`.
+- `FREE_PLAN_NAMESPACE_SALT` - Shared HS256 secret used to mint trial-claim JWTs. **Must be the identical value the console deploys with** — both come from the same Secret Manager entry populated by the console's `scripts/set-free-plan-secrets.sh`. Here it is mounted by gc-deploy at the version pinned in `deploy.json` (`mcp` and `openapi` both pin it), while the console mounts `:latest` out-of-band (`set-free-plan-secrets.sh`). After a rotation, bump the pinned version for `mcp` and `openapi` and deploy both, or this service and the console will hold different salts and claim links will fail. If unset, trial responses still succeed but omit `claim_url`/`claim_message` (single warning logged at startup).
+- `OPENAI_APPS_CHALLENGE_TOKEN` - Token served **verbatim** (exact bytes, no JSON/prefix) as `text/plain` with `Cache-Control: no-store` at `/.well-known/openai-apps-challenge`, for OpenAI app-directory domain verification. OpenAI fetches it from the **root of the registered host** (`mcp.graffiticode.org`; the `/mcp` path is ignored). Set it on the **already-tested image** at submission time — `gcloud run services update mcp-service --update-env-vars=OPENAI_APPS_CHALLENGE_TOKEN=<token>`, then move traffic to the new no-traffic revision (see Deploy) — then verify in the portal. The route **404s while unset**, so it's inert until submission. Pure seam in `src/challenge.ts`.
 - `SSE_KEEPALIVE_MS` - How often to write an SSE comment into an open `/mcp` event stream, in ms (default: `30000`; `0` disables). Cloudflare cuts an idle streaming response at 100s, and a client's standalone `GET /mcp` notification stream is idle by nature — clients saw `StreamableHTTPError: Failed to open SSE stream … code: 524` and reconnect churn. See `src/sse-keepalive.ts`.
 - `PORT` - HTTP server port (default: 3001).
 

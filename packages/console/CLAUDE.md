@@ -52,15 +52,24 @@ npm run eval:judge-smoke  # Quick judge sanity check before big runs
 
 ## Deploy
 
-**Deploys are always manual.** GitHub is never used to deploy: no workflow or push trigger ships anything, so pushing to `main` deploys nothing. Run the commands below by hand, after the lint/typecheck gate. (GitHub checks that only validate are fine: `.github/workflows/npm-ci.yaml` runs lint on push.)
+**Deploys are always manual.** GitHub is never used to deploy: no workflow or push trigger ships anything, so pushing to `main` deploys nothing. Run the commands below by hand, from the **repo root**, on a clean, merged `main`, after the lint/typecheck gate. (GitHub checks that only validate are fine.)
+
+Deploys go through **gc-deploy**, configured by the root `deploy.json` (services `console`, `mcp`, `app`, `openapi`):
 
 ```bash
-npm run gcp:build     # Cloud Build → gcr.io/graffiticode-app/console:<sha> → deploy `console` (us-central1)
-npm run gcp:restart   # redeploy :latest, no rebuild
-npm run gcp:logs      # last 100 requests;  gcp:logs:tail for live
+npm run deploy -- deploy console --plan   # preview the release; no cloud calls
+npm run deploy -- deploy console          # build → candidate revision → verify → promote
+npm run rollback -- console --env production --release <id>   # printed at the end of every deploy
+npm run gcp:logs -w packages/console      # last 100 requests;  gcp:logs:tail for live
 ```
 
-Most of the service's environment is set **out-of-band on the Cloud Run service**, not in `cloudbuild.yaml`: ANTHROPIC/OPENAI, Stripe, DSPY, OTEL, and the Secret Manager mounts (`INTERNAL_JOB_SECRET`, `FREE_PLAN_*`). So any `gcloud run deploy/update` must use **`--update-env-vars` (additive)** — `--set-env-vars` wipes everything not listed and takes the generator down. The same asymmetry is why an env-var change is a code change (see the `CODEGEN_EFFORT` story above): it has no diff, so the corpus ping is the only thing that catches it.
+A release builds the image (`us-central1-docker.pkg.dev/graffiticode-app/services/console`, by digest) and deploys it as a tagged revision with **no traffic**. Then it runs `verify/console.mjs` and the smoke paths (`/`, `/api/health?deep=1`) against that revision. Only then does it move 100% of traffic to it and retire stale tags. It refuses a dirty tree (`--allow-dirty` exists, but don't use it for prod) and refuses a console older than the `baselines` in `deploy.json` (R1: the generation-protocol v2 floor is one-way). Each release writes a receipt to `.gc-deploy/releases/<id>.json`, and the revision is labelled `gc-release`, `commit-sha` and `gc-dirty`.
+
+**`npm run gcp:build` and `gcp:restart` are legacy — don't use them.** They push to `gcr.io` and `gcloud run deploy` straight to traffic, which skips verification and bypasses gc-deploy's pinned-revision traffic and baselines.
+
+Most of the service's environment is set **out-of-band on the Cloud Run service**, not in `deploy.json`: ANTHROPIC/OPENAI, Stripe, DSPY, OTEL, and the Secret Manager mounts (`INTERNAL_JOB_SECRET`, `FREE_PLAN_*`). `deploy.json` carries only `GENERATION_PROTOCOL` and `ACT_AS_GRANT_SECRET`, and gc-deploy applies them with `--update-env-vars`/`--update-secrets`, which only add. Any manual `gcloud run deploy/update` must also use **`--update-env-vars` (additive)**: `--set-env-vars` wipes everything not listed and takes the generator down. An out-of-band update creates a revision with **no traffic**, because gc-deploy pins traffic by revision. Move traffic to it with `gcloud run services update-traffic console --to-revisions <rev>=100`. Instance count, memory and the 900s timeout are also out-of-band; see `docs/gcp-bootstrap.md`. Because env vars live outside the repo, an env-var change has no diff, which is why it counts as a code change (see the `CODEGEN_EFFORT` story above): the corpus ping is the only thing that catches it.
+
+**Long requests through `console.graffiticode.org` die at ~125s** with a Cloudflare 524, even though the service keeps running to 900s. Hit the Cloud Run URL directly (`https://console-cfdwwd7ega-uc.a.run.app`) for anything slow, such as a `?dry=1` corpus sweep (~6 min). A dry run discards its result when the client disconnects.
 
 ## Architecture
 
