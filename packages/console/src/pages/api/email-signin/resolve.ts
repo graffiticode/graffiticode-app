@@ -1,4 +1,5 @@
 import { PrivyClient } from '@privy-io/server-auth';
+import { buildSetSsoCookie } from '@graffiticode/auth-react/server';
 
 const AUTH_SERVICE_URL = process.env.NEXT_PUBLIC_GC_AUTH_URL || 'https://auth.graffiticode.org';
 const AUTH_SERVICE_INTERNAL_API_KEY = process.env.AUTH_SERVICE_INTERNAL_API_KEY || process.env.INTERNAL_API_KEY || '';
@@ -24,10 +25,14 @@ const extractEmail = (user: any): string | null => {
 };
 
 // Asks the auth service to find the uid linked to this email AND mint a
-// Firebase custom token for them. Console can't mint these locally because
+// Firebase custom token for them. It also starts a session (a refresh token),
+// which the response stores in the SSO cookie, as the wallet sign-in does; the
+// browser's user agent is passed on so the sessions page can name the device. Console can't mint these locally because
 // its admin SDK targets graffiticode-app while the client signs into the
 // graffiticode project (and the Cloud Run SA lacks signBlob permission).
-async function signInByEmail(email: string): Promise<{ uid: string; customToken: string } | null> {
+type SignIn = { uid: string; customToken: string; refreshToken: string | null };
+
+async function signInByEmail(email: string, userAgent: string | undefined): Promise<SignIn | null> {
   if (!AUTH_SERVICE_INTERNAL_API_KEY) {
     console.warn('[email-signin/resolve] auth-service internal key not configured; returning no match');
     return null;
@@ -39,7 +44,7 @@ async function signInByEmail(email: string): Promise<{ uid: string; customToken:
       'Content-Type': 'application/json',
       'X-Internal-API-Key': AUTH_SERVICE_INTERNAL_API_KEY,
     },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, userAgent }),
   });
   if (!res.ok) {
     console.warn('[email-signin/resolve] auth-service sign-in failed', res.status);
@@ -51,7 +56,8 @@ async function signInByEmail(email: string): Promise<{ uid: string; customToken:
   const uid = body.data.uid;
   const customToken = body.data.firebaseCustomToken;
   if (!uid || !customToken) return null;
-  return { uid, customToken };
+  const refreshToken = typeof body.data.refreshToken === 'string' && body.data.refreshToken ? body.data.refreshToken : null;
+  return { uid, customToken, refreshToken };
 }
 
 const handler = async (req, res) => {
@@ -79,9 +85,9 @@ const handler = async (req, res) => {
   }
   const normalizedEmail = email.trim().toLowerCase();
 
-  let result: { uid: string; customToken: string } | null = null;
+  let result: SignIn | null = null;
   try {
-    result = await signInByEmail(normalizedEmail);
+    result = await signInByEmail(normalizedEmail, req.headers['user-agent']);
   } catch (err: any) {
     console.error('[email-signin/resolve] sign-in error:', err?.message);
     return res.status(200).json({ matched: false, email: normalizedEmail });
@@ -89,6 +95,8 @@ const handler = async (req, res) => {
   if (!result) {
     return res.status(200).json({ matched: false, email: normalizedEmail });
   }
+  // The refresh token goes only into the HttpOnly cookie, never to the browser's script.
+  if (result.refreshToken) res.setHeader('Set-Cookie', buildSetSsoCookie(result.refreshToken));
   return res.status(200).json({ matched: true, customToken: result.customToken });
 };
 

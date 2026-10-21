@@ -3,6 +3,7 @@ import SignIn from '../components/SignIn';
 import APIKeysCard from '../components/APIKeysCard';
 import ConnectionsCard from '../components/ConnectionsCard';
 import LinkedEmailsCard from '../components/LinkedEmailsCard';
+import SessionsCard from '../components/SessionsCard';
 import useGraffiticodeAuth from '@graffiticode/auth-react';
 import { getPageTitle } from '../lib/utils';
 
@@ -41,6 +42,7 @@ export default function Settings() {
               <ConnectionsCard />
             </div>
             <LinkedEmailsCard />
+            <SessionsCard />
           </div>
         </div>
       </div>

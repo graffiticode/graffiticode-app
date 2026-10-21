@@ -83,3 +83,22 @@ export async function bootstrapFirebaseToken(refreshToken: string): Promise<stri
     return null;
   }
 }
+
+// Ends a session at the auth service on sign-out, so the refresh token stops
+// working everywhere rather than only losing this browser's copy. Best effort:
+// returns false on any failure or after `timeoutMs`, and never throws, so a slow
+// auth service can't block signing out.
+export async function revokeSsoSession(refreshToken: string, timeoutMs = 3000): Promise<boolean> {
+  try {
+    const res = await fetch(`${authUrl()}/v1/refresh-tokens/revoke`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    return res.ok;
+  } catch (err) {
+    console.error("[sso] revokeSsoSession failed", err);
+    return false;
+  }
+}
