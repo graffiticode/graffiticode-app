@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { buildSetSsoCookie, buildClearSsoCookie } from "@graffiticode/auth-react/server";
+import { buildSetSsoCookie, buildClearSsoCookie, readSsoCookie, revokeSsoSession } from "@graffiticode/auth-react/server";
 
 export const runtime = "nodejs";
 
@@ -20,8 +20,11 @@ export async function POST(req: NextRequest) {
   return res;
 }
 
-// DELETE: clear the shared SSO cookie on sign-out (single sign-out).
-export async function DELETE() {
+// DELETE: on sign-out, end the cookie's session at the auth service, then clear
+// the shared SSO cookie (single sign-out).
+export async function DELETE(req: NextRequest) {
+  const refreshToken = readSsoCookie(req.headers.get("cookie"));
+  if (refreshToken) await revokeSsoSession(refreshToken);
   const res = NextResponse.json({ ok: true });
   res.headers.set("Set-Cookie", buildClearSsoCookie());
   return res;

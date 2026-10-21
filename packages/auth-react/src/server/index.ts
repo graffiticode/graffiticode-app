@@ -6,4 +6,5 @@ export {
   buildClearSsoCookie,
   readSsoCookie,
   bootstrapFirebaseToken,
+  revokeSsoSession,
 } from "./sso";

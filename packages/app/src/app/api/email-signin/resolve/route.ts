@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrivyClient } from "@privy-io/server-auth";
+import { buildSetSsoCookie } from "@graffiticode/auth-react/server";
 
 export const runtime = "nodejs";
 
@@ -29,8 +30,13 @@ const extractEmail = (user: any): string | null => {
 
 // Asks the auth service to find the uid linked to this email AND mint a Firebase
 // custom token for them (the auth service targets the graffiticode project and
-// holds the signing permission this app's SA does not).
-async function signInByEmail(email: string): Promise<{ uid: string; customToken: string } | null> {
+// holds the signing permission this app's SA does not). It also starts a session
+// (a refresh token), which the response stores in the SSO cookie, as the wallet
+// sign-in does; the browser's user agent is passed on so the console's sessions
+// page can name the device.
+type SignIn = { uid: string; customToken: string; refreshToken: string | null };
+
+async function signInByEmail(email: string, userAgent: string | null): Promise<SignIn | null> {
   if (!AUTH_SERVICE_INTERNAL_API_KEY) {
     console.warn("[email-signin/resolve] auth-service internal key not configured; no match");
     return null;
@@ -42,7 +48,7 @@ async function signInByEmail(email: string): Promise<{ uid: string; customToken:
       "Content-Type": "application/json",
       "X-Internal-API-Key": AUTH_SERVICE_INTERNAL_API_KEY,
     },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, userAgent: userAgent ?? undefined }),
   });
   if (!res.ok) {
     console.warn("[email-signin/resolve] auth-service sign-in failed", res.status);
@@ -54,7 +60,8 @@ async function signInByEmail(email: string): Promise<{ uid: string; customToken:
   const uid = body.data.uid;
   const customToken = body.data.firebaseCustomToken;
   if (!uid || !customToken) return null;
-  return { uid, customToken };
+  const refreshToken = typeof body.data.refreshToken === "string" && body.data.refreshToken ? body.data.refreshToken : null;
+  return { uid, customToken, refreshToken };
 }
 
 export async function POST(req: NextRequest) {
@@ -84,9 +91,9 @@ export async function POST(req: NextRequest) {
   }
   const normalizedEmail = email.trim().toLowerCase();
 
-  let result: { uid: string; customToken: string } | null = null;
+  let result: SignIn | null = null;
   try {
-    result = await signInByEmail(normalizedEmail);
+    result = await signInByEmail(normalizedEmail, req.headers.get("user-agent"));
   } catch (err: any) {
     console.error("[email-signin/resolve] sign-in error:", err?.message);
     return NextResponse.json({ matched: false, email: normalizedEmail });
@@ -94,5 +101,8 @@ export async function POST(req: NextRequest) {
   if (!result) {
     return NextResponse.json({ matched: false, email: normalizedEmail });
   }
-  return NextResponse.json({ matched: true, customToken: result.customToken });
+  // The refresh token goes only into the HttpOnly cookie, never to the browser's script.
+  const res = NextResponse.json({ matched: true, customToken: result.customToken });
+  if (result.refreshToken) res.headers.set("Set-Cookie", buildSetSsoCookie(result.refreshToken));
+  return res;
 }
