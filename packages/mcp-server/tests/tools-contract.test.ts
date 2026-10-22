@@ -38,16 +38,20 @@ test("every structured tool declares an output schema", () => {
   }
 });
 
-test("every tool advertises noauth-only securitySchemes to every client (incl. unknowns)", () => {
-  // v1 is noauth-only for the OpenAI submission: no oauth2 scheme is advertised (we
-  // are not standing up the OAuth connection until the callback fix lands). Guards
-  // against accidentally re-advertising oauth2 before OAuth is review-ready.
+test("every tool advertises optional (mixed) auth to every client (incl. unknowns)", () => {
+  // v2: anonymous free-plan use AND Graffiticode sign-in. OpenAI's documented shape
+  // for optional auth is both schemes, noauth plus oauth2 with the granted scopes;
+  // advertising only one of them makes ChatGPT treat the tool as anonymous-only or
+  // sign-in-required. The scope must be the one the OAuth server grants.
   for (const client of ["claude-ai", ...NON_CLAUDE_CLIENTS]) {
     for (const tool of toolsForClient(client) as ToolRecord[]) {
       assert.deepEqual(tool.securitySchemes, expectedSchemes, `${client}/${tool.name} top-level securitySchemes`);
       assert.deepEqual(metaOf(tool).securitySchemes, expectedSchemes, `${client}/${tool.name} _meta.securitySchemes`);
-      const types = (tool.securitySchemes as Array<{ type: string }>).map((s) => s.type);
-      assert.deepEqual(types, ["noauth"], `${client}/${tool.name} should advertise noauth only`);
+      assert.deepEqual(
+        tool.securitySchemes,
+        [{ type: "noauth" }, { type: "oauth2", scopes: ["graffiticode"] }],
+        `${client}/${tool.name} should advertise noauth + oauth2(graffiticode)`,
+      );
     }
   }
 });
@@ -291,4 +295,16 @@ test("tool definitions never name a retired language", async () => {
   for (const id of RETIRED) {
     assert.ok(!text.includes(id), `a tool definition still names retired language ${id}`);
   }
+});
+
+test("the advertised oauth2 scopes are exactly what the OAuth server grants", async () => {
+  // A scope the server rejects (invalid_scope) would make every ChatGPT sign-in fail.
+  const { handleAuthServerMetadata } = await import("../src/oauth/handlers.js");
+  let body = "";
+  const res = { statusCode: 200, setHeader() {}, writeHead() { return res; }, end(chunk?: string) { body = chunk ?? ""; } };
+  handleAuthServerMetadata({} as never, res as never);
+  const supported = JSON.parse(body).scopes_supported;
+  const oauth2 = (TOOL_SECURITY_SCHEMES as readonly { type: string; scopes?: readonly string[] }[]).find((s) => s.type === "oauth2");
+  assert.ok(oauth2, "an oauth2 scheme is advertised");
+  assert.deepEqual([...(oauth2!.scopes ?? [])], supported);
 });

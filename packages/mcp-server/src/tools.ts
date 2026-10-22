@@ -596,16 +596,22 @@ Call this after list_languages() to learn about a specific language before using
   },
 } as const;
 
-// v1 ships noauth-only for the OpenAI submission: every tool works anonymously via
-// the free-plan path, and we are NOT standing up the OAuth connection in the portal
-// (the OAuth callback still needs the console-side token-off-URL fix before it is
-// review-ready — see docs/openai-submission.md go/no-go gate). Advertising only
-// `noauth` keeps the Scan Tools snapshot consistent with what we submit; the `oauth2`
-// scheme is added back in the reviewed OAuth update. This is metadata only — the
-// OAuth endpoints and API-key path remain functional for the existing Claude
-// connector; authenticated requests still work, they're just not advertised here.
+// Optional ("mixed") auth, v2: every tool works anonymously through the free plan
+// AND with a signed-in Graffiticode account. OpenAI's documented shape for that is
+// both schemes on every tool (top level and the _meta mirror below): `noauth`, plus
+// `oauth2` with the scopes we grant. The one scope is `graffiticode`
+// (SUPPORTED_SCOPE in oauth/handlers.ts, the server metadata's scopes_supported).
+// The other half of ChatGPT's sign-in UI is the `mcp/www_authenticate` challenge
+// server.ts returns for a missing or invalid token. The plugin ZIP declares the same
+// thing for the MCP server (mcp.json, `extensions["com.openai"].auth.type: "mixed"`).
+//
+// v1 advertised `noauth` only, until the OAuth callback stopped carrying the Google
+// ID token in its query string. The consent page now POSTs it
+// (oauth/handlers.ts handleCallback, and no query-string warning in 30 days of logs
+// as of 2026-10-22).
 export const TOOL_SECURITY_SCHEMES = [
   { type: "noauth" },
+  { type: "oauth2", scopes: ["graffiticode"] },
 ] as const;
 
 // Attach the security schemes to every tool descriptor (top-level + _meta mirror),

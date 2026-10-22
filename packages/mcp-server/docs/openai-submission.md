@@ -55,21 +55,34 @@ widget, and the expected tool-call path is shorter).
 
 ## 0. OAuth go/no-go gate (decide BEFORE creating the draft)
 
-> **DECIDED (2026-07-16): v1 is `noauth`-only.** Tools advertise `{ type: "noauth" }`
-> only (`TOOL_SECURITY_SCHEMES` in `src/tools.ts`); do **not** configure an OAuth
-> connection in the portal. OAuth ships in a later reviewed update once item 2c-vi lands.
+> **DECIDED (2026-10-22, Jeff): v2 supports mixed (optional) auth.** Anonymous free-plan use
+> and Graffiticode sign-in. Every tool advertises
+> `[{ type: "noauth" }, { type: "oauth2", scopes: ["graffiticode"] }]`
+> (`TOOL_SECURITY_SCHEMES` in `src/tools.ts`, OpenAI's documented shape for optional auth,
+> pinned by `tools-contract.test.ts`, including that the scope equals the server's
+> `scopes_supported`). The plugin ZIP's `mcp.json` declares
+> `extensions["com.openai"].auth.type: "mixed"` (`packages/skills`). Both halves must ship
+> together, and Scan Tools must re-import them.
+>
+> Superseded: on 2026-07-16 v1 was decided `noauth`-only.
 
-The optional OAuth surface is hardened server-side **except** one cross-service item:
-the consent page still returns the Google ID token in the `/oauth/callback` **query
-string** (see `src/oauth/handlers.ts` `handleCallback`), which can leak into history/logs.
-Fixing it needs a coordinated change in the console/auth consent service.
+**Why it was `noauth`-only, and why that's resolved.** The consent page used to return the
+Google ID token in the `/oauth/callback` **query string**, which leaks into CDN and Cloud Run
+logs, history and Referer. It now POSTs the token in a form body (`handleCallback` in
+`src/oauth/handlers.ts`, which still logs a loud warning if one ever arrives in a query
+string). On 2026-10-22, 30 days of mcp-service logs had no such warning, and the callbacks were
+POSTs.
 
-- **If that change has landed:** submit **with OAuth** (optional auth). Provide reviewer
-  credentials (below).
-- **If not:** submit **v1 as `noauth`-only** — in the portal, do not configure the OAuth
-  connection; the tools still advertise `{ type: "noauth" }` and work anonymously (free
-  plan). Add OAuth in a later reviewed update. **Never advertise a partially-hardened OAuth
-  surface.**
+**Submitting with mixed auth:**
+- Configure the OAuth connection in the portal (issuer `https://mcp.graffiticode.org`; the
+  metadata is at `/.well-known/oauth-authorization-server` and
+  `/.well-known/oauth-protected-resource`; scope `graffiticode`). Provide reviewer credentials
+  (§7).
+- ChatGPT shows its sign-in UI only with both halves: `securitySchemes` on the tool, and the
+  `mcp/www_authenticate` challenge the server returns for a missing or invalid token
+  (`server.ts`). Re-check both in the scan.
+- **Never advertise a partially-hardened OAuth surface.** If any of the above regresses, go
+  back to `noauth` in both places together.
 
 Anonymous write tools are safe to expose (state this to reviewers): they operate only in an
 **isolated free-plan session**, expose **no customer account data**, claiming created
