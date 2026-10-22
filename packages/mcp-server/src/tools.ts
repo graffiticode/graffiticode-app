@@ -1787,8 +1787,6 @@ async function handleItemResult(
       updated: item.updated,
     };
     applyViewAndClaim(hydration, ctx.auth, item.id, item.claimToken, ctx.clientKind);
-    const frameUrl = framedFormUrl(ctx.auth, item.lang, item.taskId);
-    if (frameUrl) hydration.frame_url = frameUrl;
     // Chat-facing summary. It now carries the item's CONTENT — rendered from the
     // same model the widget draws (item-content.ts) — not just a link. `data` is
     // already in hand here, so this costs no upstream call.
@@ -1841,6 +1839,11 @@ async function handleItemResult(
       // clients, so this reaches exactly the surface it describes.
       const claimWidget = buildClaimFields(ctx.auth, item.claimToken, ctx.clientKind)?.claim_url_widget;
       if (claimWidget) hydration.claim_url_widget = claimWidget;
+      // Widget-only for the same reason, and because get_item spreads hydration
+      // into structuredContent, whose output schema declares no `frame_url`: a
+      // validating client would reject the whole response.
+      const frameUrl = framedFormUrl(ctx.auth, item.lang, item.taskId);
+      if (frameUrl) hydration.frame_url = frameUrl;
       return {
         ...compact,
         // Links are echoed as real fields, not only inside `summary`. Non-widget
