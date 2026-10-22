@@ -34,7 +34,7 @@ g.__FRAMED__ = [{ id: "L0176", origin: L0176 }];
 const { startRenderer } = await import("../src/widget/browser/renderer.ts");
 const { framedFormUrl } = await import("../src/tools.ts");
 
-const FRAME_URL = `${L0176}/form?id=eyJ0YXNrSWRzIjpbIngiXX0`;
+const FRAME_URL = `${L0176}/form?source=parent`;
 
 function fakeHost() {
   let cb: ((r: unknown) => void) | undefined;
@@ -50,12 +50,18 @@ function fakeHost() {
   };
 }
 
+// What render_item hydration's `data` really is: the compile envelope, not a bare activity.
+const ENVELOPE = {
+  data: { type: "questions", data: { questions: [{ response_id: "r1", type: "orderlist", stimulus: "Order them" }] } },
+  errors: [],
+};
+
 const result = (frame_url: unknown = FRAME_URL, language = "L0176") => ({
   structuredContent: { item_id: "vBSsho", status: "ready", language, name: "Presidents", view_url: "https://app.graffiticode.org/form/vBSsho" },
   meta: {
     graffiticode: {
       frame_url,
-      data: { type: "questions", data: { questions: [{ response_id: "r1", type: "orderlist", stimulus: "Order them" }] } },
+      data: ENVELOPE,
     },
   },
 });
@@ -92,7 +98,8 @@ test("the card shows at once, with the page loading hidden behind it", async () 
   const src = new URL(f!.src);
   assert.equal(src.origin, L0176);
   assert.equal(src.pathname, "/form");
-  assert.equal(src.searchParams.get("id"), "eyJ0YXNrSWRzIjpbIngiXX0");
+  assert.equal(src.searchParams.get("source"), "parent");
+  assert.equal(src.searchParams.get("id"), null, "no task id: the item is handed in, not fetched");
   assert.equal(src.searchParams.get("origin"), "https://mcp-app-0123.web-sandbox.oaiusercontent.com");
 });
 
@@ -156,6 +163,38 @@ test("preview-ready from another origin, or another window, is ignored", async (
   }
 });
 
+/** Records what the widget posts into the frame. */
+function captureFrame() {
+  const sent: { message: any; targetOrigin: string }[] = [];
+  (frame()!.contentWindow as unknown as { postMessage: unknown }).postMessage = (message: any, targetOrigin: string) =>
+    sent.push({ message, targetOrigin });
+  return sent;
+}
+
+test("the page's request is answered once, with the hydration envelope, to the framed origin", async () => {
+  start();
+  const sent = captureFrame();
+  post({ type: "preview-awaiting-data" });
+  post({ type: "preview-awaiting-data" });
+  assert.deepEqual(sent, [{ message: { type: "preview-data", data: ENVELOPE }, targetOrigin: L0176 }]);
+});
+
+test("a request for the item from another origin or window gets nothing", async () => {
+  start();
+  const sent = captureFrame();
+  post({ type: "preview-awaiting-data" }, { origin: "https://evil.example" });
+  post({ type: "preview-awaiting-data" }, { source: dom.window });
+  assert.deepEqual(sent, []);
+});
+
+test("without the item's data there is nothing to hand in, so it isn't framed", async () => {
+  const r = result();
+  delete (r.meta.graffiticode as Record<string, unknown>).data;
+  start(r);
+  await tick();
+  assert.equal(frame(), null);
+});
+
 test("a frame_url on an undeclared origin is not framed", async () => {
   start(result("https://evil.example/form?id=x"));
   await tick();
@@ -168,12 +207,8 @@ test("a language that isn't framed ignores frame_url", async () => {
   assert.equal(frame(), null);
 });
 
-test("frame_url: free-plan L0176 only", () => {
-  const free = { type: "freePlan", sessionId: "s" } as never;
-  const signedIn = { type: "firebase", token: "t" } as never;
-  assert.equal(framedFormUrl(free, "0176", "a+b"), `${L0176}/form?id=a%2Bb`);
-  assert.equal(framedFormUrl(free, "L0176", "t1"), `${L0176}/form?id=t1`);
-  assert.equal(framedFormUrl(signedIn, "0176", "t1"), null, "a private task can't load in a frame");
-  assert.equal(framedFormUrl(free, "0180", "t1"), null, "only framed languages");
-  assert.equal(framedFormUrl(free, "0176", null), null);
+test("frame_url: every L0176 item, by handover, never by id", () => {
+  assert.equal(framedFormUrl("0176"), `${L0176}/form?source=parent`);
+  assert.equal(framedFormUrl("L0176"), `${L0176}/form?source=parent`);
+  assert.equal(framedFormUrl("0180"), null, "only framed languages");
 });

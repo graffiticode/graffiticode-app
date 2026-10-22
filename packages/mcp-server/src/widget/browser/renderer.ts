@@ -146,7 +146,7 @@ export function startRenderer(host: HostAdapter): void {
     // The script ran and has a payload. Absence of this in the log means the page
     // never executed — a different problem from a component that fails to draw.
     beacon("boot", lang);
-    const frameOrigin = framedOriginFor(lang, sc.frame_url);
+    const frameOrigin = framedOriginFor(lang, sc.frame_url, sc.data);
     if (frameOrigin) {
       renderFrame(sc, lang, frameOrigin);
       return;
@@ -250,11 +250,12 @@ export function startRenderer(host: HostAdapter): void {
    * Only for a framed language, only when the URL is on exactly the origin the
    * HTML generator declared for it (the CSP's frameDomains), and only from a
    * sandbox with a real origin: the page posts back to the `origin` it is given,
-   * and an opaque "null" origin can't be addressed.
+   * and an opaque "null" origin can't be addressed. And only with the item's data
+   * in hand, since the page renders what the widget hands it (renderFrame).
    */
-  function framedOriginFor(lang: string, frameUrl: unknown): string | null {
+  function framedOriginFor(lang: string, frameUrl: unknown, data: unknown): string | null {
     const framed = (typeof __FRAMED__ !== "undefined" ? __FRAMED__ : []).find((f) => f.id === lang);
-    if (!framed || typeof frameUrl !== "string") return null;
+    if (!framed || typeof frameUrl !== "string" || data === undefined) return null;
     if (!window.location.origin || window.location.origin === "null") return null;
     try {
       return new URL(frameUrl).origin === framed.origin ? framed.origin : null;
@@ -285,6 +286,12 @@ export function startRenderer(host: HostAdapter): void {
    * cross-origin frame, which then never reaches ready; see widget-html.ts).
    * `preview-error`, or no answer by the deadline, removes the hidden frame and
    * leaves the card.
+   *
+   * The page (`/form?source=parent`) fetches nothing: it asks for the item with
+   * `preview-awaiting-data`, and the widget answers once with the hydration
+   * `data` (the compile envelope, signed for the page's domain) to exactly that
+   * frame and origin. That is how a signed-in user's private item renders with no
+   * credential in the frame.
    */
   function renderFrame(sc: Record<string, unknown>, lang: string, origin: string): void {
     const url = new URL(sc.frame_url as string);
@@ -304,6 +311,7 @@ export function startRenderer(host: HostAdapter): void {
     reportHeight();
 
     let done = false;
+    let handedOver = false;
     const stop = () => {
       done = true;
       window.removeEventListener("message", onMessage);
@@ -321,7 +329,11 @@ export function startRenderer(host: HostAdapter): void {
       if (done || event.origin !== origin || event.source !== frame.contentWindow) return;
       const msg = event.data;
       if (!isRecord(msg)) return;
-      if (msg.type === "preview-ready") {
+      if (msg.type === "preview-awaiting-data") {
+        if (handedOver) return;
+        handedOver = true;
+        frame.contentWindow?.postMessage({ type: "preview-data", data: sc.data }, origin);
+      } else if (msg.type === "preview-ready") {
         stop();
         cancelFrame = null;
         card?.remove();

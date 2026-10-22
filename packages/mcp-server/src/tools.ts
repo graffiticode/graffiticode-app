@@ -948,19 +948,19 @@ export function buildClaimFields(
 /**
  * The page the widget frames for a FRAMED language (see FRAMED_LANGUAGES), or null.
  *
- * Free-plan items only: their tasks are posted public (core's generate-for-request,
- * `isPublic: auth.freePlan`), so the frame loads and signs with no credential. A
- * signed-in user's task is private, and a bearer token never goes into a widget
- * payload, so those items keep the native path and its content card.
+ * `/form?source=parent`: the page fetches nothing and waits for the widget to hand
+ * it the item. The widget sends the hydration `data` (the compile envelope, signed
+ * for the page's own domain) once the page asks for it. No task id, token or user
+ * id is in the URL, so the same path serves free-plan items and a signed-in user's
+ * private ones; fetching by id would have needed the user's credential in the frame.
  *
  * Carried only in the widget hydration (`_meta.graffiticode`), never in a field a
  * model reads. The widget appends its own `origin` so the page reports back to it.
  */
-export function framedFormUrl(auth: AuthContext, lang: string, taskId: string | null | undefined): string | null {
-  if (auth.type !== "freePlan" || !taskId) return null;
+export function framedFormUrl(lang: string): string | null {
   const framed = framedLanguage(lang);
   if (!framed) return null;
-  return `${framed.origin}/form?id=${encodeURIComponent(taskId)}`;
+  return `${framed.origin}/form?source=parent`;
 }
 
 // Set `view_url` (with the claim token embedded for free-plan items, so the
@@ -1842,7 +1842,7 @@ async function handleItemResult(
       // Widget-only for the same reason, and because get_item spreads hydration
       // into structuredContent, whose output schema declares no `frame_url`: a
       // validating client would reject the whole response.
-      const frameUrl = framedFormUrl(ctx.auth, item.lang, item.taskId);
+      const frameUrl = framedFormUrl(item.lang);
       if (frameUrl) hydration.frame_url = frameUrl;
       return {
         ...compact,

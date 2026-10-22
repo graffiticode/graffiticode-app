@@ -77,10 +77,10 @@ for (const [who, auth] of [["free-plan", FREE], ["signed-in", SIGNED_IN]] as con
   });
 }
 
-test("frame_url reaches render_item's widget hydration, for the free plan only", async () => {
-  const free = await call("render_item", FREE);
-  const hydration = (free._meta as { graffiticode: Record<string, unknown> }).graffiticode;
-  assert.equal(hydration.frame_url, "https://l0176.graffiticode.org/form?id=task-1");
-  const signedIn = await call("render_item", SIGNED_IN);
-  assert.equal((signedIn._meta as { graffiticode: Record<string, unknown> }).graffiticode.frame_url, undefined);
+test("frame_url reaches render_item's widget hydration, signed in or not, and never names the task", async () => {
+  for (const auth of [FREE, SIGNED_IN]) {
+    const res = await call("render_item", auth);
+    const hydration = (res._meta as { graffiticode: Record<string, unknown> }).graffiticode;
+    assert.equal(hydration.frame_url, "https://l0176.graffiticode.org/form?source=parent");
+  }
 });

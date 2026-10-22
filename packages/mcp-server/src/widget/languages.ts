@@ -141,10 +141,11 @@ export const NATIVE_LANGUAGES: NativeLanguage[] = [
  * request is signed for, and Learnosity's frame and worker load under that page's
  * policy, not the host's.
  *
- * Framed only when the frame can load without a credential (free-plan items,
- * whose tasks are public; see `frame_url` in tools.ts). Anything else keeps the
- * native path, which ends at the content card. L0176 therefore stays in
- * NATIVE_LANGUAGES too.
+ * The frame (`/form?source=parent`, see `framedFormUrl` in tools.ts) fetches
+ * nothing: the widget hands it the item, so free-plan and signed-in items render
+ * the same way with no credential in the frame. A result with no data, or a
+ * host that blocks the frame, keeps the native path or the card. L0176
+ * therefore stays in NATIVE_LANGUAGES too.
  */
 export interface FramedLanguage {
   /** Canonical language id, e.g. "L0176". */
