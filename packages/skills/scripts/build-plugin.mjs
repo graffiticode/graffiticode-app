@@ -282,7 +282,8 @@ function discoverSkills(sha) {
  *
  * `-v2` rather than `-dev`: the collision is with v1 specifically, and the build
  * being installed beside it IS version 2. It stays a separate identity from the
- * submission, which ships as plain `graffiticode` — a version number belongs in
+ * submission, which ships under the portal-assigned name `app-<app id>` (the
+ * portal rejects an update whose name differs) — a version number belongs in
  * the version field, not in the name a listing carries forever.
  */
 function altIdentity(meta) {
