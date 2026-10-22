@@ -75,6 +75,13 @@ const STYLES = `
   body.dark .card-note { color: #6b7280; }
   .native-content { min-width: 0; }
   .framed-content { display: block; width: 100%; border: 0; border-radius: 8px; background: #fff; }
+  /* A frame loading behind the card. It must stay IN the viewport and unclipped:
+     Chrome throttles a cross-origin frame that is off screen, visibility:hidden or
+     fully clipped, and L0176 then never reaches Learnosity's ready (measured
+     2026-10-22). So it covers the viewport at opacity 0, inert, and the wrapper's
+     overflow keeps its 600px from scrolling the widget while the card shows.
+     Revealing it is dropping this class; the iframe itself never moves. */
+  .framed-pending { position: fixed; inset: 0; overflow: hidden; opacity: 0; pointer-events: none; }
   .card-pre { margin-top: 10px; padding: 10px; font-size: 12px; white-space: pre-wrap; overflow-x: auto;
     background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; max-height: 320px; overflow-y: auto; }
 .card-table{width:100%;border-collapse:collapse;margin:8px 0;font-size:12px}

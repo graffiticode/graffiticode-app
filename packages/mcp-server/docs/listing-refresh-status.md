@@ -149,7 +149,7 @@ the beacon method in `openai-submission.md` §11.
 
 | | |
 |---|---|
-| Live in the directory | **v1.0.0**, approved 2026-08-14 |
+| Live in the directory | **v2.1.0** (Jeff, 2026-10-22; this table predates that). Its CSP is its submission snapshot, which has no `frameDomains`, so framed L0176 falls back to the card there until a resubmission declares `https://l0176.graffiticode.org` |
 | Last submission | **v2.0.0, REJECTED 2026-08-30** — "one or more test cases did not produce correct results" |
 | The v2 draft | **still editable in the portal** (read back 2026-09-16). This is what resubmits unless changed |
 | Resubmission | **not filed.** Blocked on one thing: nobody has run the 5+3 test cases in ChatGPT |
