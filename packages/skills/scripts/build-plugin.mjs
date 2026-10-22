@@ -6,10 +6,13 @@
 // portal so far was assembled by hand and not kept. This script makes the
 // artifact a pure function of one commit, so its SHA-256 answers the question.
 //
-// The shipped tree matches this repo's tree: skills at the top level. The MCP
-// server discovers them there at request time over the GitHub API, and OpenAI's
-// portal expects the same structure (each skill as a root-level directory
-// containing SKILL.md).
+// In this repo skills sit at the top level, where the MCP server discovers them
+// at request time over the GitHub API. The plugin ZIP ships them under skills/
+// instead: Agent Plugins §6.1 makes skills/<name>/SKILL.md a fixed location that
+// plugin.json cannot override, so a package with root-level skill directories
+// installs with no skills at all (2.1.1's first builds did exactly that).
+// --skills-only keeps the root-level shape, for the portal's separate skills
+// upload.
 //
 // Run: npm run package [-- --flags]
 
@@ -319,6 +322,7 @@ function serializeNative(o) {
   // mcp.json by convention will find.
   if (o.mcpServers) out.mcpServers = "./mcp.json";
   if (o.apps) out.apps = "./.app.json";
+  out.skills = "./skills/";
   return out;
 }
 
@@ -578,7 +582,7 @@ function main() {
         ...(mcpJson ? [{ path: "mcp.json", bytes: mcpJson }] : []),
         ...(appJson ? [{ path: ".app.json", bytes: appJson }] : []),
         ...icons,
-        ...skills.map((s) => ({ path: `${s.id}/SKILL.md`, bytes: s.bytes })),
+        ...skills.map((s) => ({ path: `skills/${s.id}/SKILL.md`, bytes: s.bytes })),
       ];
   const totalBytes = entries.reduce((n, e) => n + e.bytes.length, 0);
 
