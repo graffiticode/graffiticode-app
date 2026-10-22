@@ -78,6 +78,7 @@ import {
   widgetResourceUris,
   matchWidgetUri,
   widgetResourceMeta,
+  widgetAssetOrigin,
   CLAUDE_WIDGET_MIME_TYPE,
 } from "./widget/index.js";
 import { normalizeLanguageId, isNativeLanguage } from "./widget/languages.js";
@@ -929,7 +930,7 @@ function createMcpServer(authProvider: AuthProvider, sessionMeta: SessionMeta = 
           {
             uri,
             mimeType: CLAUDE_WIDGET_MIME_TYPE,
-            text: generateWidgetHtml(MCP_SERVER_URL),
+            text: generateWidgetHtml(widgetAssetOrigin()),
             _meta: widgetResourceMeta(),
           },
         ],

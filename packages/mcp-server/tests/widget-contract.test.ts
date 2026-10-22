@@ -33,10 +33,19 @@ test("retired OpenAI widget pointers are classified but not confused with MCP Ap
   assert.equal(CLAUDE_WIDGET_MIME_TYPE, "text/html;profile=mcp-app");
 });
 
-test("Claude CSP declares only the component bundle origin", () => {
+// The whole policy, pinned: the bundle origin, and exactly one frame origin (L0176's own
+// /form, the framed language). Never connectDomains, never a wildcard, nothing else.
+test("CSP declares the bundle origin and only L0176's /form as a frame", () => {
+  const origin = process.env.WIDGET_ASSET_ORIGIN || process.env.MCP_SERVER_URL || "https://mcp.graffiticode.org";
   const csp = widgetCsp();
-  assert.deepEqual(Object.keys(csp.camel), ["resourceDomains"]);
-  assert.deepEqual(Object.keys(csp.snake), ["resource_domains"]);
+  assert.deepEqual(csp.camel, {
+    resourceDomains: [origin],
+    frameDomains: ["https://l0176.graffiticode.org"],
+  });
+  assert.deepEqual(csp.snake, {
+    resource_domains: [origin],
+    frame_domains: ["https://l0176.graffiticode.org"],
+  });
 });
 
 // ChatGPT's web sandbox reads `openai/widgetCSP`, not `ui.csp`. Without it the

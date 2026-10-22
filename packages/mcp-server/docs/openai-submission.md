@@ -36,8 +36,10 @@ widget, and the expected tool-call path is shorter).
   so on screen (`f5759be`) instead of only in a console nobody has open.
 
   **The submission therefore has a UI surface**: the portal imports it at Scan Tools, and UI
-  screenshots are in scope. CSP declares `resourceDomains` only (`widgetCsp()` in
-  `src/widget/index.ts`) — no `frameDomains` (the OpenAI review flag), no `connectDomains`.
+  screenshots are in scope. CSP (`widgetCsp()` in `src/widget/index.ts`) declares
+  `resourceDomains` (the bundle origin) and, since 2026-10-22, **`frameDomains` =
+  `https://l0176.graffiticode.org` only** — the OpenAI review flag, accepted because L0176 can't
+  render natively (see the L0176 test case) — and no `connectDomains`.
   **Which route ChatGPT's consumer app takes is still unobserved** — production has only ever
   logged `codex-mcp-client` and `openai-mcp`. Check the `[widget] tools/list` log line during
   the review window and record it here.
@@ -249,6 +251,11 @@ nothing, leaving the user with a claim and an empty screen.
    accepted answer marked ✓, the note "Interactive preview unavailable — open it to use the
    item", and an "Open the Learnosity assessment" link.
    *Verified 2026-09-17: L0176, ready in 11.3s.*
+   **Superseded 2026-10-22 (pending the actual-host proof):** a free-plan reviewer now gets the
+   item interactive inline: the widget frames `l0176.graffiticode.org/form` (the CSP's one frame
+   domain) and keeps the frame once L0176 reports `preview-ready`; the card above remains the
+   fallback (signed-in items, or no `preview-ready` within 20 s). Re-verify and update this test
+   case before submitting. The history below explains why native rendering is impossible.
    **Tell the reviewer this is the intended result.** A Learnosity item cannot render inline:
    it is delivered by Learnosity's own hosted Items API, which needs network access the widget's
    CSP deliberately withholds, a signed request, and a whitelisted domain — and the widget runs
@@ -338,8 +345,9 @@ access/refresh tokens through the auth service.
    `securitySchemes`. Confirm the portal imports the **widget on `render_item` only**
    (`openai/outputTemplate`) — `get_item` returns raw src/data for programmatic clients and
    carries no widget metadata. Provide the **smallest CSP the portal
-   permits** — ours declares `resourceDomains` only; if the portal offers `frameDomains`, leave
-   it EMPTY. Inspect the imported snapshot: the resource URI is content-hashed, so a stale hash
+   permits** — ours declares `resourceDomains` (the bundle origin) and `frameDomains` =
+   `https://l0176.graffiticode.org` only; enter exactly that frame domain, nothing broader, and
+   be ready to justify it (L0176's own form, the only way a Learnosity item renders). Inspect the imported snapshot: the resource URI is content-hashed, so a stale hash
    in the snapshot means the portal cached a previous build.
 6. Upload the **plugin ZIP** (§2), built with `npm run package`.
 7. Add listing copy, starter prompts, the exact **5+3** tests (§6), availability, release

@@ -7,14 +7,16 @@
  * ChatGPT experiment, but production resource routing only serves this document
  * to MCP Apps hosts.
  *
- * `__MCP_ORIGIN__` (bundle origin, must match the CSP resourceDomains) and
- * `__NATIVE__` (languages with a native bundle) are injected here.
+ * `__MCP_ORIGIN__` (bundle origin, must match the CSP resourceDomains),
+ * `__NATIVE__` (languages with a native bundle) and `__FRAMED__` (languages
+ * framed from their own `/form` origin, which must match the CSP frameDomains)
+ * are injected here.
  */
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
-import { NATIVE_LANGUAGES } from "./languages.js";
+import { NATIVE_LANGUAGES, FRAMED_LANGUAGES } from "./languages.js";
 
 // esbuild always writes the bundle to dist/widget/. In production this module is
 // itself in dist/widget/, so the module-relative path resolves directly. Under the
@@ -72,6 +74,7 @@ const STYLES = `
   .card-note { margin-top: 10px; font-size: 12px; font-style: italic; color: #9ca3af; cursor: help; }
   body.dark .card-note { color: #6b7280; }
   .native-content { min-width: 0; }
+  .framed-content { display: block; width: 100%; border: 0; border-radius: 8px; background: #fff; }
   .card-pre { margin-top: 10px; padding: 10px; font-size: 12px; white-space: pre-wrap; overflow-x: auto;
     background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; max-height: 320px; overflow-y: auto; }
 .card-table{width:100%;border-collapse:collapse;margin:8px 0;font-size:12px}
@@ -95,6 +98,7 @@ const STYLES = `
 export function generateWidgetHtml(origin: string): string {
   const script = loadBundle();
   const native = JSON.stringify(NATIVE_LANGUAGES.map((l) => l.id));
+  const framed = JSON.stringify(FRAMED_LANGUAGES.map(({ id, origin }) => ({ id, origin })));
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -107,6 +111,7 @@ export function generateWidgetHtml(origin: string): string {
   <script>
     window.__MCP_ORIGIN__ = ${JSON.stringify(origin)};
     window.__NATIVE__ = ${native};
+    window.__FRAMED__ = ${framed};
   </script>
   <script>${script}</script>
 </body>

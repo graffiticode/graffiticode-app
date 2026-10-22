@@ -127,6 +127,41 @@ export const NATIVE_LANGUAGES: NativeLanguage[] = [
   { id: "L0183", pkg: "@graffiticode/l0183-view" },
 ];
 
+/**
+ * Languages whose item the widget FRAMES instead of mounting: the language's own
+ * `/form` page in an iframe, from `origin`. Each origin is declared, exactly, in
+ * the widget CSP's `frameDomains`.
+ *
+ * L0176 is the one language that can't render natively. Learnosity's Questions
+ * API loads its script and fonts from questions.learnosity.com, runs a blob:
+ * worker, and authenticates from a hidden questions.learnosity.com iframe; and it
+ * refuses any request not signed for the page's exact hostname, while Broker signs
+ * for l0176.graffiticode.org (measured in a real browser, 2026-10-22). Framing
+ * L0176's own page satisfies all of that at once: the page is on the domain the
+ * request is signed for, and Learnosity's frame and worker load under that page's
+ * policy, not the host's.
+ *
+ * Framed only when the frame can load without a credential (free-plan items,
+ * whose tasks are public; see `frame_url` in tools.ts). Anything else keeps the
+ * native path, which ends at the content card. L0176 therefore stays in
+ * NATIVE_LANGUAGES too.
+ */
+export interface FramedLanguage {
+  /** Canonical language id, e.g. "L0176". */
+  id: string;
+  /** The origin serving the language's `/form` page. */
+  origin: string;
+}
+
+export const FRAMED_LANGUAGES: FramedLanguage[] = [
+  { id: "L0176", origin: process.env.L0176_FORM_ORIGIN || "https://l0176.graffiticode.org" },
+];
+
+export function framedLanguage(lang: string): FramedLanguage | undefined {
+  const id = normalizeLanguageId(lang);
+  return FRAMED_LANGUAGES.find((l) => l.id === id);
+}
+
 /** Normalize `0166` / `l0166` / `L0166` to `L0166`. */
 export function normalizeLanguageId(lang: string): string {
   const digits = lang.replace(/^[lL]/, "");
