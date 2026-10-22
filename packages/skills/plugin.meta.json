@@ -1,5 +1,5 @@
 {
-  "name": "graffiticode",
+  "name": "app-6a5a7c2760248191a8c61bb2b6c26ac9",
   "author": {
     "name": "Artcompiler",
     "url": "https://graffiticode.org"
@@ -13,17 +13,25 @@
       "Create an invoice with line items, quantity, unit price, a line total per row, and a grand total, formatted as currency.",
       "Create a concept web explaining how rain forms.",
       "Create a Learnosity water cycle assessment: one multiple-choice and one fill-in-the-blank, answers marked."
-    ]
+    ],
+    "websiteURL": "https://graffiticode.org",
+    "supportURL": "https://forum.graffiticode.org/c/support/57",
+    "privacyPolicyURL": "https://mcp.graffiticode.org/privacy",
+    "termsOfServiceURL": "https://mcp.graffiticode.org/terms",
+    "composerIcon": "./assets/icon.png",
+    "logo": "./assets/icon.png"
   },
   "mcpServers": {
     "graffiticode": {
       "type": "streamable-http",
-      "url": "https://mcp.graffiticode.org/mcp"
-    }
-  },
-  "apps": {
-    "graffiticode": {
-      "id": "asdk_app_6a5a7c2760248191a8c61bb2b6c26ac9"
+      "url": "https://mcp.graffiticode.org/mcp",
+      "extensions": {
+        "com.openai": {
+          "auth": {
+            "type": "mixed"
+          }
+        }
+      }
     }
   }
 }

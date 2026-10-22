@@ -6,10 +6,13 @@
 // portal so far was assembled by hand and not kept. This script makes the
 // artifact a pure function of one commit, so its SHA-256 answers the question.
 //
-// The shipped tree matches this repo's tree: skills at the top level. The MCP
-// server discovers them there at request time over the GitHub API, and OpenAI's
-// portal expects the same structure (each skill as a root-level directory
-// containing SKILL.md).
+// In this repo skills sit at the top level, where the MCP server discovers them
+// at request time over the GitHub API. The plugin ZIP ships them under skills/
+// instead: Agent Plugins §6.1 makes skills/<name>/SKILL.md a fixed location that
+// plugin.json cannot override, so a package with root-level skill directories
+// installs with no skills at all (2.1.1's first builds did exactly that).
+// --skills-only keeps the root-level shape, for the portal's separate skills
+// upload.
 //
 // Run: npm run package [-- --flags]
 
@@ -61,6 +64,9 @@ const CATEGORIES = [
 // the mistake someone makes coming from git tags.
 const SEMVER =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
+
+const URL_FIELDS = ["websiteURL", "supportURL", "privacyPolicyURL", "termsOfServiceURL"];
+const ICON_FIELDS = ["composerIcon", "logo"];
 
 const errors = [];
 const warnings = [];
@@ -282,7 +288,8 @@ function discoverSkills(sha) {
  *
  * `-v2` rather than `-dev`: the collision is with v1 specifically, and the build
  * being installed beside it IS version 2. It stays a separate identity from the
- * submission, which ships as plain `graffiticode` — a version number belongs in
+ * submission, which ships under the portal-assigned name `app-<app id>` (the
+ * portal rejects an update whose name differs) — a version number belongs in
  * the version field, not in the name a listing carries forever.
  */
 function altIdentity(meta) {
@@ -315,6 +322,7 @@ function serializeNative(o) {
   // mcp.json by convention will find.
   if (o.mcpServers) out.mcpServers = "./mcp.json";
   if (o.apps) out.apps = "./.app.json";
+  out.skills = "./skills/";
   return out;
 }
 
@@ -395,6 +403,16 @@ function validatePlugin(o, skills, entries, totalBytes) {
         }
         i.defaultPrompt.forEach((p, n) => checkText(`interface.defaultPrompt[${n}]`, p, LIMITS.defaultPromptChars, { singleLine: true }));
       }
+    }
+    // Once a plugin no longer borrows a registered app's listing (.app.json),
+    // the portal requires these on the plugin itself.
+    for (const k of URL_FIELDS) {
+      if (typeof i[k] !== "string" || !/^https:\/\/\S+$/.test(i[k])) {
+        err(`interface.${k} is required and must be an https URL, got ${JSON.stringify(i[k])}`);
+      }
+    }
+    for (const k of ICON_FIELDS) {
+      if (typeof i[k] !== "string" || i[k] === "") err(`interface.${k} is required (a path to the app icon)`);
     }
   }
 
@@ -544,13 +562,27 @@ function main() {
     ? Buffer.from(JSON.stringify({ apps: plugin.apps }, null, 2) + "\n", "utf8")
     : null;
 
+  // Icon files the listing points at ship beside plugin.json, read from the ref
+  // like everything else. Two fields naming one file ship it once.
+  const iconPaths = [...new Set(ICON_FIELDS.map((k) => plugin.interface?.[k]).filter((p) => typeof p === "string" && p))];
+  const icons = iconPaths.flatMap((p) => {
+    const path = p.replace(/^\.\//, "");
+    const bytes = readBlob(sha, path);
+    if (!bytes) {
+      err(`interface icon "${p}" is not in ref ${short}`);
+      return [];
+    }
+    return [{ path, bytes }];
+  });
+
   const entries = opts.skillsOnly
     ? skills.map((s) => ({ path: `${s.id}/SKILL.md`, bytes: s.bytes }))
     : [
         { path: "plugin.json", bytes: pluginJson },
         ...(mcpJson ? [{ path: "mcp.json", bytes: mcpJson }] : []),
         ...(appJson ? [{ path: ".app.json", bytes: appJson }] : []),
-        ...skills.map((s) => ({ path: `${s.id}/SKILL.md`, bytes: s.bytes })),
+        ...icons,
+        ...skills.map((s) => ({ path: `skills/${s.id}/SKILL.md`, bytes: s.bytes })),
       ];
   const totalBytes = entries.reduce((n, e) => n + e.bytes.length, 0);
 
