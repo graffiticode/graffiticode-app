@@ -602,8 +602,11 @@ Call this after list_languages() to learn about a specific language before using
 // `oauth2` with the scopes we grant. The one scope is `graffiticode`
 // (SUPPORTED_SCOPE in oauth/handlers.ts, the server metadata's scopes_supported).
 // The other half of ChatGPT's sign-in UI is the `mcp/www_authenticate` challenge
-// server.ts returns for a missing or invalid token. The plugin ZIP declares the same
-// thing for the MCP server (mcp.json, `extensions["com.openai"].auth.type: "mixed"`).
+// server.ts returns for a missing or invalid token. The app-level setting lives in
+// the portal: the plugin ships under the registered app's id, so the app's saved
+// authentication (configured there as optional OAuth) governs the connection. The
+// ZIP must carry NO auth override; the portal rejects one for an app that already
+// has authentication configured.
 //
 // v1 advertised `noauth` only, until the OAuth callback stopped carrying the Google
 // ID token in its query string. The consent page now POSTs it

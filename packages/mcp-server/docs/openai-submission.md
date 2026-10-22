@@ -60,9 +60,13 @@ widget, and the expected tool-call path is shorter).
 > `[{ type: "noauth" }, { type: "oauth2", scopes: ["graffiticode"] }]`
 > (`TOOL_SECURITY_SCHEMES` in `src/tools.ts`, OpenAI's documented shape for optional auth,
 > pinned by `tools-contract.test.ts`, including that the scope equals the server's
-> `scopes_supported`). The plugin ZIP's `mcp.json` declares
-> `extensions["com.openai"].auth.type: "mixed"` (`packages/skills`). Both halves must ship
-> together, and Scan Tools must re-import them.
+> `scopes_supported`). **The app-level auth is the portal's, not the ZIP's.** The plugin ships
+> under the registered app's id (`plugin.json` `name`), so the app's saved Authentication
+> settings govern the connection, and they must be set to **optional (mixed) OAuth** there.
+> The ZIP carries **no** `extensions["com.openai"].auth` override. The portal rejects one ("This
+> app already has authentication configured. Remove the ZIP's auth override…"), which happened
+> twice on 2026-10-22 (`b4c9032`, then again after `0dac798` re-added it). Scan Tools must
+> re-import the tools' `securitySchemes`.
 >
 > Superseded: on 2026-07-16 v1 was decided `noauth`-only.
 
@@ -74,6 +78,11 @@ string). On 2026-10-22, 30 days of mcp-service logs had no such warning, and the
 POSTs.
 
 **Submitting with mixed auth:**
+- **Confirm the existing app's saved Authentication is optional (mixed) OAuth.** An OAuth-only
+  connection would force sign-in for everyone. If the portal won't let the saved connection be
+  edited in place, follow OpenAI's
+  [configure-authentication-for-submission](https://developers.openai.com/plugins/deploy/submission#configure-authentication-for-submission)
+  workflow, and don't put the auth back in the ZIP.
 - Configure the OAuth connection in the portal (issuer `https://mcp.graffiticode.org`; the
   metadata is at `/.well-known/oauth-authorization-server` and
   `/.well-known/oauth-protected-resource`; scope `graffiticode`). Provide reviewer credentials
@@ -134,6 +143,7 @@ Checklist for the ZIP:
 | Version | Ref | SHA-256 | Uploaded |
 |---|---|---|---|
 | 2.1.0 | `f2c3035` (2026-09-19) | `7c7ae8527b36c6edec9be7ecbcb8372fb518e4c18077b4662d2f2eac0dc4faa2` | not yet |
+| 2.2.0 | `db25c01` (2026-10-22), no ZIP auth override; mixed auth set in the portal app | `5c5a5de0b5e122d4c002403bff7fd4b829becbcce03d11dd897f0a06b18b2a05` | not yet |
 
 Rebuild that ref to compare: `npm run package -- --ref 7e4945f --dry-run` prints the same
 SHA-256 or the artifact is not what this table claims.
