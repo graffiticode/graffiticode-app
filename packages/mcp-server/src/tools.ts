@@ -17,7 +17,7 @@ import {
 import { normalizeClientKind } from "./events.js";
 import { coreBackendEnabled, coreCreateItem, coreReviseItem } from "./core-backend.js";
 import { contentToMarkdown, describeItem, normalizeLang } from "./item-content.js";
-import { widgetResourceUris } from "./widget/index.js";
+import { widgetResourceUris, framedLanguage } from "./widget/index.js";
 
 // --- Help Entry Structure (matches console HelpPanel) ---
 
@@ -945,6 +945,24 @@ export function buildClaimFields(
   };
 }
 
+/**
+ * The page the widget frames for a FRAMED language (see FRAMED_LANGUAGES), or null.
+ *
+ * Free-plan items only: their tasks are posted public (core's generate-for-request,
+ * `isPublic: auth.freePlan`), so the frame loads and signs with no credential. A
+ * signed-in user's task is private, and a bearer token never goes into a widget
+ * payload, so those items keep the native path and its content card.
+ *
+ * Carried only in the widget hydration (`_meta.graffiticode`), never in a field a
+ * model reads. The widget appends its own `origin` so the page reports back to it.
+ */
+export function framedFormUrl(auth: AuthContext, lang: string, taskId: string | null | undefined): string | null {
+  if (auth.type !== "freePlan" || !taskId) return null;
+  const framed = framedLanguage(lang);
+  if (!framed) return null;
+  return `${framed.origin}/form?id=${encodeURIComponent(taskId)}`;
+}
+
 // Set `view_url` (with the claim token embedded for free-plan items, so the
 // render-host footer can offer a "Claim it" link for this exact item) plus the
 // claim_url/claim_message fields. The raw token is intentionally not surfaced as
@@ -1821,6 +1839,11 @@ async function handleItemResult(
       // clients, so this reaches exactly the surface it describes.
       const claimWidget = buildClaimFields(ctx.auth, item.claimToken, ctx.clientKind)?.claim_url_widget;
       if (claimWidget) hydration.claim_url_widget = claimWidget;
+      // Widget-only for the same reason, and because get_item spreads hydration
+      // into structuredContent, whose output schema declares no `frame_url`: a
+      // validating client would reject the whole response.
+      const frameUrl = framedFormUrl(ctx.auth, item.lang, item.taskId);
+      if (frameUrl) hydration.frame_url = frameUrl;
       return {
         ...compact,
         // Links are echoed as real fields, not only inside `summary`. Non-widget

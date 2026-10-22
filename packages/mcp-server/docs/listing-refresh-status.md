@@ -99,7 +99,7 @@ cd ../skills && unzip -l dist/graffiticode-plugin-2.1.0.zip
 | Tool count | **7** (create_item, update_item, render_item, get_item, get_spec, list_languages, get_language_info) |
 | Widget marker | On `render_item` **ONLY** (not `get_item`) |
 | Widget URI format | `widget-mcp.<hash>.html` (NOT `widget-oai` or `form-widget`) |
-| CSP | `resourceDomains` only, no `frameDomains` |
+| CSP | `resourceDomains` (bundle origin) + `frameDomains` = `https://l0176.graffiticode.org` only (since 2026-10-22, for L0176) |
 
 ### 4. Verify scan hit the live server
 

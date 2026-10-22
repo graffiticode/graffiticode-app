@@ -12,11 +12,28 @@
  */
 import { RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
 import { widgetContentHash } from "./widget-html.js";
+import { FRAMED_LANGUAGES } from "./languages.js";
 
 export { generateWidgetHtml, widgetContentHash } from "./widget-html.js";
-export { NATIVE_LANGUAGES } from "./languages.js";
+export { NATIVE_LANGUAGES, FRAMED_LANGUAGES, framedLanguage } from "./languages.js";
 
 const MCP_SERVER_URL = process.env.MCP_SERVER_URL || "https://mcp.graffiticode.org";
+
+/**
+ * The origin the widget loads its bundles and beacons from, and so the origin its
+ * CSP admits in `resourceDomains`.
+ *
+ * Its own setting, NOT `MCP_SERVER_URL`: that one is also the OAuth issuer, the
+ * protected resource, the callbacks and the introspection audience. A proof
+ * revision on a tagged URL needs its widget to load from that URL while its OAuth
+ * metadata stays exactly production's, or promoting it would reject every existing
+ * token as minted for another resource. Production sets it explicitly
+ * (deploy.json), so a release always overwrites a proof value: the deploy CLI's
+ * `--update-env-vars` keeps any variable it isn't given.
+ */
+export function widgetAssetOrigin(): string {
+  return process.env.WIDGET_ASSET_ORIGIN || MCP_SERVER_URL;
+}
 
 // Claude / MCP Apps resource. mimeType is the official MCP Apps content type
 // (`text/html;profile=mcp-app`) from the ext-apps SDK.
@@ -34,7 +51,7 @@ let cachedUris: { mcp: string } | null = null;
 
 export function widgetResourceUris(): { mcp: string } {
   if (!cachedUris) {
-    const h = widgetContentHash(MCP_SERVER_URL, widgetResourceMeta());
+    const h = widgetContentHash(widgetAssetOrigin(), widgetResourceMeta());
     cachedUris = {
       mcp: `ui://graffiticode/widget-mcp.${h}.html`,
     };
@@ -61,17 +78,24 @@ export function matchWidgetUri(uri: string): "openai" | "mcp" | null {
 }
 
 /**
- * Widget CSP — the native widget loads per-language bundles from our own origin
+ * Widget CSP. The native widget loads per-language bundles from our own origin
  * and makes no other network calls (formula/chart evaluation is client-side), so
- * `resourceDomains` is the ONLY directive it needs. Crucially, NO `frameDomains`:
- * declaring it is what draws OpenAI's "extra manual review / often not approved
- * for broad distribution" flag, and Claude verified our origin in `resourceDomains`
- * reaches `script-src`, which is all the bundle import needs.
+ * `resourceDomains` admits only that origin, and there is still no
+ * `connectDomains`. Claude verified our origin in `resourceDomains` reaches
+ * `script-src`, which is all the bundle import needs.
+ *
+ * `frameDomains` lists exactly the origins of the FRAMED languages (L0176's
+ * `/form`; see FRAMED_LANGUAGES for why it can't render natively), and nothing
+ * else. Declaring any frame domain draws OpenAI's extra manual review; that was
+ * accepted on 2026-10-22, because the native alternative needs a frame too
+ * (Learnosity authenticates from a questions.learnosity.com iframe), plus more.
  */
 export function widgetCsp(): { camel: Record<string, string[]>; snake: Record<string, string[]> } {
+  const origin = widgetAssetOrigin();
+  const frames = FRAMED_LANGUAGES.map((l) => l.origin);
   return {
-    camel: { resourceDomains: [MCP_SERVER_URL] },
-    snake: { resource_domains: [MCP_SERVER_URL] },
+    camel: { resourceDomains: [origin], frameDomains: frames },
+    snake: { resource_domains: [origin], frame_domains: frames },
   };
 }
 

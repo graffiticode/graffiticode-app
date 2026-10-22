@@ -29,6 +29,9 @@ export { mergeToolPayload };
 declare const __MCP_ORIGIN__: string;
 // Injected by the HTML generator: which languages have a native bundle.
 declare const __NATIVE__: string[];
+// Injected by the HTML generator: languages framed from their own /form origin
+// (the CSP's frameDomains), and those origins.
+declare const __FRAMED__: { id: string; origin: string }[];
 
 interface LangModule {
   styles: string;
@@ -58,6 +61,16 @@ const FIRST_RESULT_DEADLINE_MS = 20_000;
 /** How long a native component gets to draw something before the card takes over. */
 const EMPTY_MOUNT_GRACE_MS = 1_500;
 
+/**
+ * How long a framed page gets to say its assessment came up (`preview-ready`)
+ * before the card takes over. Generous: the frame loads the page, compiles and
+ * signs the item, then loads Learnosity's SDK and authenticates.
+ */
+const FRAME_READY_DEADLINE_MS = 20_000;
+
+/** A framed page's height. Its View reports none, so it scrolls inside this. */
+const FRAME_HEIGHT_PX = 600;
+
 export function startRenderer(host: HostAdapter): void {
   const root = document.getElementById("content")!;
   // Latched only by a TERMINAL result. The previous `done` latch fired on the
@@ -68,6 +81,9 @@ export function startRenderer(host: HostAdapter): void {
   // whenever it changes", and made a slow item unrecoverable without a reload.
   let settled = false;
   let sawResult = false;
+  // Undoes a pending framed render (its listener and deadline), so a later
+  // result can't be overwritten by an earlier frame's verdict.
+  let cancelFrame: (() => void) | null = null;
 
   host.onTheme((theme) => document.body.classList.toggle("dark", theme === "dark"));
 
@@ -118,6 +134,8 @@ export function startRenderer(host: HostAdapter): void {
   }
 
   async function render(r: ToolResult): Promise<void> {
+    cancelFrame?.();
+    cancelFrame = null;
     const sc = mergeToolPayload(r);
     const status = typeof sc.status === "string" ? sc.status : undefined;
 
@@ -128,6 +146,11 @@ export function startRenderer(host: HostAdapter): void {
     // The script ran and has a payload. Absence of this in the log means the page
     // never executed — a different problem from a component that fails to draw.
     beacon("boot", lang);
+    const frameOrigin = framedOriginFor(lang, sc.frame_url);
+    if (frameOrigin) {
+      renderFrame(sc, lang, frameOrigin);
+      return;
+    }
     // Set only when a native mount was attempted and failed; renderCard shows it.
     let mountError: string | undefined;
     if (__NATIVE__.includes(lang) && sc.data !== undefined) {
@@ -219,6 +242,83 @@ export function startRenderer(host: HostAdapter): void {
     renderCard(sc, mountError);
     beacon("card", lang, mountError);
     reportHeight();
+  }
+
+  /**
+   * The origin to frame `frameUrl` from, or null to render the usual way.
+   *
+   * Only for a framed language, only when the URL is on exactly the origin the
+   * HTML generator declared for it (the CSP's frameDomains), and only from a
+   * sandbox with a real origin: the page posts back to the `origin` it is given,
+   * and an opaque "null" origin can't be addressed.
+   */
+  function framedOriginFor(lang: string, frameUrl: unknown): string | null {
+    const framed = (typeof __FRAMED__ !== "undefined" ? __FRAMED__ : []).find((f) => f.id === lang);
+    if (!framed || typeof frameUrl !== "string") return null;
+    if (!window.location.origin || window.location.origin === "null") return null;
+    try {
+      return new URL(frameUrl).origin === framed.origin ? framed.origin : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Frame the language's own page, and wait for it to say the assessment is up.
+   *
+   * The page's View posts `onload` and `data-updated` on mount, before the task
+   * loads or Learnosity initializes, so those mean nothing here. Only the Form's
+   * `preview-ready` (Learnosity's readyListener) counts, and only from this
+   * frame: the message's origin must be the framed origin AND its source this
+   * iframe's window. `preview-error`, or no answer by the deadline, falls back to
+   * the card, which says the preview is unavailable. A host that refuses the
+   * frame is caught by the deadline too; it can't be detected any other way.
+   */
+  function renderFrame(sc: Record<string, unknown>, lang: string, origin: string): void {
+    const url = new URL(sc.frame_url as string);
+    url.searchParams.set("origin", window.location.origin);
+    const frame = el("iframe", "framed-content");
+    frame.title = (sc.name as string) || "Graffiticode item";
+    frame.setAttribute("allow", "clipboard-write");
+    frame.style.height = `${FRAME_HEIGHT_PX}px`;
+    frame.src = url.toString();
+    root.className = "";
+    root.replaceChildren(frame);
+    appendFooterLink(sc);
+    reportHeight();
+
+    let done = false;
+    const stop = () => {
+      done = true;
+      window.removeEventListener("message", onMessage);
+      clearTimeout(timer);
+    };
+    const fallBack = (stage: "frameerror" | "frametimeout", why: string) => {
+      stop();
+      cancelFrame = null;
+      console.warn(`[widget] ${why} — using the card`);
+      beacon(stage, lang, why);
+      renderCard(sc, why);
+      reportHeight();
+    };
+    function onMessage(event: MessageEvent): void {
+      if (done || event.origin !== origin || event.source !== frame.contentWindow) return;
+      const msg = event.data;
+      if (!isRecord(msg)) return;
+      if (msg.type === "preview-ready") {
+        stop();
+        cancelFrame = null;
+        beacon("mounted", lang);
+      } else if (msg.type === "preview-error") {
+        fallBack("frameerror", `${lang} framed preview failed: ${String(msg.reason ?? "unknown")}`);
+      }
+    }
+    window.addEventListener("message", onMessage);
+    const timer = setTimeout(
+      () => fallBack("frametimeout", `${lang} framed preview did not report ready within ${FRAME_READY_DEADLINE_MS}ms`),
+      FRAME_READY_DEADLINE_MS,
+    );
+    cancelFrame = stop;
   }
 
   /**
