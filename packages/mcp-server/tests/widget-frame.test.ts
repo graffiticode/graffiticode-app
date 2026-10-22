@@ -6,7 +6,8 @@
  * task loads or Learnosity initializes, so the widget must ignore them. Only
  * `preview-ready` (Learnosity's readyListener, posted by L0176's Form) counts,
  * and only from this frame: right origin AND right source window. A
- * `preview-error`, or silence until the deadline, falls back to the content card.
+ * The content card shows at once and the page loads hidden behind it; it is
+ * revealed in place on `preview-ready`, and dropped on `preview-error` or silence.
  *
  * The renderer is driven for real in jsdom, as in widget-mount-diagnostic.test.ts.
  */
@@ -76,55 +77,65 @@ function post(data: unknown, { origin = L0176, source = frame()?.contentWindow }
 
 const tick = () => new Promise((r) => setTimeout(r, 20));
 
-test("a framed result renders the page, with the widget's own origin appended", async () => {
+const card = () => body().querySelector(".card");
+const pending = (f: HTMLIFrameElement | null) => Boolean(f?.parentElement?.classList.contains("framed-pending"));
+
+test("the card shows at once, with the page loading hidden behind it", async () => {
   start();
   await tick();
+  assert.ok(card(), "the card is shown immediately");
+  assert.match(body().textContent ?? "", /Order them/);
   const f = frame();
-  assert.ok(f, "an iframe is rendered");
+  assert.ok(f, "the frame is loading");
+  assert.ok(pending(f), "but hidden until it reports ready");
+  assert.equal(f!.parentElement!.getAttribute("aria-hidden"), "true");
   const src = new URL(f!.src);
   assert.equal(src.origin, L0176);
   assert.equal(src.pathname, "/form");
   assert.equal(src.searchParams.get("id"), "eyJ0YXNrSWRzIjpbIngiXX0");
   assert.equal(src.searchParams.get("origin"), "https://mcp-app-0123.web-sandbox.oaiusercontent.com");
-  assert.equal(body().querySelector(".card"), null);
 });
 
-test("preview-ready from the frame keeps the frame", async () => {
+test("preview-ready reveals the same frame in place and removes the card", async () => {
   mock.timers.enable({ apis: ["setTimeout"] });
   try {
     start();
+    const f = frame();
     post({ type: "preview-ready" });
+    assert.equal(card(), null, "the card goes");
+    assert.equal(frame(), f, "the frame is never re-created or moved (that would reload it)");
+    assert.equal(pending(f), false);
+    assert.equal(f!.parentElement!.getAttribute("aria-hidden"), null);
+    assert.ok(body().querySelector("button.footer-link"), "the way out to the item stays");
     mock.timers.tick(60_000);
-    assert.ok(frame(), "the frame stays");
-    assert.equal(body().querySelector(".card"), null);
+    assert.equal(frame(), f, "the deadline no longer applies");
   } finally {
     mock.timers.reset();
   }
 });
 
-test("an early onload followed by preview-error falls back to the card", async () => {
+test("an early onload followed by preview-error keeps the card and drops the frame", async () => {
   start();
   post({ type: "onload", data: {} });
   post({ type: "data-updated", data: {} });
-  assert.ok(frame(), "the View's mount messages change nothing");
+  assert.ok(pending(frame()), "the View's mount messages change nothing");
   post({ type: "preview-error", reason: "learnosity: 10003" });
   assert.equal(frame(), null);
-  const note = body().querySelector(".card-note");
-  assert.ok(note, "the card says the preview is unavailable");
-  assert.match(note!.getAttribute("title") ?? "", /L0176 framed preview failed: learnosity: 10003/);
+  assert.ok(card());
   assert.match(body().textContent ?? "", /Order them/, "the card shows the item's content");
 });
 
-test("an early onload and then silence falls back to the card at the deadline", async () => {
+test("an early onload and then silence keeps the card and drops the frame at the deadline", async () => {
   mock.timers.enable({ apis: ["setTimeout"] });
   try {
     start();
     post({ type: "onload", data: {} });
     mock.timers.tick(19_000);
-    assert.ok(frame(), "still waiting before the deadline");
+    assert.ok(pending(frame()), "still loading behind the card before the deadline");
+    assert.ok(card());
     mock.timers.tick(1_500);
     assert.equal(frame(), null);
-    assert.match(body().querySelector(".card-note")?.getAttribute("title") ?? "", /did not report ready/);
+    assert.ok(card(), "the card was there all along");
   } finally {
     mock.timers.reset();
   }
@@ -136,9 +147,10 @@ test("preview-ready from another origin, or another window, is ignored", async (
     start();
     post({ type: "preview-ready" }, { origin: "https://evil.example" });
     post({ type: "preview-ready" }, { source: dom.window });
+    assert.ok(pending(frame()), "neither revealed the frame");
     mock.timers.tick(21_000);
-    assert.equal(frame(), null, "neither counted, so the deadline fell back");
-    assert.ok(body().querySelector(".card"));
+    assert.equal(frame(), null, "so the deadline dropped it");
+    assert.ok(card());
   } finally {
     mock.timers.reset();
   }

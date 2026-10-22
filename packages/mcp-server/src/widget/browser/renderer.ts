@@ -264,27 +264,43 @@ export function startRenderer(host: HostAdapter): void {
   }
 
   /**
-   * Frame the language's own page, and wait for it to say the assessment is up.
+   * Show the card now, load the language's own page hidden behind it, and swap
+   * the page in only once it says the assessment is up.
+   *
+   * Card first because the frame can't be trusted to appear: a host whose CSP
+   * has no frame domain (the published ChatGPT app keeps the CSP of its
+   * submission snapshot; Claude.ai refuses the frame outright) shows a blocked
+   * or empty frame, and nothing in the page can detect that. Showing the frame
+   * first made those users stare at a blank box for the whole deadline; now
+   * they see the card at once, exactly as before framing existed.
    *
    * The page's View posts `onload` and `data-updated` on mount, before the task
    * loads or Learnosity initializes, so those mean nothing here. Only the Form's
    * `preview-ready` (Learnosity's readyListener) counts, and only from this
    * frame: the message's origin must be the framed origin AND its source this
-   * iframe's window. `preview-error`, or no answer by the deadline, falls back to
-   * the card, which says the preview is unavailable. A host that refuses the
-   * frame is caught by the deadline too; it can't be detected any other way.
+   * iframe's window. Then the card goes and the frame is revealed IN PLACE: an
+   * iframe moved in the DOM reloads, so it is never moved; only its wrapper's
+   * `framed-pending` class is dropped. While pending, the wrapper keeps it in
+   * the viewport at opacity 0 (Chrome throttles an off-screen or hidden
+   * cross-origin frame, which then never reaches ready; see widget-html.ts).
+   * `preview-error`, or no answer by the deadline, removes the hidden frame and
+   * leaves the card.
    */
   function renderFrame(sc: Record<string, unknown>, lang: string, origin: string): void {
     const url = new URL(sc.frame_url as string);
     url.searchParams.set("origin", window.location.origin);
+    renderCard(sc);
+    const card = root.firstElementChild;
+    const holder = el("div", "framed-pending");
+    holder.setAttribute("aria-hidden", "true");
     const frame = el("iframe", "framed-content");
     frame.title = (sc.name as string) || "Graffiticode item";
     frame.setAttribute("allow", "clipboard-write");
+    frame.tabIndex = -1;
     frame.style.height = `${FRAME_HEIGHT_PX}px`;
     frame.src = url.toString();
-    root.className = "";
-    root.replaceChildren(frame);
-    appendFooterLink(sc);
+    holder.appendChild(frame);
+    root.appendChild(holder);
     reportHeight();
 
     let done = false;
@@ -296,9 +312,9 @@ export function startRenderer(host: HostAdapter): void {
     const fallBack = (stage: "frameerror" | "frametimeout", why: string) => {
       stop();
       cancelFrame = null;
-      console.warn(`[widget] ${why} — using the card`);
+      console.warn(`[widget] ${why} — keeping the card`);
       beacon(stage, lang, why);
-      renderCard(sc, why);
+      holder.remove();
       reportHeight();
     };
     function onMessage(event: MessageEvent): void {
@@ -308,6 +324,12 @@ export function startRenderer(host: HostAdapter): void {
       if (msg.type === "preview-ready") {
         stop();
         cancelFrame = null;
+        card?.remove();
+        holder.classList.remove("framed-pending");
+        holder.removeAttribute("aria-hidden");
+        frame.removeAttribute("tabindex");
+        appendFooterLink(sc);
+        reportHeight();
         beacon("mounted", lang);
       } else if (msg.type === "preview-error") {
         fallBack("frameerror", `${lang} framed preview failed: ${String(msg.reason ?? "unknown")}`);
