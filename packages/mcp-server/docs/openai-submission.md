@@ -181,6 +181,42 @@ as the Challenge Base URL — confirm in-portal before assuming.
       `TERMINAL_POLL_DEADLINE_MS`). Count the cards on a slow generation.
 - [ ] Claude regression smoke (native widget still renders).
 - [ ] If OAuth: connect end-to-end using the **exact redirect URI ChatGPT registers**.
+- [ ] **CSP proven where it is enforced (§5a).** Developer mode does not count.
+
+### 5a. Prove the widget CSP in an enforcing context — developer mode doesn't enforce it
+
+**Developer mode is not evidence that the CSP works.** ChatGPT's developer-mode connectors
+show a **"CSP off" pill**, and OpenAI support says: *"In dev mode it can feel more permissive,
+but published apps rely entirely on the `_meta.ui.csp` (or the legacy `_meta["openai/widgetCSP"]`)
+definition"* and *"once the app is published, ChatGPT strictly enforces whatever CSP you declare"*
+([community thread](https://community.openai.com/t/assets-blocked-when-using-a-chatgpt-app-published-through-organization-vs-developer-mode/1368633)).
+
+**What we measured.** On 2026-10-22 the framed L0176 preview rendered inline through a
+developer-mode connector, for both free-plan and signed-in users. That proved the code:
+- the `/form?source=parent` handover;
+- the card shown first;
+- signing and expiry;
+- the `preview-ready` signal.
+
+It did **not** prove that our `frameDomains` declaration lets the frame load once the CSP is
+enforced. OpenAI's docs say nested frames are blocked by default, and that origins are allowed
+with `_meta.ui.csp.frameDomains` / `openai/widgetCSP.frame_domains` on the widget resource. We
+declare both, with exactly `https://l0176.graffiticode.org`
+([Security & Privacy](https://developers.openai.com/plugins/guides/security-privacy)).
+Claude.ai enforces its CSP and blocks the frame despite the declaration; a reminder that
+"declared" is not "allowed".
+
+**Before filing a directory submission that changes the CSP:**
+1. Publish the build to **our own workspace/organization first** (a workspace plugin), where
+   the CSP is enforced as it will be in the directory. Disconnect any developer-mode connector
+   to the same URL in that chat, so the run can't silently take the permissive path.
+2. In that workspace app, render a **Learnosity** item (the prompt must name Learnosity, or the
+   item is re-routed to L0180), signed out and signed in.
+3. Confirm in the mcp-service logs: `resources/read` of the current `widget-mcp.<hash>`, then
+   `beacon stage=mounted lang=L0176`. A `frametimeout` means the frame was blocked under
+   enforcement; the user still sees the card, but stop and fix before submitting.
+4. Also check one native language (L0180 or L0179): `mounted`.
+5. Record the date, the widget hash and the beacons here, then submit.
 
 ---
 
@@ -251,11 +287,13 @@ nothing, leaving the user with a claim and an empty screen.
    accepted answer marked ✓, the note "Interactive preview unavailable — open it to use the
    item", and an "Open the Learnosity assessment" link.
    *Verified 2026-09-17: L0176, ready in 11.3s.*
-   **Superseded 2026-10-22 (pending the actual-host proof):** a free-plan reviewer now gets the
-   item interactive inline: the widget frames `l0176.graffiticode.org/form` (the CSP's one frame
-   domain) and keeps the frame once L0176 reports `preview-ready`; the card above remains the
-   fallback (signed-in items, or no `preview-ready` within 20 s). Re-verify and update this test
-   case before submitting. The history below explains why native rendering is impossible.
+   **Superseded 2026-10-22 (pending §5a):** a reviewer, signed in or not, now gets the item
+   interactive inline. The widget shows the card above first, frames
+   `l0176.graffiticode.org/form?source=parent` (the CSP's one frame domain), hands the item in,
+   and swaps the frame in once L0176 reports `preview-ready`. The card stays if no
+   `preview-ready` arrives within 20 s. This was verified only in developer mode, which doesn't
+   enforce the CSP ("CSP off"). Prove it in an enforcing workspace app (§5a) and update this
+   test case before submitting. The history below explains why native rendering is impossible.
    **Tell the reviewer this is the intended result.** A Learnosity item cannot render inline:
    it is delivered by Learnosity's own hosted Items API, which needs network access the widget's
    CSP deliberately withholds, a signed request, and a whitelisted domain — and the widget runs
@@ -348,7 +386,8 @@ access/refresh tokens through the auth service.
    permits** — ours declares `resourceDomains` (the bundle origin) and `frameDomains` =
    `https://l0176.graffiticode.org` only; enter exactly that frame domain, nothing broader, and
    be ready to justify it (L0176's own form, the only way a Learnosity item renders). Inspect the imported snapshot: the resource URI is content-hashed, so a stale hash
-   in the snapshot means the portal cached a previous build.
+   in the snapshot means the portal cached a previous build. **Only after §5a has passed** for
+   this build: developer mode doesn't enforce the CSP, so it can't stand in for that check.
 6. Upload the **plugin ZIP** (§2), built with `npm run package`.
 7. Add listing copy, starter prompts, the exact **5+3** tests (§6), availability, release
    notes. **UI screenshots are now in scope** — capture them from ChatGPT, not Claude, and only
