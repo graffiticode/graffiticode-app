@@ -18,14 +18,7 @@
   "mcpServers": {
     "graffiticode": {
       "type": "streamable-http",
-      "url": "https://mcp.graffiticode.org/mcp",
-      "extensions": {
-        "com.openai": {
-          "auth": {
-            "type": "mixed"
-          }
-        }
-      }
+      "url": "https://mcp.graffiticode.org/mcp"
     }
   },
   "apps": {
