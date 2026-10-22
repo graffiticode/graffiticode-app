@@ -32,7 +32,9 @@ const dirs = readdirSync(ROOT)
   // `dist` is build output, not a skill. It is gitignored, so the MCP server
   // (which reads the repo over the GitHub API) never sees it — but this script
   // reads the filesystem, where a local `npm run package` leaves it behind.
-  .filter((d) => d !== "scripts" && d !== "node_modules" && d !== "dist")
+  // `assets` holds the plugin listing's icon, shipped by build-plugin.mjs; the
+  // MCP server skips it because it has no SKILL.md.
+  .filter((d) => d !== "scripts" && d !== "node_modules" && d !== "dist" && d !== "assets")
   .sort();
 
 const skills = dirs.map((id) => {
