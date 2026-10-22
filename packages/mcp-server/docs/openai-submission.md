@@ -143,6 +143,7 @@ Checklist for the ZIP:
 | Version | Ref | SHA-256 | Uploaded |
 |---|---|---|---|
 | 2.1.0 | `f2c3035` (2026-09-19) | `7c7ae8527b36c6edec9be7ecbcb8372fb518e4c18077b4662d2f2eac0dc4faa2` | not yet |
+| 2.2.0 | `db25c01` (2026-10-22), no ZIP auth override; mixed auth set in the portal app | `5c5a5de0b5e122d4c002403bff7fd4b829becbcce03d11dd897f0a06b18b2a05` | not yet |
 
 Rebuild that ref to compare: `npm run package -- --ref 7e4945f --dry-run` prints the same
 SHA-256 or the artifact is not what this table claims.
