@@ -83,7 +83,7 @@ Invent content only when the user explicitly delegates creativity:
 
 ## Workflow
 
-Every rendering request follows the same four steps. Do not skip steps 1–2.
+Every rendering request follows the same five steps. Do not skip steps 1–2, or step 4.
 
 ### 1. Discover the right language
 
@@ -140,17 +140,38 @@ colored teal. X-axis: month abbreviations. Y-axis: dollars, formatted with $
 and comma separators. Include a horizontal reference line at $50,000 labeled
 'Target'. Dark theme."
 
-### 4. Iterate with `update_item`
+### 4. Show it with `render_item`
+
+`create_item` returns at once with an `item_id` and `status: "generating"` —
+no content, no links, and its `language` is only the one you asked for. Call
+`render_item(item_id)` next, every time. It waits for the generation and
+returns:
+
+- **`status: "ready"`** — the item is built. Hosts with widgets render it
+  inline. Now use the result's `summary`, `language`, `view_url` and (free
+  plan) `claim_url` / `claim_message`.
+- **`status: "generating"`** — still running past the wait; `progress` says
+  how far. Call `render_item` again.
+- **`status: "failed"`** — tell the user what `error` / `message` says, and
+  offer to retry with a clearer description. Don't surface links for a failed
+  item.
+
+### 5. Iterate with `update_item`
 
 `update_item(item_id, modification)` preserves conversation history and
 composes naturally with incremental edits. Prefer iteration over recreation —
 history is lost on a fresh `create_item`. Use `update_item` for any follow-up
 refinement unless the user explicitly asks for a new item.
 
+`update_item` is asynchronous too: it returns `status: "generating"`, and you
+call `render_item(item_id)` to show the result, exactly as after a create.
+
 ## Iteration context
 
-Every `create_item` and `update_item` response returns `{item_id, src, data}`.
-Read and hold this context — don't discard it.
+`create_item`, `update_item` and `render_item` don't return the item's code or
+compiled data. When you need either — to state exact values in a follow-up, or
+to pick up a language's vocabulary — call `get_item(item_id)` once the item is
+ready; it returns `{item_id, src, data, …}`.
 
 **`data` (compiled JSON)** is the ground truth of what is currently rendered:
 actual values, labels, counts, thresholds, structure. Use it to formulate
@@ -165,14 +186,13 @@ real function names reduces translation ambiguity on the backend.
 - Bad: "make the connector line dashed"
 - Good: "set `stroke-dasharray` on the connector between node A and node B to `4 2`"
 
-Read `src` after the first `create_item` to acquire vocabulary for that
-language. Subsequent `update_item` calls can use those names confidently.
+Reading `src` once, after the first item in a language is ready, gives you
+vocabulary for later `update_item` calls. It is optional: a plain-English
+modification works without it. The same call recovers a session that resumes
+with a bare `item_id`.
 
-**`get_item(item_id)`** is for session recovery only — when a conversation
-resumes with a bare `item_id` and no `src`/`data` in context. Call it then to
-reacquire vocabulary and compiled state before issuing any `update_item`.
-Do not call it after `create_item` or `update_item`; those responses already
-carry the same payload.
+`src` and `data` are private to the item's language. Use them to write English
+for the same item; never paste them into another language's `create_item`.
 
 ## Charting data you do not already have
 
@@ -186,8 +206,10 @@ does the other's half.
 and chart it" description sent to the chart language comes back re-routed to
 the data language: status `ready`, a well-formed item, a dataset — and no
 chart. Nothing in the response reads as an error. **Check the `language` on the
-response, not just the status**; if it isn't the one you asked for, the platform
-made a routing decision and you are holding a different artifact than you think.
+`render_item` result, not just the status** (the `create_item` response only
+echoes the language you asked for); if it isn't the one you asked for, the
+platform made a routing decision and you are holding a different artifact than
+you think.
 
 Run the two legs yourself:
 
@@ -195,8 +217,8 @@ Run the two legs yourself:
    path to navigate into), the transforms in the order they apply, and the final
    shape — which fields, what order, how many rows. Narrow it here: the result
    has to be small enough to restate in the next step.
-2. **Read the values off the compiled result.** The dataset's `data` holds the
-   actual rows. That is the ground truth of what was fetched — read it rather
+2. **Read the values off the compiled result.** Once `render_item` says the
+   dataset is ready, `get_item` returns its `data`: the actual rows. That is the ground truth of what was fetched — read it rather
    than assuming what the URL returned.
 3. **Create the chart with those values stated in the description.** Chart type,
    the values themselves, axis labels and formatting, title, theme.
@@ -215,24 +237,24 @@ language's `src` or a raw JSON blob. That prohibition stands.
 ## Output rules
 
 The widget is the rendering. Your reply is one line — a summary of what was
-created or changed, drawn from the tool response's own `description` or
-`change_summary` field. Nothing more.
+created or changed, drawn from the ready `render_item` result's `summary`.
+Nothing more.
 
 - Do not reproduce the data in prose.
 - Do not preview or simulate the widget in markdown.
 - Do not describe the layout or list the fields.
-- If the tool response `description` or `change_summary` is null (rare — code
-  generator failure), write a brief fallback drawn from the user's own request.
+- If there is no `summary`, write a brief line drawn from the user's own
+  request.
 
 ## Surfacing the item: view URL and the claim flow
 
-Every `create_item` / `update_item` response carries a **`view_url`** — the item's page on
+Once an item is ready, the `render_item` result carries a **`view_url`** — the item's page on
 `app.graffiticode.org`. Where the host renders the widget inline (claude.ai, Claude Desktop) the
 widget is the primary view, and `view_url` is the openable, shareable link to that same item. Surface
 it so the user can open the artifact in a browser tab — especially in headless/Cowork jobs where there
 is no inline widget.
 
-When the call was made **without credentials (the free plan)**, the response also includes:
+When the user is **not signed in (the free plan)**, that result also includes:
 
 - **`claim_url`** — a `console.graffiticode.org/claim` link (a signed 24-hour JWT) that saves the
   item into a permanent account.
@@ -246,8 +268,8 @@ step. Free-plan items are session-scoped and expire after 48 hours unless claime
 it's relevant, without nagging.
 
 Only ever surface the `view_url` / `claim_url` values the server returned — never fabricate or
-template them. If `claim_url` is absent, the call was authenticated and the item already persists in
-the user's account.
+template them — and only from a `ready` result. If `claim_url` is absent, the user is signed in and
+the item already persists in their account.
 
 ## Relationship to domain-specific skills
 
@@ -272,9 +294,12 @@ catch-all for unrouted structured output.
   Several languages carry no domain, and an unknown domain returns an empty set
   that looks identical to "nothing exists for this". When in doubt, list
   unscoped.
-- Check the `language` field on every `create_item` response. The platform
-  re-routes when another language fits better, and a re-routed item is ready and
-  well-formed while being a different kind of artifact than you asked for.
+- Check the `language` on the `render_item` result, not the `create_item`
+  response. The platform re-routes when another language fits better, and a
+  re-routed item is ready and well-formed while being a different kind of
+  artifact than you asked for.
+- Always follow `create_item` / `update_item` with `render_item`. Their own
+  response is only "generating" — never present it as the finished item.
 - Do not invent language IDs. If no returned language matches, say so and fall
   back to static output.
 - Treat `item_id` as a persistent reference. Store it across turns and use
@@ -283,6 +308,6 @@ catch-all for unrouted structured output.
 - In automated/headless Cowork jobs, the item_id is the primary job output.
   Surface it explicitly so downstream steps or the user can retrieve the item
   later.
-- After `create_item` or `update_item`, read `src` to acquire function-name
-  vocabulary for that language. Use those names in subsequent English
-  declarations to `update_item` — precision reduces backend translation errors.
+- When precision matters, `get_item` a ready item and use the function names
+  in its `src` in your English to `update_item` — precision reduces backend
+  translation errors.
