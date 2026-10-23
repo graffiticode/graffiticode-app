@@ -1009,11 +1009,41 @@ function applyViewAndClaim(
 // content, and the MCP client renders the response JSON as chat text — emitting
 // them now would surface (and repeat, on every poll) an "Open in Graffiticode"
 // link before anything exists. They're added on the "ready" response.
+/**
+ * What a proven widget host is told while an item is still being made.
+ *
+ * The ready directive alone did not stop the duplicate: on 2026-10-23 ChatGPT
+ * wrote the spreadsheet as a markdown table from its OWN create_item request
+ * while render_item was still answering "generating" — before any content
+ * existed — and then the widget mounted under it. So the generating responses
+ * say it too: one progress line, no contents, keep waiting. `progress` is the
+ * elapsed/written fragment (possibly empty), kept so the user still sees
+ * movement. Only for RENDERING_HOSTS on paths that will render (create/update,
+ * and render_item — never get_item); everything else keeps its old wording.
+ */
+export function buildGeneratingDirective(itemId: string, progress = ""): string {
+  return (
+    `Show one brief progress update${progress}. Do not reproduce, preview, or simulate ` +
+    `the item's contents in chat. Call render_item("${itemId}") to continue waiting.`
+  );
+}
+
+/** The still-generating message for retrieval: quiet for a proven widget host. */
+function stillGeneratingMessage(retrievalTool: string, itemId: string, progress: string, quiet: boolean): string {
+  if (quiet) return buildGeneratingDirective(itemId, progress);
+  // Ask for the progress to be SHOWN. Without this the model receives the
+  // line and silently calls the tool again, so the user sees only their
+  // client's in-flight spinner — reported on 2026-09-09 as "a bouncing dots
+  // animation" with no sign of movement.
+  return `Still generating${progress}. Tell the user that progress, then call ${retrievalTool}(item_id) again to keep waiting.`;
+}
+
 export function buildGeneratingResponse(
   itemId: string,
   lang: string,
   name: string | null,
-  operation: "create" | "update"
+  operation: "create" | "update",
+  quiet = false
 ): Record<string, unknown> {
   const label = name ? `"${name}"` : `your L${lang} item`;
   // The id is INTERPOLATED into the prose, not left as a literal `item_id`
@@ -1037,8 +1067,9 @@ export function buildGeneratingResponse(
     summary: `${operation === "update" ? "Updating" : "Creating"} ${label}… call ${call} to display it when ready.`,
     // Steer to render_item (compact result, renders the widget) — NOT raw get_item,
     // which would pull language-private src/data into the model transcript.
-    message:
-      `Generation started. Call ${call} to retrieve and display the result — it waits for completion and returns status 'ready' (or 'failed').`,
+    message: quiet
+      ? buildGeneratingDirective(itemId)
+      : `Generation started. Call ${call} to retrieve and display the result — it waits for completion and returns status 'ready' (or 'failed').`,
   };
 }
 
@@ -1334,7 +1365,7 @@ export async function handleCreateItem(
       description,
     });
     captureWorkspaceNamespace(ctx.auth, job);
-    return buildGeneratingResponse(job.itemId, langId, name ?? null, "create");
+    return buildGeneratingResponse(job.itemId, langId, name ?? null, "create", clientMountsWidget(ctx.clientKind, ctx.declaresUi));
   }
 
   // Start async generation (creates the item shell + enqueues the work) and
@@ -1355,7 +1386,7 @@ export async function handleCreateItem(
     modification: description,
   });
 
-  return buildGeneratingResponse(job.itemId, langId, name ?? null, "create");
+  return buildGeneratingResponse(job.itemId, langId, name ?? null, "create", clientMountsWidget(ctx.clientKind, ctx.declaresUi));
 }
 
 /**
@@ -1411,7 +1442,7 @@ export async function handleUpdateItem(
     });
     captureWorkspaceNamespace(ctx.auth, job);
     const item = await apiGetItemWithTask({ auth: ctx.auth, id: item_id });
-    return buildGeneratingResponse(job.itemId, item?.lang ?? "", item?.name ?? null, "update");
+    return buildGeneratingResponse(job.itemId, item?.lang ?? "", item?.name ?? null, "update", clientMountsWidget(ctx.clientKind, ctx.declaresUi));
   }
 
   // Fetch existing item + task src to build the contextual prompt.
@@ -1464,7 +1495,7 @@ export async function handleUpdateItem(
     currentData,
   });
 
-  return buildGeneratingResponse(job.itemId, existingItem.lang, existingItem.name, "update");
+  return buildGeneratingResponse(job.itemId, existingItem.lang, existingItem.name, "update", clientMountsWidget(ctx.clientKind, ctx.declaresUi));
 }
 
 const GET_ITEM_POLL_DEADLINE_MS = 45_000; // under codex's ~60s tool-call cap
@@ -1608,6 +1639,9 @@ async function handleItemResult(
   // Poll messages name the SAME retrieval tool the caller used, so the model
   // keeps calling the right one (render_item stays compact; get_item stays raw).
   const retrievalTool = mode === "render" ? "render_item" : "get_item";
+  // While it is still generating, a proven widget host on the render path is told
+  // to show progress only (buildGeneratingDirective); get_item never is.
+  const quietGenerating = mode === "render" && clientMountsWidget(ctx.clientKind, ctx.declaresUi);
   // render_item's short deadline is protection against a WIDGET HOST abandoning the
   // call and painting its own error where the widget belongs. A client that mounts
   // nothing cannot do that, and for it the short deadline is pure cost: it returns
@@ -1725,14 +1759,7 @@ async function handleItemResult(
         status: "generating",
         language: `L${item.lang}`,
         name: item.name,
-        message:
-          `Still generating${progressFragment(elapsedS(), pendingChars)}. ` +
-          // Ask for the progress to be SHOWN. Without this the model receives the
-          // line and silently calls the tool again, so the user sees only their
-          // client's in-flight spinner — reported on 2026-09-09 as "a bouncing dots
-          // animation" with no sign of movement. The ready path already works this
-          // way ("Show the user this item's contents…"), and it works because it asks.
-          `Tell the user that progress, then call ${retrievalTool}(item_id) again to keep waiting.`,
+        message: stillGeneratingMessage(retrievalTool, item.id, progressFragment(elapsedS(), pendingChars), quietGenerating),
         summary: buildGeneratingSummary(item.name, retrievalTool, item.id, elapsedS(), pendingChars),
         // Without the leading space the fragment carries: the widget places it
         // itself, and an empty string means "nothing honest to say yet".
@@ -1762,14 +1789,7 @@ async function handleItemResult(
         status: "generating",
         language: `L${item.lang}`,
         name: item.name,
-        message:
-          `Still generating${progressFragment(elapsedS(), pendingChars)}. ` +
-          // Ask for the progress to be SHOWN. Without this the model receives the
-          // line and silently calls the tool again, so the user sees only their
-          // client's in-flight spinner — reported on 2026-09-09 as "a bouncing dots
-          // animation" with no sign of movement. The ready path already works this
-          // way ("Show the user this item's contents…"), and it works because it asks.
-          `Tell the user that progress, then call ${retrievalTool}(item_id) again to keep waiting.`,
+        message: stillGeneratingMessage(retrievalTool, item.id, progressFragment(elapsedS(), pendingChars), quietGenerating),
         summary: buildGeneratingSummary(item.name, retrievalTool, item.id, elapsedS(), pendingChars),
         // Without the leading space the fragment carries: the widget places it
         // itself, and an empty string means "nothing honest to say yet".
@@ -1795,14 +1815,7 @@ async function handleItemResult(
         status: "generating",
         language: `L${item.lang}`,
         name: item.name,
-        message:
-          `Still generating${progressFragment(elapsedS(), pendingChars)}. ` +
-          // Ask for the progress to be SHOWN. Without this the model receives the
-          // line and silently calls the tool again, so the user sees only their
-          // client's in-flight spinner — reported on 2026-09-09 as "a bouncing dots
-          // animation" with no sign of movement. The ready path already works this
-          // way ("Show the user this item's contents…"), and it works because it asks.
-          `Tell the user that progress, then call ${retrievalTool}(item_id) again to keep waiting.`,
+        message: stillGeneratingMessage(retrievalTool, item.id, progressFragment(elapsedS(), pendingChars), quietGenerating),
         summary: buildGeneratingSummary(item.name, retrievalTool, item.id, elapsedS(), pendingChars),
         // Without the leading space the fragment carries: the widget places it
         // itself, and an empty string means "nothing honest to say yet".
