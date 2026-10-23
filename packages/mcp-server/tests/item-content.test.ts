@@ -619,27 +619,16 @@ test("the progress phrase is shared, and empty when there is nothing to say", ()
   );
 });
 
-test("every client is told to show the contents, whatever it claims to render", () => {
-  // Suppression was tried three ways in one day and each cost more than it saved.
-  // Keyed on NAME, a ChatGPT plugin announced "the interactive quiz is rendered
-  // above" with nothing on screen. Keyed on the UI-EXTENSION DECLARATION, it
-  // reached codex-mcp-client — a terminal — and produced a bare link. Made
-  // CONDITIONAL, the model still took the quiet branch and a chart arrived as one
-  // sentence and a URL.
-  //
-  // The deciding measurement: a FRESHLY connected ChatGPT client on the current
-  // build read the widget HTML, fetched the language bundle (HTTP 200) and
-  // painted nothing. Suppression protects a render not yet observed on these
-  // hosts and charges for it on every call; duplication, if a mount ever starts
-  // working, is visible and fixable by a deploy.
-  for (const mounts of [true, false]) {
-    const d = buildLinkDirective("https://app.graffiticode.org/form/abc", mounts);
-    assert.match(d, /Show the user this item's contents/, `mountsWidget=${mounts}`);
-    assert.doesNotMatch(d, /already rendered/i);
-    assert.doesNotMatch(d, /do NOT reproduce/i);
-    assert.match(d, /https:\/\/app\.graffiticode\.org\/form\/abc/);
-    assert.match(d, /not a substitute/i);
-  }
+test("a host proven to render is told the item is on screen, not to reproduce it", () => {
+  // ChatGPT mounted the widget AND printed a markdown copy under it (2026-10-23),
+  // because every client was told to show the contents. A proven host now gets
+  // one sentence and the link; the link clause stays the last word.
+  const d = buildLinkDirective("https://app.graffiticode.org/form/abc", true);
+  assert.doesNotMatch(d, /Show the user this item's contents/);
+  assert.match(d, /displayed above/i);
+  assert.match(d, /do not reproduce/i);
+  assert.match(d, /https:\/\/app\.graffiticode\.org\/form\/abc/);
+  assert.match(d, /not a substitute for the link\.$/i, "the link clause is the last word");
 });
 
 test("a client that mounts nothing is still told to show the contents", () => {
@@ -656,7 +645,12 @@ test("clientMountsWidget answers for the hosts actually seen in production", () 
   // declares the extension and is deliberately given text.
   assert.equal(clientMountsWidget("Anthropic/ClaudeAI", true), true);
   assert.equal(clientMountsWidget("openai-mcp", true), true);
-  assert.equal(clientMountsWidget("codex-mcp-client", true), true);
+  assert.equal(clientMountsWidget("openai-mcp (Codex)", true), true);
+  // Was `true` on the route alone. codex-mcp-client declares the UI extension and
+  // matches the OpenAI family, but it is the Codex terminal: it has never booted
+  // the widget (2026-10-23 logs), and "displayed above" there is a bare link.
+  assert.equal(clientMountsWidget("codex-mcp-client", true), false, "the terminal: declares, never renders");
+  assert.equal(clientMountsWidget("some-new-openai-client", true), false, "declared but not measured to render");
   // Was `true` ("openai mounts without declaring"), on the strength of a chart
   // that drew in ChatGPT mobile on 2026-09-11. Flipped 2026-09-17 after the
   // opposite case appeared: a ChatGPT workspace plugin created a quiz, mounted
@@ -686,11 +680,11 @@ test("the call site actually passes the mount flag", () => {
   // handler-level harness to assert the behaviour end to end (it would need the
   // auth and API layers mocked), so this pins the wiring until there is one.
   const src = readFileSync(new URL("../src/tools.ts", import.meta.url), "utf-8");
-  const call = /buildLinkDirective\(\s*hydration\.view_url as string,\s*clientMountsWidget\(/;
+  const call = /buildLinkDirective\(\s*hydration\.view_url as string,\s*mode === "render" && clientMountsWidget\(/;
   assert.match(
     src,
     call,
-    "handleItemResult must pass clientMountsWidget(...) to buildLinkDirective",
+    "handleItemResult must pass mode === \"render\" && clientMountsWidget(...) to buildLinkDirective",
   );
 });
 

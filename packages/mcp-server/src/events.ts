@@ -78,6 +78,12 @@ interface ToolEvent extends BaseEvent {
    */
   item?: string;
   /**
+   * render_item's per-call `render_id`, which the widget echoes on its beacons
+   * (`rid`). Joins a render to its outcome (mounted, card, or none) exactly.
+   * Server-generated; still allowlisted to a UUID shape like any logged field.
+   */
+  render?: string;
+  /**
    * The `status` the tool RETURNED — not whether the call succeeded.
    *
    * `outcome` already says the call didn't throw, and that is exactly what made
@@ -410,6 +416,8 @@ export function logSessionStarted(
   emit(event);
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
 export function logToolCall(params: {
   auth: "freePlan" | "firebase";
   session: string;
@@ -418,6 +426,7 @@ export function logToolCall(params: {
   ms: number;
   lang?: string;
   item?: string;
+  render?: string;
   status?: string;
   descLen?: number;
   err?: string;
@@ -444,6 +453,7 @@ export function logToolCall(params: {
   if (lang !== undefined) event.lang = lang;
   const item = normalizeItem(params.item);
   if (item !== undefined) event.item = item;
+  if (typeof params.render === "string" && UUID_RE.test(params.render)) event.render = params.render;
   const status = normalizeStatus(params.status);
   if (status !== undefined) event.status = status;
   if (params.descLen !== undefined) event.desc_len = params.descLen;
