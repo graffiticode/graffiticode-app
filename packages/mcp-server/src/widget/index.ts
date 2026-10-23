@@ -14,7 +14,7 @@ import { RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
 import { widgetContentHash } from "./widget-html.js";
 import { FRAMED_LANGUAGES } from "./languages.js";
 
-export { generateWidgetHtml, widgetContentHash } from "./widget-html.js";
+export { generateWidgetHtml, widgetContentHash, widgetBuildId } from "./widget-html.js";
 export { NATIVE_LANGUAGES, FRAMED_LANGUAGES, framedLanguage } from "./languages.js";
 
 const MCP_SERVER_URL = process.env.MCP_SERVER_URL || "https://mcp.graffiticode.org";
@@ -99,6 +99,10 @@ export function widgetCsp(): { camel: Record<string, string[]>; snake: Record<st
   };
 }
 
+export const WIDGET_DESCRIPTION =
+  "Shows the Graffiticode item itself, interactive where the language supports it. " +
+  "The assistant need not restate its contents; one sentence and the item's link are enough.";
+
 /**
  * The `_meta` for the widget resource, in BOTH CSP dialects.
  *
@@ -113,5 +117,12 @@ export function widgetCsp(): { camel: Record<string, string[]>; snake: Record<st
  */
 export function widgetResourceMeta(): Record<string, unknown> {
   const csp = widgetCsp();
-  return { ui: { csp: csp.camel }, "openai/widgetCSP": csp.snake };
+  return {
+    ui: { csp: csp.camel },
+    "openai/widgetCSP": csp.snake,
+    // ChatGPT reads this to cut narration that repeats the widget; other hosts
+    // ignore it. render_item's directive (tools.ts buildLinkDirective) says the
+    // same to the model for hosts that are known to render.
+    "openai/widgetDescription": WIDGET_DESCRIPTION,
+  };
 }

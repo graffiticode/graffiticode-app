@@ -1,4 +1,5 @@
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import { randomUUID } from "node:crypto";
 import { isDiscoverable } from "@graffiticode-app/core/discovery";
 import {
   getData,
@@ -1159,44 +1160,28 @@ export function buildGeneratingSummary(
 export function buildLinkDirective(viewUrl: string, mountsWidget = false): string {
   // A client that MOUNTED the item has already shown it. Asking the model to
   // "show the contents from summary" then produces the item twice: once as the
-  // live widget and once as a markdown transcription of it underneath. Observed
-  // on 2026-09-11 — a 5x5 sheet rendered as an interactive grid with a second,
-  // static copy of the same numbers printed below it.
+  // live widget and once as a markdown transcription of it underneath (seen
+  // 2026-09-11, and again in ChatGPT on 2026-10-23 for an L0179 sheet).
   //
-  // The clause that prevents the ORIGINAL failure is kept either way, as the last
-  // word: a model that decides prose is enough must still hand over the link.
-  // …but whether a component ACTUALLY draws cannot be known from here, so this
-  // half no longer asserts that it did. Both signals we have were measured wrong
-  // on 2026-09-17, in opposite directions:
+  // History, briefly. On 2026-09-17 suppression was removed for every client:
+  // ChatGPT hosts then loaded the widget and painted nothing, so "it is shown
+  // above" produced a phantom render, and the recoverable failure (showing the
+  // item twice) was preferred. That premise no longer holds for the hosts in
+  // RENDERING_HOSTS — see clientMountsWidget for the measurement — and the
+  // renderer now never settles on a result without its content (renderer.ts,
+  // hydration). So a proven host is told the item is on screen, and every other
+  // client still gets the contents: for a terminal, the summary IS the product.
   //
-  //   name-only  — a ChatGPT workspace plugin matched the OpenAI allow-list,
-  //                mounted nothing, and told the user "The interactive
-  //                Graffiticode quiz is rendered above". Nothing was there.
-  //   declared   — codex-mcp-client declares io.modelcontextprotocol/ui and is a
-  //                TERMINAL: it received "do NOT reproduce its contents" and
-  //                printed a bare link, which is the failure this whole directive
-  //                was written to prevent.
-  //
-  // So the model is told what to do in each case and left to see which it is,
-  // rather than being handed a false premise. A host that did mount and prints
-  // the contents anyway shows the item twice, which is recoverable; a host that
-  // did not mount and was told to stay quiet leaves the user with nothing.
-  // …and as of 2026-09-17 that is the ONLY directive, for every client.
-  //
-  // Suppression was tried three ways and each cost more than it saved. Keyed on
-  // NAME, a ChatGPT plugin announced "the interactive quiz is rendered above"
-  // with nothing on screen. Keyed on the UI-EXTENSION DECLARATION, it reached a
-  // terminal and produced a bare link. Made CONDITIONAL, the model still chose
-  // the quiet branch and a chart arrived as one sentence and a URL.
-  //
-  // What decided it: on a FRESHLY connected ChatGPT client against the current
-  // build, the host read the widget HTML and fetched the language bundle (HTTP
-  // 200) and still painted nothing. Suppression protects a render that has never
-  // been observed on these hosts, and it charges for that protection on every
-  // single call. If a widget does start mounting, the failure becomes the item
-  // appearing twice — visible, and fixable by a deploy without a resubmission,
-  // which is the opposite of a silent empty answer.
-  void mountsWidget;
+  // The clause that prevents the ORIGINAL failure — prose instead of the link —
+  // stays the last word either way.
+  if (mountsWidget) {
+    return (
+      "The item is displayed above in the Graffiticode view. Reply with one short " +
+      "sentence about it (from `summary`) and give the user this link to open it: " +
+      `${viewUrl}. Do not reproduce its contents — no tables, lists or mock-ups; ` +
+      "the view already shows them. A description alone is not a substitute for the link."
+    );
+  }
   return (
     "Show the user this item's contents from `summary` below, then give them this " +
     `link so they can open and use it: ${viewUrl}` +
@@ -1205,32 +1190,47 @@ export function buildLinkDirective(viewUrl: string, mountsWidget = false): strin
 }
 
 /**
+ * Hosts MEASURED to render the widget for a ready item.
+ *
+ * Measured 2026-10-23 from mcp-service logs (7 days): every ready render_item for
+ * `openai-mcp` (13/13) and `openai-mcp (Codex)` (26/26) was followed by the
+ * widget booting and ending visible (a native mount, the L0176 frame, or the
+ * content card); `Anthropic/ClaudeAI` likewise. Heuristic — matched by timing —
+ * and made exact from this release by the per-render `render_id` the beacons now
+ * carry.
+ *
+ * Deliberately an allow-list of exact names. `codex-mcp-client` declares the UI
+ * extension and matches the OpenAI family, but it is the Codex terminal: it has
+ * never booted the widget, and telling it the item is "displayed above" is the
+ * 2026-09-17 bare-link failure.
+ */
+// render_item's per-call id, from the widget hydration it returned (before the
+// hydration is stripped for clients that render no widget). Logged on mcp_tool.
+export function renderIdOf(result: Record<string, unknown>): string | undefined {
+  const meta = result._meta as { graffiticode?: { render_id?: unknown } } | undefined;
+  const id = meta?.graffiticode?.render_id;
+  return typeof id === "string" ? id : undefined;
+}
+
+export const RENDERING_HOSTS: ReadonlySet<string> = new Set([
+  "openai-mcp",
+  "openai-mcp (Codex)",
+  "Anthropic/ClaudeAI",
+  "claude-ai",
+]);
+
+/**
  * Does this caller mount a widget, and therefore already show the item?
  *
- * Both halves are needed. The name alone over-matches — `claude-code` passes the
- * Claude whitelist and mounts nothing — and the declaration alone over-matches
- * too, since `web-sandbox`-style clients declare the extension and are
- * deliberately given text. This is `widgetRouteFor` asked as a yes/no, so the two
- * cannot drift apart.
+ * Both halves are needed: the route (a recognised family that DECLARED the UI
+ * extension — `widgetRouteFor`) and proof that the host actually renders
+ * (RENDERING_HOSTS). The route alone over-matches: `codex-mcp-client` declares
+ * the extension and mounts nothing, and on 2026-09-17 a ChatGPT workspace plugin
+ * that mounted nothing told the user "the interactive quiz is rendered above".
+ * Only render_item asks this; get_item has no widget whatever the host.
  */
 export function clientMountsWidget(clientKind?: string, declaresUi?: boolean): boolean {
-  // Only a DECLARED mount counts as "already shown".
-  //
-  // This used to be `route !== "none"`, which let the name-only `openai` route
-  // claim a render it never performed — the same over-match this function's own
-  // docstring warns about for `claude-code`, reintroduced for OpenAI clients.
-  // Observed 2026-09-17 in a ChatGPT workspace plugin: the quiz was created, no
-  // widget appeared, and the assistant said "The interactive Graffiticode quiz
-  // is rendered above" because this message told it to. The user got neither the
-  // widget nor the contents.
-  //
-  // A host that mounts and ALSO prints the contents shows the item twice, which
-  // is the 2026-09-11 bug this suppression was written for. That is the better
-  // failure: duplication is recoverable by reading past it, while a phantom
-  // render leaves nothing on screen and tells the user it is there. So the
-  // suppression now needs the extension declaration, and the name-only route
-  // keeps the contents.
-  return widgetRouteFor(clientKind, declaresUi) === "mcp-apps";
+  return widgetRouteFor(clientKind, declaresUi) === "mcp-apps" && !!clientKind && RENDERING_HOSTS.has(clientKind);
 }
 
 /**
@@ -1861,9 +1861,11 @@ async function handleItemResult(
     // So it asks for both and says what each is for, and the clause that prevents
     // the original prose-instead-of-link failure is kept as the LAST word, where it
     // forbids replacing the link rather than replacing the content.
+    // Only render_item mounts a widget: get_item is told to show the contents
+    // whatever the host.
     const linkDirective = buildLinkDirective(
       hydration.view_url as string,
-      clientMountsWidget(ctx.clientKind, ctx.declaresUi),
+      mode === "render" && clientMountsWidget(ctx.clientKind, ctx.declaresUi),
     );
     const message = hydration.claim_message
       ? `${linkDirective}\n\n${hydration.claim_message as string}`
@@ -1881,6 +1883,11 @@ async function handleItemResult(
       // validating client would reject the whole response.
       const frameUrl = framedFormUrl(item.lang);
       if (frameUrl) hydration.frame_url = frameUrl;
+      // One id per render_item call, widget-only like the two above. The widget
+      // echoes it on its beacons and the call's mcp_tool event logs it, so a render
+      // can be matched to what the user actually saw (a mount, the card, or nothing)
+      // exactly rather than by timing.
+      hydration.render_id = randomUUID();
       return {
         ...compact,
         // Links are echoed as real fields, not only inside `summary`. Non-widget

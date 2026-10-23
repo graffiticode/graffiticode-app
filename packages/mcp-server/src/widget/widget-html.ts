@@ -48,6 +48,21 @@ function loadBundle(): string {
   return cachedScript;
 }
 
+/**
+ * The widget CODE's identity: a hash of the renderer bundle alone.
+ *
+ * Not the resource hash (`widgetContentHash`), which hashes the generated HTML —
+ * embedding that in the HTML would be self-referential. The bundle never contains
+ * its own id, so this injects without a cycle. Beacons carry it as `wv`, which is
+ * how the server tells a current widget from a host's cached old one (ChatGPT may
+ * serve cached resource contents for up to an hour after a release).
+ */
+let cachedBuildId: string | null = null;
+export function widgetBuildId(): string {
+  if (cachedBuildId === null) cachedBuildId = createHash("sha256").update(loadBundle()).digest("hex").slice(0, 8);
+  return cachedBuildId;
+}
+
 const STYLES = `
   * { margin: 0; padding: 0; box-sizing: border-box; }
   /* A frame scrollbar that comes and goes changes the content's width, and
@@ -117,6 +132,7 @@ export function generateWidgetHtml(origin: string): string {
   <div id="content" class="loading">Loading…</div>
   <script>
     window.__MCP_ORIGIN__ = ${JSON.stringify(origin)};
+    window.__WIDGET_BUILD__ = ${JSON.stringify(widgetBuildId())};
     window.__NATIVE__ = ${native};
     window.__FRAMED__ = ${framed};
   </script>

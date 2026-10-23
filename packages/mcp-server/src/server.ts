@@ -51,6 +51,7 @@ import {
   widgetRouteFor,
   isOpenAIClient,
   isWidgetHost,
+  renderIdOf,
 } from "./tools.js";
 import { formatToolResult } from "./tool-result.js";
 import { buildChallengeResponse } from "./challenge.js";
@@ -80,7 +81,18 @@ import {
   widgetResourceMeta,
   widgetAssetOrigin,
   CLAUDE_WIDGET_MIME_TYPE,
+  widgetBuildId,
 } from "./widget/index.js";
+
+// The widget build this server serves, for telling a current widget's beacons
+// from a cached old one's. Never throws: a missing bundle only loses that tag.
+function currentWidgetBuild(): string | null {
+  try {
+    return widgetBuildId();
+  } catch {
+    return null;
+  }
+}
 import { normalizeLanguageId, isNativeLanguage } from "./widget/languages.js";
 import {
   handleProtectedResourceMetadata,
@@ -776,6 +788,7 @@ function createMcpServer(authProvider: AuthProvider, sessionMeta: SessionMeta = 
         ms: Date.now() - start,
         lang,
         item: typeof result.item_id === "string" ? result.item_id : argItemId,
+        render: renderIdOf(result),
         // What the result actually SAID, not just that it didn't throw. A
         // render_item that polls out at 45s returns status:"generating" with no
         // item — a success by `outcome` and a wasted 45s to the user. See the
@@ -1063,7 +1076,21 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     const stage = beacon[1];
     const lang = (url.searchParams.get("lang") || "-").slice(0, 8);
     const why = (url.searchParams.get("why") || "").slice(0, 200);
-    console.log(`[widget] beacon stage=${stage} lang=${lang}${why ? ` why=${why}` : ""}`);
+    // Correlation (see renderer.ts): `rid` is render_item's per-call render_id,
+    // `outcome` the render's one terminal result (mounted | card), `late` that its
+    // hydration arrived after the wait, and `wv` the widget build that sent it —
+    // `current=0` (or no wv) is a host's cached old widget, not a missing outcome.
+    // Each is allowlisted to its shape before it reaches the log.
+    const rid = url.searchParams.get("rid") ?? "";
+    const outcome = url.searchParams.get("outcome") ?? "";
+    const wv = url.searchParams.get("wv") ?? "";
+    const tags = [
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(rid) ? `rid=${rid}` : "",
+      outcome === "mounted" || outcome === "card" ? `outcome=${outcome}` : "",
+      url.searchParams.get("late") === "1" ? "late=1" : "",
+      /^[0-9a-f]{8}$/.test(wv) ? `wv=${wv} current=${wv === currentWidgetBuild() ? 1 : 0}` : "",
+    ].filter(Boolean).join(" ");
+    console.log(`[widget] beacon stage=${stage} lang=${lang}${tags ? ` ${tags}` : ""}${why ? ` why=${why}` : ""}`);
     res.writeHead(200, {
       "Content-Type": "text/javascript; charset=utf-8",
       "Access-Control-Allow-Origin": "*",

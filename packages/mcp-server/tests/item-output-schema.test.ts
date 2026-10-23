@@ -13,7 +13,7 @@ import test from "node:test";
 import Ajv from "ajv";
 
 delete process.env.GRAFFITICODE_BACKEND;
-const { handleToolCall, getItemTool, renderItemTool, createItemTool, updateItemTool } = await import("../src/tools.js");
+const { handleToolCall, getItemTool, renderItemTool, createItemTool, updateItemTool, renderIdOf } = await import("../src/tools.js");
 const { formatToolResult } = await import("../src/tool-result.js");
 
 const ITEM = {
@@ -59,8 +59,13 @@ const validUpdateItem = ajv.compile(updateItemTool.outputSchema as object);
 const FREE = { type: "freePlan", sessionId: "s-1" };
 const SIGNED_IN = { type: "firebase", token: "t", source: "oauth" };
 
-async function call(tool: string, auth: unknown, args: Record<string, unknown> = { item_id: "item-1" }) {
-  const ctx = { auth, clientKind: "openai-mcp", declaresUi: true } as never;
+async function call(
+  tool: string,
+  auth: unknown,
+  args: Record<string, unknown> = { item_id: "item-1" },
+  client: { clientKind: string; declaresUi: boolean } = { clientKind: "openai-mcp", declaresUi: true },
+) {
+  const ctx = { auth, ...client } as never;
   return formatToolResult((await handleToolCall(ctx, tool, args)) as Record<string, unknown>);
 }
 
@@ -106,3 +111,43 @@ for (const [who, auth] of [["free-plan", FREE], ["signed-in", SIGNED_IN]] as con
     assert.ok(validUpdateItem(sc), JSON.stringify(validUpdateItem.errors));
   });
 }
+
+// What the model is told to do with a ready item depends on the TOOL as well as
+// the host: only render_item mounts a widget. get_item has none, so it always
+// asks for the contents, even on a host that renders render_item's widget.
+test("a rendering host: render_item says the item is shown; get_item still asks for the contents", async () => {
+  const render = await call("render_item", SIGNED_IN);
+  const get = await call("get_item", SIGNED_IN);
+  const msg = (r: Record<string, unknown>) => String((r.structuredContent as Record<string, unknown>).message);
+  assert.match(msg(render), /displayed above/i);
+  assert.match(msg(render), /do not reproduce/i);
+  assert.doesNotMatch(msg(render), /Show the user this item's contents/);
+  assert.match(msg(get), /Show the user this item's contents/);
+  assert.doesNotMatch(msg(get), /displayed above/i);
+});
+
+test("a client that renders no widget is asked for the contents by render_item too", async () => {
+  for (const client of [
+    { clientKind: "claude-code", declaresUi: false },
+    { clientKind: "codex-mcp-client", declaresUi: true },
+  ]) {
+    const render = await call("render_item", SIGNED_IN, { item_id: "item-1" }, client);
+    assert.match(String((render.structuredContent as Record<string, unknown>).message), /Show the user this item's contents/, client.clientKind);
+  }
+});
+
+test("render_item carries a fresh render_id in its widget hydration only; get_item carries none", async () => {
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+  const a = await call("render_item", SIGNED_IN);
+  const b = await call("render_item", SIGNED_IN);
+  const idOf = (r: Record<string, unknown>) => (r._meta as { graffiticode: Record<string, unknown> }).graffiticode.render_id;
+  assert.match(String(idOf(a)), uuid);
+  assert.notEqual(idOf(a), idOf(b), "one per call");
+  assert.equal("render_id" in (a.structuredContent as Record<string, unknown>), false, "never in a field a model reads");
+  // What server.ts logs on the call's mcp_tool event.
+  const raw = (await handleToolCall({ auth: SIGNED_IN, clientKind: "openai-mcp", declaresUi: true } as never, "render_item", { item_id: "item-1" })) as Record<string, unknown>;
+  assert.match(String(renderIdOf(raw)), uuid);
+  const get = (await handleToolCall({ auth: SIGNED_IN, clientKind: "openai-mcp", declaresUi: true } as never, "get_item", { item_id: "item-1" })) as Record<string, unknown>;
+  assert.equal(renderIdOf(get), undefined);
+  assert.equal("render_id" in get, false);
+});

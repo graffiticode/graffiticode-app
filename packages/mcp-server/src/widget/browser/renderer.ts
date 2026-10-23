@@ -27,6 +27,9 @@ export { mergeToolPayload };
 
 // Injected by the HTML generator: the origin serving /widget/lang/<id>.mjs.
 declare const __MCP_ORIGIN__: string;
+// Injected by the HTML generator: this widget code's build id (widgetBuildId),
+// sent on every beacon as `wv` so a host's cached old widget can be told apart.
+declare const __WIDGET_BUILD__: string;
 // Injected by the HTML generator: which languages have a native bundle.
 declare const __NATIVE__: string[];
 // Injected by the HTML generator: languages framed from their own /form origin
@@ -71,6 +74,21 @@ const FRAME_READY_DEADLINE_MS = 20_000;
 /** A framed page's height. Its View reports none, so it scrolls inside this. */
 const FRAME_HEIGHT_PX = 600;
 
+/**
+ * How long a ready result may wait for its hydration before we say so.
+ *
+ * A host can deliver a ready result before its `_meta` (the hydration carrying
+ * `data`, the links and the `render_id`). This is NOT a deadline: past it we send
+ * one `nohydration` diagnostic and keep listening, because a delivery at six
+ * seconds must still render. Only a hydrated result settles the widget.
+ */
+const HYDRATION_WAIT_MS = 5_000;
+
+/** Whether a ready result carries the widget hydration (the item's data). */
+export function isHydrated(sc: Record<string, unknown>): boolean {
+  return sc.data !== undefined;
+}
+
 export function startRenderer(host: HostAdapter): void {
   const root = document.getElementById("content")!;
   // Latched only by a TERMINAL result. The previous `done` latch fired on the
@@ -81,6 +99,10 @@ export function startRenderer(host: HostAdapter): void {
   // whenever it changes", and made a slow item unrecoverable without a reload.
   let settled = false;
   let sawResult = false;
+  // An unhydrated ready result is waiting for its hydration: the diagnostic
+  // timer, and whether it already fired (so the eventual outcome says `late`).
+  let hydrationTimer: ReturnType<typeof setTimeout> | null = null;
+  let hydrationLate = false;
   // Undoes a pending framed render (its listener and deadline), so a later
   // result can't be overwritten by an earlier frame's verdict.
   let cancelFrame: (() => void) | null = null;
@@ -92,7 +114,25 @@ export function startRenderer(host: HostAdapter): void {
     if (settled) return;
     const sc = mergeToolPayload(r);
     const status = typeof sc.status === "string" ? sc.status : undefined;
-    if (isTerminalStatus(status)) settled = true;
+    // Only a FINISHED result settles: a failure, or a ready result WITH its
+    // hydration. A ready result whose `_meta` hasn't arrived renders a provisional
+    // card and leaves the widget listening — settling on it would discard the
+    // later delivery that carries the content, which is the only content on
+    // screen once the chat stops repeating the item.
+    if (isTerminalStatus(status)) {
+      if (status === "failed" || isHydrated(sc)) {
+        settled = true;
+        if (hydrationTimer) clearTimeout(hydrationTimer);
+        hydrationTimer = null;
+      } else if (!hydrationTimer && !hydrationLate) {
+        hydrationTimer = setTimeout(() => {
+          hydrationTimer = null;
+          if (settled) return;
+          hydrationLate = true;
+          beacon("nohydration", normalizeLang(sc.language));
+        }, HYDRATION_WAIT_MS);
+      }
+    }
     void render(r);
   });
 
@@ -143,12 +183,30 @@ export function startRenderer(host: HostAdapter): void {
     if (status === "failed") return showStatus(sc, "failed");
 
     const lang = normalizeLang(sc.language);
+    // Ready but not yet hydrated: show what we have (the name and link) and wait.
+    // No boot, no outcome — those belong to the hydrated render that follows.
+    if (!isHydrated(sc)) {
+      renderCard(sc);
+      reportHeight();
+      return;
+    }
+    // This render's id (render_item's per-call `render_id`) rides on every beacon,
+    // and the render reports exactly ONE terminal outcome: mounted or card.
+    const rid = typeof sc.render_id === "string" ? sc.render_id : undefined;
+    const late = hydrationLate;
+    let reported = false;
+    const outcome = (kind: "mounted" | "card", why?: string): void => {
+      if (reported) return;
+      reported = true;
+      beacon("outcome", lang, why, { outcome: kind, ...(rid ? { rid } : {}), ...(late ? { late: "1" } : {}) });
+    };
+    const diag = (stage: string, why?: string): void => beacon(stage, lang, why, rid ? { rid } : undefined);
     // The script ran and has a payload. Absence of this in the log means the page
     // never executed — a different problem from a component that fails to draw.
-    beacon("boot", lang);
+    diag("boot");
     const frameOrigin = framedOriginFor(lang, sc.frame_url, sc.data);
     if (frameOrigin) {
-      renderFrame(sc, lang, frameOrigin);
+      renderFrame(sc, lang, frameOrigin, outcome, diag);
       return;
     }
     // Set only when a native mount was attempted and failed; renderCard shows it.
@@ -188,9 +246,10 @@ export function startRenderer(host: HostAdapter): void {
           if (looksLikeDataDump(text)) {
             const why = `${lang} rendered its payload as JSON — the view does not understand this shape`;
             console.warn(`[widget] ${why} — using the card`);
-            beacon("dump", lang, why);
+            diag("dump", why);
             renderCard(sc, why);
             reportHeight();
+            outcome("card", why);
             return;
           }
           // Nodes are not the same thing as a rendering.
@@ -213,22 +272,25 @@ export function startRenderer(host: HostAdapter): void {
           const drewSomething =
             text.length > 0 || mountPoint.querySelector("canvas, svg, img, input, button") !== null;
           if (mountPoint.childNodes.length > 0 && drewSomething) {
-            beacon("mounted", lang);
+            diag("mounted");
+            outcome("mounted");
             return;
           }
           if (mountPoint.childNodes.length > 0) {
             const why = `${lang} mounted ${mountPoint.childNodes.length} node(s) with nothing visible — needs a host script the sandbox cannot load`;
             console.warn(`[widget] ${why} — using the card`);
-            beacon("blank", lang, why);
+            diag("blank", why);
             renderCard(sc, why);
             reportHeight();
+            outcome("card", why);
             return;
           }
           const why = `${lang} mounted but produced no output within ${EMPTY_MOUNT_GRACE_MS}ms`;
           console.warn(`[widget] ${why} — using the card`);
-          beacon("empty", lang, why);
+          diag("empty", why);
           renderCard(sc, why);
           reportHeight();
+          outcome("card", why);
         }, EMPTY_MOUNT_GRACE_MS);
         return;
       } catch (err) {
@@ -236,12 +298,13 @@ export function startRenderer(host: HostAdapter): void {
         // the content card, which needs no bundle.
         mountError = `${lang} failed to mount: ${err instanceof Error ? err.message : String(err)}`;
         console.error("[widget] native mount failed:", err);
-        beacon("error", lang, mountError);
+        diag("error", mountError);
       }
     }
     renderCard(sc, mountError);
-    beacon("card", lang, mountError);
+    diag("card", mountError);
     reportHeight();
+    outcome("card", mountError);
   }
 
   /**
@@ -293,7 +356,13 @@ export function startRenderer(host: HostAdapter): void {
    * frame and origin. That is how a signed-in user's private item renders with no
    * credential in the frame.
    */
-  function renderFrame(sc: Record<string, unknown>, lang: string, origin: string): void {
+  function renderFrame(
+    sc: Record<string, unknown>,
+    lang: string,
+    origin: string,
+    outcome: (kind: "mounted" | "card", why?: string) => void,
+    diag: (stage: string, why?: string) => void,
+  ): void {
     const url = new URL(sc.frame_url as string);
     url.searchParams.set("origin", window.location.origin);
     renderCard(sc);
@@ -321,9 +390,10 @@ export function startRenderer(host: HostAdapter): void {
       stop();
       cancelFrame = null;
       console.warn(`[widget] ${why} — keeping the card`);
-      beacon(stage, lang, why);
+      diag(stage, why);
       holder.remove();
       reportHeight();
+      outcome("card", why);
     };
     function onMessage(event: MessageEvent): void {
       if (done || event.origin !== origin || event.source !== frame.contentWindow) return;
@@ -342,7 +412,8 @@ export function startRenderer(host: HostAdapter): void {
         frame.removeAttribute("tabindex");
         appendFooterLink(sc);
         reportHeight();
-        beacon("mounted", lang);
+        diag("mounted");
+        outcome("mounted");
       } else if (msg.type === "preview-error") {
         fallBack("frameerror", `${lang} framed preview failed: ${String(msg.reason ?? "unknown")}`);
       }
@@ -364,11 +435,17 @@ export function startRenderer(host: HostAdapter): void {
    * signal, and the server's access log is the readout. Fire and forget: a
    * failed beacon must never affect what the user sees.
    */
-  function beacon(stage: string, lang?: string, why?: string): void {
+  function beacon(stage: string, lang?: string, why?: string, extra?: Record<string, string>): void {
     try {
       const q = new URLSearchParams();
       if (lang) q.set("lang", lang);
       if (why) q.set("why", why.slice(0, 200));
+      for (const [k, v] of Object.entries(extra ?? {})) q.set(k, v);
+      if (typeof __WIDGET_BUILD__ !== "undefined") q.set("wv", __WIDGET_BUILD__);
+      // Test seam: jsdom can't resolve the import below, so tests observe the
+      // beacon here. Never set in a real page.
+      (globalThis as { __BEACON_SINK__?: (stage: string, q: Record<string, string>) => void })
+        .__BEACON_SINK__?.(stage, Object.fromEntries(q));
       void import(
         /* @vite-ignore */ `${__MCP_ORIGIN__}/widget/beacon/${stage}.mjs?${q.toString()}`
       ).catch(() => {});

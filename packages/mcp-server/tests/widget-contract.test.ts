@@ -76,3 +76,26 @@ test("renderer merges namespaced hydration with compact structured content", () 
   assert.deepEqual(merged.data, { data: { type: "spreadsheet" }, errors: [] });
   assert.equal(merged.view_url, "https://app.graffiticode.org/form/item-1");
 });
+
+test("the widget resource asks ChatGPT not to narrate what it shows (openai/widgetDescription)", async () => {
+  const { widgetResourceMeta, WIDGET_DESCRIPTION } = await import("../src/widget/index.js");
+  const meta = widgetResourceMeta() as Record<string, unknown>;
+  assert.equal(meta["openai/widgetDescription"], WIDGET_DESCRIPTION);
+  assert.match(WIDGET_DESCRIPTION, /need not restate its contents/);
+});
+
+test("the widget build id is the bundle's hash, injected into the HTML without a cycle", async () => {
+  const { createHash } = await import("node:crypto");
+  const { readFileSync } = await import("node:fs");
+  const { widgetBuildId, generateWidgetHtml, widgetContentHash } = await import("../src/widget/index.js");
+  const bundle = readFileSync(new URL("../dist/widget/widget.bundle.js", import.meta.url), "utf8");
+  const id = widgetBuildId();
+  assert.equal(id, createHash("sha256").update(bundle).digest("hex").slice(0, 8));
+  assert.equal(widgetBuildId(), id, "stable");
+  const html = generateWidgetHtml("https://mcp.graffiticode.org");
+  assert.ok(html.includes(`window.__WIDGET_BUILD__ = ${JSON.stringify(id)};`));
+  // The resource hash covers the HTML (and so the build id) and its metadata; a
+  // metadata-only change moves the resource hash but never the build id.
+  assert.notEqual(widgetContentHash("https://mcp.graffiticode.org", { a: 1 }), widgetContentHash("https://mcp.graffiticode.org", { a: 2 }));
+  assert.equal(widgetBuildId(), id);
+});
