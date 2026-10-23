@@ -13,7 +13,11 @@ import { assertItemCreateAllowed } from "./access.js";
 
 // startCodeGeneration: reserve a v2 job (with the item shell, for a create) and
 // wake the console's worker. Serves create_item and update_item.
-export async function startGeneration(ctx: any, args: any) {
+// `trusted` carries what only an in-process caller may set: `externalWrites:
+// false` from the MCP backend (core-backend.ts), so MCP authoring never writes
+// outside Graffiticode. A separate argument, never read from `args`, because
+// GraphQL and REST hand their request input straight to `args`.
+export async function startGeneration(ctx: any, args: any, trusted: { externalWrites?: false } = {}) {
   const {
     itemId,
     siblingOf,
@@ -106,6 +110,7 @@ export async function startGeneration(ctx: any, args: any) {
       auth, itemId, lang, name, client, prompt, modification, currentSrc, currentData,
       ...(baseTaskId !== undefined ? { baseTaskId } : {}),
       sessionNamespace: ctx.sessionNamespace, sessionUuid: ctx.sessionUuid, workspaceKey, idempotency,
+      externalWrites: trusted.externalWrites === false ? false : true,
     });
     return {
       itemId: reserved.itemId,

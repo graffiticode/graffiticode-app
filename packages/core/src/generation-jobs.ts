@@ -97,6 +97,13 @@ export type JobEnvelope = {
   deadlineAt: number;
   // User jobs: the act-as grant for this job (never a token).
   actAsGrant: string | null;
+  // false: the worker never records or performs a connection write, whatever
+  // language or upstream the router picks. Set only from the in-process MCP
+  // backend's trusted argument (core-backend.ts), never from GraphQL or REST
+  // input: MCP authoring must not write outside Graffiticode (OpenAI's review;
+  // saving to a Learnosity item bank is a console action). Absent on older
+  // envelopes and every other caller's: today's behaviour.
+  externalWrites?: boolean;
 };
 
 export type GenerationJobDoc = { envelope: JobEnvelope; dispatch: JobDispatch };
@@ -158,7 +165,7 @@ function pointerFields(generationId: string, state: GenerationPointer["state"], 
  */
 export async function reserveGeneration({
   auth, itemId, lang, name, client, prompt, modification, currentSrc, currentData, baseTaskId,
-  sessionNamespace, sessionUuid, workspaceKey, idempotency, now = Date.now(),
+  sessionNamespace, sessionUuid, workspaceKey, idempotency, externalWrites = true, now = Date.now(),
 }: {
   auth: Principal;
   itemId?: string | null;
@@ -176,6 +183,9 @@ export async function reserveGeneration({
   workspaceKey?: string | null;
   // A REST Idempotency-Key claim, bound to this job in the same commit.
   idempotency?: IdempotencyClaim | null;
+  // false only from the in-process MCP backend's trusted argument, never from
+  // request input (see JobEnvelope.externalWrites).
+  externalWrites?: boolean;
   now?: number;
 }): Promise<{ itemId: string; generationId: string }> {
   const generationId = randomUUID();
@@ -211,6 +221,7 @@ export async function reserveGeneration({
     createdAt: now,
     deadlineAt,
     actAsGrant,
+    externalWrites: externalWrites !== false,
   });
   const dispatch: JobDispatch = {
     state: "reserved",
@@ -585,7 +596,10 @@ export async function runJobV2(generationId: string): Promise<{ status: number; 
       return { status: 200, body: { status: "failed", error: message } };
     }
     const lang = result.language && result.language !== env.lang ? result.language : env.lang;
-    const connection = await connectionIntent(auth, lang, result.taskCode);
+    // MCP authoring never writes externally: no intent, so completeJob records
+    // no connection_write and the sweeper has nothing to send. Language-
+    // independent: it holds for whatever language and upstreams the router chose.
+    const connection = env.externalWrites === false ? null : await connectionIntent(auth, lang, result.taskCode);
     holding();
     await completeJob(generationId, owner, auth, result, connection);
     // Right after the commit, as the user we already act as; the sweeper
@@ -695,6 +709,8 @@ export async function retryGeneration({ auth, itemId, idempotency, now = Date.no
     sessionUuid: env.principal.kind === "freePlan" ? env.principal.sessionUuid : null,
     workspaceKey: env.workspaceKey,
     idempotency,
+    // A retry of MCP authoring stays write-free.
+    externalWrites: env.externalWrites !== false,
     now,
   });
 }

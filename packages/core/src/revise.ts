@@ -114,6 +114,9 @@ export async function createFromDescription(
   ctx: RequestCredentials & Record<string, unknown>,
   { lang, description, name, siblingOf, client, clientKind, geoCountry, idempotency }:
     { lang: string; description: string; name?: string; siblingOf?: string; idempotency?: unknown } & Hints,
+  // `{ externalWrites: false }` from the in-process MCP backend only
+  // (generation.ts startGeneration).
+  trusted: { externalWrites?: false } = {},
 ) {
   const misuse = detectForwardedArtifact(description);
   if (misuse) throw new Error(misuse);
@@ -127,7 +130,7 @@ export async function createFromDescription(
     prompt: description,
     modification: description,
     idempotency,
-  });
+  }, trusted);
 }
 
 // update_item: a revision of an existing item. The prompt carries the
@@ -136,6 +139,7 @@ export async function createFromDescription(
 export async function reviseItem(
   ctx: RequestCredentials & Record<string, unknown>,
   { itemId, modification, client, clientKind, geoCountry, idempotency }: { itemId: string; modification: string; idempotency?: unknown } & Hints,
+  trusted: { externalWrites?: false } = {},
 ) {
   const auth = await resolveAuth(ctx);
   const item: any = await getItem({ auth, id: itemId, connectionFields: false });
@@ -155,5 +159,5 @@ export async function reviseItem(
     currentData,
     baseTaskId: item.taskId ?? null,
     idempotency,
-  });
+  }, trusted);
 }
