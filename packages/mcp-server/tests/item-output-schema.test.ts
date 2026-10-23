@@ -13,7 +13,7 @@ import test from "node:test";
 import Ajv from "ajv";
 
 delete process.env.GRAFFITICODE_BACKEND;
-const { handleToolCall, getItemTool, renderItemTool } = await import("../src/tools.js");
+const { handleToolCall, getItemTool, renderItemTool, createItemTool, updateItemTool } = await import("../src/tools.js");
 const { formatToolResult } = await import("../src/tool-result.js");
 
 const ITEM = {
@@ -45,6 +45,7 @@ globalThis.fetch = (async (_url: string, init: { body: string }) => {
   const { query } = JSON.parse(init.body);
   const data = /GetItemWithTask/.test(query) ? { item: ITEM }
     : /GetData/.test(query) ? { data: JSON.stringify(DATA) }
+    : /StartCodeGeneration/.test(query) ? { startCodeGeneration: { itemId: "item-1", status: "generating", workspaceNamespace: null } }
     : {};
   return { ok: true, status: 200, json: async () => ({ data }), text: async () => "" };
 }) as never;
@@ -52,13 +53,15 @@ globalThis.fetch = (async (_url: string, init: { body: string }) => {
 const ajv = new Ajv({ strict: false, allErrors: true });
 const validGetItem = ajv.compile(getItemTool.outputSchema as object);
 const validRenderItem = ajv.compile(renderItemTool.outputSchema as object);
+const validCreateItem = ajv.compile(createItemTool.outputSchema as object);
+const validUpdateItem = ajv.compile(updateItemTool.outputSchema as object);
 
 const FREE = { type: "freePlan", sessionId: "s-1" };
 const SIGNED_IN = { type: "firebase", token: "t", source: "oauth" };
 
-async function call(tool: string, auth: unknown) {
+async function call(tool: string, auth: unknown, args: Record<string, unknown> = { item_id: "item-1" }) {
   const ctx = { auth, clientKind: "openai-mcp", declaresUi: true } as never;
-  return formatToolResult((await handleToolCall(ctx, tool, { item_id: "item-1" })) as Record<string, unknown>);
+  return formatToolResult((await handleToolCall(ctx, tool, args)) as Record<string, unknown>);
 }
 
 for (const [who, auth] of [["free-plan", FREE], ["signed-in", SIGNED_IN]] as const) {
@@ -84,3 +87,22 @@ test("frame_url reaches render_item's widget hydration, signed in or not, and ne
     assert.equal(hydration.frame_url, "https://l0176.graffiticode.org/form?source=parent");
   }
 });
+
+// create_item / update_item return a "generating" result that carries `summary`;
+// their schema forbids undeclared properties, so an undeclared field made every
+// result invalid for a validating client.
+for (const [who, auth] of [["free-plan", FREE], ["signed-in", SIGNED_IN]] as const) {
+  test(`${who} create_item output validates against its outputSchema`, async () => {
+    const res = await call("create_item", auth, { language: "L0176", description: "A multiple choice question about photosynthesis." });
+    const sc = res.structuredContent as Record<string, unknown>;
+    assert.equal(sc.status, "generating");
+    assert.ok(validCreateItem(sc), JSON.stringify(validCreateItem.errors));
+  });
+
+  test(`${who} update_item output validates against its outputSchema`, async () => {
+    const res = await call("update_item", auth, { item_id: "item-1", modification: "Make it harder." });
+    const sc = res.structuredContent as Record<string, unknown>;
+    assert.equal(sc.status, "generating");
+    assert.ok(validUpdateItem(sc), JSON.stringify(validUpdateItem.errors));
+  });
+}

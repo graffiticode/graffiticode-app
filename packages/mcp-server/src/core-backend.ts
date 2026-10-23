@@ -176,10 +176,17 @@ export async function coreExecute(auth: AuthContext, query: string, variables: R
 
 // create_item / update_item in core mode: the shared preparation in
 // @graffiticode-app/core/revise, rather than this server's copy.
+// MCP authoring never writes outside Graffiticode (OpenAI's review: nothing
+// hidden behind create_item / update_item; saving to a Learnosity item bank is a
+// console action). Passed as core's separate trusted argument, which only this
+// in-process backend can set; the worker then records and sends no connection
+// write, whatever language the router picks.
+const MCP_AUTHORING = { externalWrites: false } as const;
+
 export async function coreCreateItem(auth: AuthContext, args: Parameters<typeof createFromDescription>[1]) {
   const ctx = await contextFor(auth);
   try {
-    return job(await createFromDescription(ctx, args));
+    return job(await createFromDescription(ctx, args, MCP_AUTHORING));
   } catch (err) {
     throw asGraphqlError(err);
   }
@@ -188,7 +195,7 @@ export async function coreCreateItem(auth: AuthContext, args: Parameters<typeof 
 export async function coreReviseItem(auth: AuthContext, args: Parameters<typeof reviseItem>[1]) {
   const ctx = await contextFor(auth);
   try {
-    return job(await reviseItem(ctx, args));
+    return job(await reviseItem(ctx, args, MCP_AUTHORING));
   } catch (err) {
     // This server reports a missing item itself, unwrapped (handleUpdateItem).
     if (err instanceof NotFoundError) throw new Error(err.message);

@@ -308,3 +308,46 @@ test("the advertised oauth2 scopes are exactly what the OAuth server grants", as
   assert.ok(oauth2, "an oauth2 scheme is advertised");
   assert.deepEqual([...(oauth2!.scopes ?? [])], supported);
 });
+
+// The router model: exactly the original seven tools. create_item routes to a
+// language; nothing is split per language, and no tool is added.
+test("exactly the seven tools, discovery included", () => {
+  assert.deepEqual((tools as ToolRecord[]).map((t) => t.name).sort(), [
+    "create_item", "get_item", "get_language_info", "get_spec", "list_languages", "render_item", "update_item",
+  ]);
+  const create = (tools as ToolRecord[]).find((t) => t.name === "create_item")!;
+  const schema = create.inputSchema as { properties: Record<string, unknown>; required: string[] };
+  assert.ok(schema.properties.language, "create_item still takes the routed language guess");
+  assert.ok(schema.required.includes("language"));
+});
+
+// The effect boundary is stated, not hidden: authoring never writes outside
+// Graffiticode, and saving to Learnosity is a console action, never update_item.
+test("create_item and update_item state that they never write externally", () => {
+  for (const name of ["create_item", "update_item"]) {
+    const d = String((tools as ToolRecord[]).find((t) => t.name === name)!.description);
+    assert.match(d, /never writes to an external system/, name);
+    assert.match(d, /Learnosity item bank/, name);
+    assert.match(d, /Graffiticode console/, name);
+  }
+  const update = String((tools as ToolRecord[]).find((t) => t.name === "update_item")!.description);
+  assert.match(update, /never call it to "save"/);
+});
+
+test("a deployed server refuses to author outside core mode; tests and local dev are unaffected", async () => {
+  const { assertAuthoringBackend } = await import("../src/tools.js");
+  const saved = { k: process.env.K_SERVICE, b: process.env.GRAFFITICODE_BACKEND };
+  try {
+    process.env.K_SERVICE = "mcp-service";
+    delete process.env.GRAFFITICODE_BACKEND;
+    assert.throws(() => assertAuthoringBackend(), /GRAFFITICODE_BACKEND=core/);
+    process.env.GRAFFITICODE_BACKEND = "core";
+    assert.doesNotThrow(() => assertAuthoringBackend());
+    delete process.env.K_SERVICE;
+    delete process.env.GRAFFITICODE_BACKEND;
+    assert.doesNotThrow(() => assertAuthoringBackend());
+  } finally {
+    if (saved.k === undefined) delete process.env.K_SERVICE; else process.env.K_SERVICE = saved.k;
+    if (saved.b === undefined) delete process.env.GRAFFITICODE_BACKEND; else process.env.GRAFFITICODE_BACKEND = saved.b;
+  }
+});
