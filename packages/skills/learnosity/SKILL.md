@@ -67,9 +67,16 @@ Call `create_item(language, description)` with a natural-language description. W
 Bad: "Make a Learnosity MCQ about fractions."
 Good: "Author a Learnosity multiple-choice item on adding fractions with unlike denominators for Grade 5. Four options, one correct answer, three distractors that reflect common errors (not finding a common denominator, adding numerators and denominators separately, forgetting to simplify). Exact-match scoring, one point. Tag the item with standard CCSS.MATH.CONTENT.5.NF.A.1."
 
+**Show it with `render_item`.**
+
+`create_item` returns at once with an `item_id` and `status: "generating"` — no content and no links yet. Call `render_item(item_id)` next, every time. It waits for the generation, then:
+- **`ready`**: the item renders (inline where the host supports widgets). Use the result's `summary`, `language`, `view_url` and, on the free plan, `claim_url` / `claim_message`.
+- **`generating`**: still running; `progress` says how far. Call `render_item` again.
+- **`failed`**: tell the user what `error` / `message` says and offer to retry with a clearer description. Surface no links.
+
 **Iterate with `update_item`.**
 
-`update_item(item_id, modification)` preserves conversation history. Incremental Learnosity-specific edits compose naturally: "add a second distractor matching the common error of …," "switch to partial-match scoring," "change the stimulus image," "add a hint," "tag with an additional standard."
+`update_item(item_id, modification)` preserves conversation history. Incremental Learnosity-specific edits compose naturally: "add a second distractor matching the common error of …," "switch to partial-match scoring," "change the stimulus image," "add a hint," "tag with an additional standard." It is asynchronous too: follow it with `render_item(item_id)`.
 
 **Do not call `get_item` before `update_item` for edits.** `update_item` already reads the current state internally; an explicit `get_item` first is redundant and slower. Only call `get_item` when the user explicitly asks to inspect the item's current content or when you need to cite the item ID back to them.
 
@@ -135,10 +142,11 @@ Good: *"From our nightly sync, read every item in the bank tagged Grade 5 — al
 
 **Graffiticode's tools author content; they never write to Learnosity.** `create_item` and `update_item` never save to an item bank, whatever the instruction says, and their results carry no `itemBank` outcome. Don't ask `update_item` to "save" an item, and never tell the user an item was saved to Learnosity.
 
-When the user wants an item in their item bank, hand off to the Graffiticode console:
+When the user wants a ready item in their item bank, hand off to the Graffiticode console. Which link depends on whether the user is signed in, i.e. whether the `render_item` result has a `claim_url`:
 
-1. Give them the item's console page: `https://console.graffiticode.org/items/<item_id>` (built from the `item_id` you already have). **Not** the `view_url`: that opens the rendered item, which has no save control.
-2. They need to be **signed in as the account that owns the item** (a free-plan item must be claimed first, through its `claim_url`) and to have a **current Learnosity connection** (console Settings). The item's **Connection** panel shows "Saves write through <connection>".
+1. **Signed in (no `claim_url`):** give them the item's console page, `https://console.graffiticode.org/items/<item_id>`, built from the `item_id` you have. **Not** the `view_url`: that opens the rendered item, which has no save control.
+   **Free plan (a `claim_url`):** don't build a console link — the item isn't in an account yet, and claiming copies it into the user's account **under a new id**, so a link made from this `item_id` won't open it. Give them the `claim_url`: they sign in, the item is saved to their account, and the claim screen's **Open item** button opens the saved copy's console page. (If several items were claimed together, the others are in the console's items list.)
+2. They need a **current Learnosity connection** (console Settings). The item's **Connection** panel shows "Saves write through <connection>".
 3. **Saving.** If the user asked for the save while authoring, the item already requests it, so **Recompile** in the item's menu writes the current version to the bank as new draft items. Otherwise they ask for the save in the console and save the edit, which writes it.
 4. The Connection panel then shows **"Saved to Learnosity"**, or a problem with **Retry** / **Check the item bank**. Saved items land as unpublished drafts; publishing is done in Learnosity's Author Site.
 
@@ -150,19 +158,15 @@ When the user wants an item in their item bank, hand off to the Graffiticode con
 
 Items render as interactive widgets inline in claude.ai. **The widget is the rendering. Your reply is a one-line summary, nothing more.**
 
-Prefer the response's own summary fields for that one-sentence confirmation:
+Base that one-sentence confirmation on the ready `render_item` result's `summary` — e.g., *"Added a second distractor on Q2 and switched to partial-match scoring."* When the user wants it in their item bank, point them to the console handoff above, and never report a save.
 
-- **On first creation** (`create_item`): echo `description`.
-- **On edits** (`update_item`): echo `change_summary` — e.g., *"Added a second distractor on Q2 and switched to partial-match scoring."*
-- **When the user wants it in their item bank**: point them to the console page and steps above. Never report a save.
-
-Don't re-parse `data.questions` to describe what changed; the backend wrote the summary for you.
+Don't fetch the item's data to describe what changed; the backend wrote the summary for you.
 
 **Do not preview or simulate the item in chat.** No mock MCQ / cloze / shortText layouts, no option lists, no printed answer keys, no Learnosity JSON dumps, no "here's what the item looks like" sections in prose or Markdown. The widget renders the item — your one-liner accompanies the widget, it does not substitute for it. If the user asks "what does it look like?" or "show me the questions," point them to the rendered widget; don't reproduce the content as text.
 
 ## Saving the Graffiticode item itself (free plan)
 
-Distinct from saving to the **Learnosity** item bank (above): the Graffiticode item also has a **`view_url`** in every response — surface it so the user can open the rendered item. If the call was made **without Graffiticode credentials (free plan)**, the response also includes a **`claim_url`** / **`claim_message`**, and the `view_url` carries the claim token so its footer offers a one-click **"Claim it in Graffiticode →"** link; free-plan Graffiticode items expire after 48 hours unless claimed. (Saving to the Learnosity item bank is a separate, account-backed console action — see above.) Only surface the URLs the server returned.
+Distinct from saving to the **Learnosity** item bank (above): once the item is ready, the `render_item` result has a **`view_url`** — surface it so the user can open the rendered item. If the user is **not signed in to Graffiticode (free plan)**, it also includes a **`claim_url`** / **`claim_message`**, and the `view_url` carries the claim token so its footer offers a one-click **"Claim it in Graffiticode →"** link; free-plan Graffiticode items expire after 48 hours unless claimed. (Saving to the Learnosity item bank is a separate, account-backed console action — see above.) Only surface the URLs the server returned, and only from a `ready` result.
 
 ## Guardrails
 
@@ -174,8 +178,9 @@ Distinct from saving to the **Learnosity** item bank (above): the Graffiticode i
 - **Never close a knowledge hole from memory.** When the recipe marks a vendor config binding *unconfirmed*, relay it as unconfirmed. Filling that gap with a remembered Learnosity config path yields an integration that fails open — it looks configured and enforces nothing, and the user ships it believing otherwise.
 - **Never report a config-driven restriction as working on the strength of a clean render.** A fired ready callback means the page loaded, not that your config took effect. Confirm it differentially — run with the key and without it, and compare — or tell the user it is unverified.
 - **Stay in the Learnosity lane.** If the user asks for something outside Learnosity (flashcards, spreadsheets, concept webs), suggest the broader `assessments` skill rather than forcing a Learnosity fit.
+- **Always follow `create_item` / `update_item` with `render_item`.** Their own response only says "generating"; never present it as the finished item.
 - **Iterate, don't recreate.** On follow-up edits, call `update_item` on the existing `item_id`; fresh creates lose conversation history.
-- **Never save through the tools.** `update_item` is for content edits only; saving to the item bank happens in the Graffiticode console (`https://console.graffiticode.org/items/<item_id>`). Don't improvise API-direct or computer-use save paths.
+- **Never save through the tools.** `update_item` is for content edits only; saving to the item bank happens in the Graffiticode console (the item's console page when signed in; through the `claim_url` on the free plan). Don't improvise API-direct or computer-use save paths.
 - **Never plan a paged read without declaring how far it goes.** One page or to exhaustion is part of the design, not a detail. A read that stops early returns HTTP 200 with a well-formed body and a count of the page, so nothing downstream will ever tell the user data is missing.
 - **Never reuse a paging loop across endpoint families.** The item-bank and sessions families end on opposite signals. Implement the rule the recipe gives for the operation you asked about, and write a separate loop for a different family rather than generalizing.
 - **Never send a partial write payload without confirming the semantics.** Replace is the default and the verb does not predict it. Under replace, every field you omit is cleared and the response says nothing — get the semantics from the recipe and state them to the user before they run it against a real bank.

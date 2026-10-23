@@ -109,7 +109,7 @@ Call list_languages(search, domain) only when the catalog does not obviously ans
 
 Some languages are gated: they target a specific vendor or platform and carry a \`when_to_use\` note saying so. Never pick one unless the user actually named that vendor or platform — matching item types (multiple-choice, cloze, short text) is never sufficient. If no language fits the request, tell the user what Graffiticode does have and ask, rather than settling for the nearest match.
 
-Authoring stays inside Graffiticode: create_item and update_item never write to an external system. Saving an item to a Learnosity item bank is something the user does in the Graffiticode console, at https://console.graffiticode.org/items/<item_id> (signed in, with a Learnosity connection) — never ask update_item to "save" it.
+Authoring stays inside Graffiticode: create_item and update_item never write to an external system. Saving an item to a Learnosity item bank is something the user does in the Graffiticode console, with a Learnosity connection: signed in, at https://console.graffiticode.org/items/<item_id>; on the free plan, through the claim_url (claiming saves a copy under a new id, which the claim screen's Open item button opens) — never ask update_item to "save" it.
 
 All requests to create_item and update_item must be natural language descriptions of what to create or change. A language-specific AI backend handles all code generation. Do not attempt to generate Graffiticode DSL code directly.
 

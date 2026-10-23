@@ -46,6 +46,8 @@ test("the instructions say saving to Learnosity is a console action, and the hea
   const s = buildServerInstructions(CATALOG);
   assert.match(s, /never write to an external system/);
   assert.match(s, /https:\/\/console\.graffiticode\.org\/items\/<item_id>/);
+  // A free-plan item is claimed into a copy with a new id, so its link is the claim_url.
+  assert.match(s, /free plan, through the claim_url/);
   const head = s.split("\n\nFAST-PATH")[0];
   assert.ok(head.length <= INSTRUCTIONS_HEAD_BUDGET, `head is ${head.length} chars`);
 });

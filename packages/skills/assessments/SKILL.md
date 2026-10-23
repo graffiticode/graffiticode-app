@@ -101,9 +101,16 @@ A good description is specific about:
 Bad: "Make a quiz about fractions."
 Good: "Create a 5-item multiple-choice quiz on adding fractions with unlike denominators. Grade 5 level. Each item has four choices with one correct answer and three plausible distractors that reflect common computational errors. Include an answer key and a one-sentence explanation per item."
 
-**2. Iterate with `update_item`.**
+**2. Show it with `render_item`.**
 
-`update_item(item_id, modification)` preserves conversation history, so incremental edits compose naturally: "make the distractors harder," "add a hint on question 3," "switch to a dark theme," "change the topic from fractions to decimals." Prefer iteration over recreation — history is lost on a fresh create.
+`create_item` returns at once with an `item_id` and `status: "generating"` — no content and no links yet. Call `render_item(item_id)` next, every time. It waits for the generation, then:
+- **`ready`**: the item renders (inline where the host supports widgets). Use the result's `summary`, `language`, `view_url` and, on the free plan, `claim_url` / `claim_message`.
+- **`generating`**: still running; `progress` says how far. Call `render_item` again.
+- **`failed`**: tell the user what `error` / `message` says and offer to retry with a clearer description. Surface no links.
+
+**3. Iterate with `update_item`.**
+
+`update_item(item_id, modification)` preserves conversation history, so incremental edits compose naturally: "make the distractors harder," "add a hint on question 3," "switch to a dark theme," "change the topic from fractions to decimals." Prefer iteration over recreation — history is lost on a fresh create. It is asynchronous too: follow it with `render_item(item_id)`.
 
 ## Composite requests (content + a host/format)
 
@@ -118,7 +125,7 @@ with `get_spec`, then create the host item from that spec.
 
 1. **Author the inner content in its own specialist.** Describe just the content (e.g. "a Grade 5
    ELA, Claim 1 Target 11 reasoning-and-evidence item about <topic>") and `create_item` it — the
-   server routes it to the right specialist dialect. `get_item` to confirm it's ready.
+   server routes it to the right specialist dialect. `render_item` to confirm it's ready.
 2. **`get_spec(inner_item_id)`** — returns a complete, platform-neutral English description of the
    authored content (passage, stems, options, answer keys, rationales — everything).
 3. **Create the host item from the spec.** `create_item(host_language, <that spec> + your intent
@@ -133,18 +140,13 @@ is the only correct bridge.
 
 Items render as interactive widgets inline in claude.ai. The tool response carries the widget metadata automatically. **The widget is the rendering. Your reply is a one-line summary, nothing more.**
 
-Prefer the response's own summary fields for that one-sentence confirmation:
-
-- **On first creation** (`create_item`): echo `description` ("what the code does") — e.g., *"Made a 5-item MCQ on photosynthesis with four distractors each."*
-- **On edits** (`update_item`): echo `change_summary` ("what changed this turn") — e.g., *"Switched to dark theme and hardened the distractors on Q3."*
-
-Don't re-parse `data` to describe what changed; the backend already wrote the summary for you. If a field is `null` (rare — typically only when the code generator failed), fall back to a brief summary drawn from the user's own request.
+Base that one-sentence confirmation on the ready `render_item` result's `summary` — e.g., *"Made a 5-item MCQ on photosynthesis with four distractors each,"* or after an edit, *"Switched to dark theme and hardened the distractors on Q3."* Don't fetch the item's data to describe it; if there's no `summary`, write a brief line drawn from the user's own request.
 
 **Do not preview or simulate the item in chat.** No sample layouts, no mock multiple-choice blocks, no ASCII/Markdown renderings of the stem and options, no printed answer keys, no "here's what it looks like" sections. The widget renders the item — your one-liner is in addition to, not a substitute for, the widget. If the user asks "what does it look like?" or "show me the questions," point them at the widget; do not reproduce the content in prose or formatted text.
 
 ## Saving the item (free plan)
 
-Each `create_item` / `update_item` response carries a **`view_url`** (the item's page on `app.graffiticode.org`); surface it so the user can open or share the rendered item. When the call was made **without credentials (free plan)**, the response also includes a **`claim_url`** and a **`claim_message`**, and the `view_url` carries the claim token — so when the user opens it, the render-host footer offers a one-click **"Claim it in Graffiticode →"** link for that item (the primary way to save it). Surface the `view_url` and, in chat, the `claim_message` (the same `/claim` destination by a manual route). Free-plan items are session-scoped and expire after 48 hours unless claimed. Only surface the URLs the server returned; if `claim_url` is absent the call was authenticated and the item already persists.
+Once the item is ready, the `render_item` result carries a **`view_url`** (the item's page on `app.graffiticode.org`); surface it so the user can open or share the rendered item. When the user is **not signed in (free plan)**, it also includes a **`claim_url`** and a **`claim_message`**, and the `view_url` carries the claim token — so when the user opens it, the render-host footer offers a one-click **"Claim it in Graffiticode →"** link for that item (the primary way to save it). Surface the `view_url` and, in chat, the `claim_message` (the same `/claim` destination by a manual route). Free-plan items are session-scoped and expire after 48 hours unless claimed. Only surface the URLs the server returned, and only from a `ready` result; if `claim_url` is absent the user is signed in and the item already persists.
 
 ## Guardrails
 
@@ -155,4 +157,5 @@ Each `create_item` / `update_item` response carries a **`view_url`** (the item's
 - **Never pick a Learnosity language unless the user named Learnosity.** A `learnosity`-domain language is off the table unless the user named Learnosity, an Item Bank, the Items API, or a Learnosity-integrated LMS. Question type (MCQ, cloze, short-text, ordering, choice-matrix) is **never** the discriminator — every platform has those. When the user *has* named Learnosity, the `learnosity` skill (if installed) is the better fit; it is tighter and scoped to that domain.
 - **No silent fallback.** A generic quiz has a home — the general-purpose assessment language. But if nothing in the `assessments` set matches the request, say so and ask (see the routing section); never settle for the nearest-looking language, and never substitute a shape the language says it has not built.
 - **An opinion is not an assessment.** A survey, poll, or idea-ranking request has no answer key and scores nobody — a response there is never right or wrong. That is a different domain. Route out and say so, rather than authoring it as an unscored quiz item.
+- **Always follow `create_item` / `update_item` with `render_item`.** Their own response only says "generating"; never present it as the finished item. Check the `language` on the `render_item` result — the platform may have routed the request to a different language than you asked for.
 - **Respect the conversation.** On follow-up edits, call `update_item` on the existing `item_id`; don't start over unless the user explicitly asks for a new item.

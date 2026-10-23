@@ -311,8 +311,9 @@ nothing, leaving the user with a claim and an empty screen.
    accepted answer marked ✓, the note "Interactive preview unavailable — open it to use the
    item", and an "Open the Learnosity assessment" link.
    **Saving (2026-10-23):** if the reviewer asks to "save it to the item bank", the expected
-   answer points them to `https://console.graffiticode.org/items/<item_id>` (sign in, Learnosity
-   connection, Recompile). `create_item` / `update_item` never save, and never claim to.
+   answer points them to the console (Learnosity connection, Recompile): signed in, at
+   `https://console.graffiticode.org/items/<item_id>`; anonymous, through the item's `claim_url`,
+   whose claim screen's **Open item** opens the claimed copy (claiming gives it a new id). `create_item` / `update_item` never save, and never claim to.
    *Verified 2026-09-17: L0176, ready in 11.3s.*
    **Superseded 2026-10-22 (pending §5a):** a reviewer, signed in or not, now gets the item
    interactive inline. The widget shows the card above first, frames
@@ -388,7 +389,7 @@ that are not individually exposed."* Two real problems sat behind it, and both a
     records and sends **no** connection write, for any language, composition or retry
     (graffiticode-app #41).
   - Saving to a Learnosity item bank is a **console action**
-    (`https://console.graffiticode.org/items/<item_id>`), and the skill says so.
+    (the item's console page, or its `claim_url` on the free plan), and the skill says so.
 - **An unstated contract.** Both descriptions now state the effects, and the generating output
   schema declares the `summary` it always returned.
 
