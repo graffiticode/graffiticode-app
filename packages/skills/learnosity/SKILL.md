@@ -71,7 +71,7 @@ Good: "Author a Learnosity multiple-choice item on adding fractions with unlike 
 
 `update_item(item_id, modification)` preserves conversation history. Incremental Learnosity-specific edits compose naturally: "add a second distractor matching the common error of …," "switch to partial-match scoring," "change the stimulus image," "add a hint," "tag with an additional standard."
 
-**Do not call `get_item` before `update_item` for edits or saves.** `update_item` already reads the current state internally; an explicit `get_item` first is redundant and slower. Only call `get_item` when the user explicitly asks to inspect the item's current content or when you need to cite the item ID back to them.
+**Do not call `get_item` before `update_item` for edits.** `update_item` already reads the current state internally; an explicit `get_item` first is redundant and slower. Only call `get_item` when the user explicitly asks to inspect the item's current content or when you need to cite the item ID back to them.
 
 ## Planning an authoring-UX integration
 
@@ -131,21 +131,18 @@ Good: *"From our nightly sync, read every item in the bank tagged Grade 5 — al
 
 **The confidence rule above applies here unchanged.** Some operations are modelled from the vendor's documentation only and have never been exercised against a live consumer, and the recipe says which. Relay that exactly as given; do not upgrade it because the call looks routine. A documented-but-unexercised **write** is the sharpest form of this — under replace semantics the destructive version of the call returns the same clean success as the safe one, so there is no observation you can make afterwards that distinguishes them.
 
-## Side-effectful operations (saving item content to the item bank)
+## Saving item content to the Learnosity item bank: a console action
 
-Saving to the Learnosity item bank is done via `update_item` with a natural-language instruction — no dedicated save tool exists and none is needed:
+**Graffiticode's tools author content; they never write to Learnosity.** `create_item` and `update_item` never save to an item bank, whatever the instruction says, and their results carry no `itemBank` outcome. Don't ask `update_item` to "save" an item, and never tell the user an item was saved to Learnosity.
 
-```
-update_item(item_id, "save this item to the Learnosity item bank")
-```
+When the user wants an item in their item bank, hand off to the Graffiticode console:
 
-The language backend interprets the save intent and writes to Learnosity's Item Bank. Confirm the save by inspecting the `data.itemBank` field in the `update_item` response:
+1. Give them the item's console page: `https://console.graffiticode.org/items/<item_id>` (built from the `item_id` you already have). **Not** the `view_url`: that opens the rendered item, which has no save control.
+2. They need to be **signed in as the account that owns the item** (a free-plan item must be claimed first, through its `claim_url`) and to have a **current Learnosity connection** (console Settings). The item's **Connection** panel shows "Saves write through <connection>".
+3. **Saving.** If the user asked for the save while authoring, the item already requests it, so **Recompile** in the item's menu writes the current version to the bank as new draft items. Otherwise they ask for the save in the console and save the edit, which writes it.
+4. The Connection panel then shows **"Saved to Learnosity"**, or a problem with **Retry** / **Check the item bank**. Saved items land as unpublished drafts; publishing is done in Learnosity's Author Site.
 
-- **Success:** `data.itemBank = { saved: true, references: ["graffiticode-…"] | ["artcompiler-…"], savedAt: "2026-…" }`. Echo the reference(s) back to the user so they can locate the item in Learnosity's Author Site (e.g., "Saved to the Learnosity item bank with reference `graffiticode-abc123`.").
-- **Failure:** the `update_item` call returns `errors` (the language backend's `dataApi` throws on non-2xx from Learnosity, which surfaces as a generation error). Relay the error message; do not assume the save succeeded.
-- **No `itemBank` field present:** the user's instruction was interpreted as a content edit rather than a save. If they clearly asked to save, re-issue with a more explicit instruction ("save this item to the Learnosity item bank as a draft") and check `data.itemBank` again.
-
-**Do not invent out-of-system save paths.** If the save feedback is ambiguous, ask the user to verify in the Learnosity Author Site rather than suggesting alternatives like "post directly to the Learnosity Items API with consumer key/secret," "use computer use to navigate the Author UI," or "import JSON manually." Those are outside this skill's scope and usually wrong — the save has almost certainly happened if `update_item` returned without errors.
+**Do not invent other save paths** ("post directly to the Items API with a consumer key/secret", "use computer use on the Author Site", "import JSON manually"). The console is the save path.
 
 ## Output
 
@@ -157,7 +154,7 @@ Prefer the response's own summary fields for that one-sentence confirmation:
 
 - **On first creation** (`create_item`): echo `description`.
 - **On edits** (`update_item`): echo `change_summary` — e.g., *"Added a second distractor on Q2 and switched to partial-match scoring."*
-- **On saves to the item bank**: combine `change_summary` (often *"Saved; no content changes"*) with the reference from `data.itemBank.references` — e.g., *"Saved to the Learnosity item bank with reference `graffiticode-abc123`."*
+- **When the user wants it in their item bank**: point them to the console page and steps above. Never report a save.
 
 Don't re-parse `data.questions` to describe what changed; the backend wrote the summary for you.
 
@@ -165,7 +162,7 @@ Don't re-parse `data.questions` to describe what changed; the backend wrote the 
 
 ## Saving the Graffiticode item itself (free plan)
 
-Distinct from saving to the **Learnosity** item bank (above): the Graffiticode item also has a **`view_url`** in every response — surface it so the user can open the rendered item. If the call was made **without Graffiticode credentials (free plan)**, the response also includes a **`claim_url`** / **`claim_message`**, and the `view_url` carries the claim token so its footer offers a one-click **"Claim it in Graffiticode →"** link; free-plan Graffiticode items expire after 48 hours unless claimed. (Saving to the Learnosity item bank is a separate, account-backed operation — see above.) Only surface the URLs the server returned.
+Distinct from saving to the **Learnosity** item bank (above): the Graffiticode item also has a **`view_url`** in every response — surface it so the user can open the rendered item. If the call was made **without Graffiticode credentials (free plan)**, the response also includes a **`claim_url`** / **`claim_message`**, and the `view_url` carries the claim token so its footer offers a one-click **"Claim it in Graffiticode →"** link; free-plan Graffiticode items expire after 48 hours unless claimed. (Saving to the Learnosity item bank is a separate, account-backed console action — see above.) Only surface the URLs the server returned.
 
 ## Guardrails
 
@@ -178,7 +175,7 @@ Distinct from saving to the **Learnosity** item bank (above): the Graffiticode i
 - **Never report a config-driven restriction as working on the strength of a clean render.** A fired ready callback means the page loaded, not that your config took effect. Confirm it differentially — run with the key and without it, and compare — or tell the user it is unverified.
 - **Stay in the Learnosity lane.** If the user asks for something outside Learnosity (flashcards, spreadsheets, concept webs), suggest the broader `assessments` skill rather than forcing a Learnosity fit.
 - **Iterate, don't recreate.** On follow-up edits, call `update_item` on the existing `item_id`; fresh creates lose conversation history.
-- **Don't improvise out-of-band save paths.** Saves go through `update_item`; ambiguous results get verified by the user in the Learnosity UI, not by inventing API-direct or computer-use workarounds.
+- **Never save through the tools.** `update_item` is for content edits only; saving to the item bank happens in the Graffiticode console (`https://console.graffiticode.org/items/<item_id>`). Don't improvise API-direct or computer-use save paths.
 - **Never plan a paged read without declaring how far it goes.** One page or to exhaustion is part of the design, not a detail. A read that stops early returns HTTP 200 with a well-formed body and a count of the page, so nothing downstream will ever tell the user data is missing.
 - **Never reuse a paging loop across endpoint families.** The item-bank and sessions families end on opposite signals. Implement the rule the recipe gives for the operation you asked about, and write a separate loop for a different family rather than generalizing.
 - **Never send a partial write payload without confirming the semantics.** Replace is the default and the verb does not predict it. Under replace, every field you omit is cleared and the response says nothing — get the semantics from the recipe and state them to the user before they run it against a real bank.

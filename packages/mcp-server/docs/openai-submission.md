@@ -309,6 +309,9 @@ nothing, leaving the user with a claim and an empty screen.
    answer marked ✓, the fill-in-the-blank's sentence with the blank shown as `_____` and its
    accepted answer marked ✓, the note "Interactive preview unavailable — open it to use the
    item", and an "Open the Learnosity assessment" link.
+   **Saving (2026-10-23):** if the reviewer asks to "save it to the item bank", the expected
+   answer points them to `https://console.graffiticode.org/items/<item_id>` (sign in, Learnosity
+   connection, Recompile). `create_item` / `update_item` never save, and never claim to.
    *Verified 2026-09-17: L0176, ready in 11.3s.*
    **Superseded 2026-10-22 (pending §5a):** a reviewer, signed in or not, now gets the item
    interactive inline. The widget shows the card above first, frames
@@ -372,6 +375,36 @@ nothing, leaving the user with a claim and an empty screen.
   reviewed update once revert is surfaced via MCP.)
 - Retrieval/discovery tools (`render_item`, `get_item`, `get_spec`, `list_languages`,
   `get_language_info`): `readOnlyHint:true`.
+
+### The authoring contract, and the appeal note (2026-10-23)
+
+The 2.2.0 scan flagged `create_item` / `update_item`: *"This tool appears to execute operations
+that are not individually exposed."* Two real problems sat behind it, and both are fixed:
+- **A hidden external write.** For a signed-in user with a Learnosity connection, an MCP
+  generation's worker wrote to their item bank when the program contained `save-to-itembank`, and
+  the Learnosity skill steered saves through `update_item`.
+  - Now the in-process MCP backend passes core a trusted `externalWrites: false`, so the worker
+    records and sends **no** connection write, for any language, composition or retry
+    (graffiticode-app #41).
+  - Saving to a Learnosity item bank is a **console action**
+    (`https://console.graffiticode.org/items/<item_id>`), and the skill says so.
+- **An unstated contract.** Both descriptions now state the effects, and the generating output
+  schema declares the `summary` it always returned.
+
+**If the router is still flagged, appeal the finding**
+([appeal](https://developers.openai.com/plugins/deploy/submission#appeal-an-automated-finding))
+with this explanation:
+
+> Graffiticode is a language router: `create_item` performs one operation — author content in the
+> user's Graffiticode workspace from a natural-language description — and the platform chooses
+> (and may compose) the content language that fits, exactly as a document tool chooses a template.
+> `update_item` performs one operation — revise an item the user owns. Neither writes to any
+> external system (enforced server-side; there is no hidden save, publish, or send). Their only
+> outward effect is declared: a fetch-and-shape-data item reads the public HTTPS URLs it names
+> (hence `openWorldHint: true`). The language catalog is exposed read-only by `list_languages` /
+> `get_language_info`. Splitting authoring into one tool per language would misrepresent the
+> product: it would move language selection, which is the product, into the host's tool choice,
+> and every new language would change the tool surface.
 
 ---
 

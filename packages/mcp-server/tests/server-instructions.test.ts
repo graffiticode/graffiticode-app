@@ -41,3 +41,11 @@ test("no catalog still leads with what Graffiticode is for", () => {
   assert.match(SERVER_INSTRUCTIONS.slice(0, 600), /rather than writing it out in chat/);
   assert.match(SERVER_INSTRUCTIONS.slice(0, 600), /list_languages/);
 });
+
+test("the instructions say saving to Learnosity is a console action, and the head still fits", () => {
+  const s = buildServerInstructions(CATALOG);
+  assert.match(s, /never write to an external system/);
+  assert.match(s, /https:\/\/console\.graffiticode\.org\/items\/<item_id>/);
+  const head = s.split("\n\nFAST-PATH")[0];
+  assert.ok(head.length <= INSTRUCTIONS_HEAD_BUDGET, `head is ${head.length} chars`);
+});

@@ -109,6 +109,8 @@ Call list_languages(search, domain) only when the catalog does not obviously ans
 
 Some languages are gated: they target a specific vendor or platform and carry a \`when_to_use\` note saying so. Never pick one unless the user actually named that vendor or platform — matching item types (multiple-choice, cloze, short text) is never sufficient. If no language fits the request, tell the user what Graffiticode does have and ask, rather than settling for the nearest match.
 
+Authoring stays inside Graffiticode: create_item and update_item never write to an external system. Saving an item to a Learnosity item bank is something the user does in the Graffiticode console, at https://console.graffiticode.org/items/<item_id> (signed in, with a Learnosity connection) — never ask update_item to "save" it.
+
 All requests to create_item and update_item must be natural language descriptions of what to create or change. A language-specific AI backend handles all code generation. Do not attempt to generate Graffiticode DSL code directly.
 
 Write those descriptions in ENGLISH. The generator is English-only and rejects a request written in another language. This constrains the instruction you send, not the content you ask for: text that should appear inside the item — vocabulary, names, quoted passages, a whole passage in another language — may be in any language. So a user writing to you in Russian gets an English description of what to build, with their Russian content carried through verbatim.
@@ -235,6 +237,9 @@ const generationOutputSchema = {
     language: { type: "string" },
     name: nullableString,
     message: { type: "string" },
+    // The chat-facing line (buildGeneratingResponse). Undeclared, it made every
+    // create/update result invalid against additionalProperties:false.
+    summary: { type: "string" },
   },
   required: ["item_id", "status", "operation", "language", "name", "message"],
   additionalProperties: false,
@@ -310,7 +315,9 @@ Only the description itself must be English — content you want to appear in th
 
 To reuse content from an existing item (any language) — e.g. "make this spreadsheet into a Learnosity question" — call get_spec(item_id) and use its returned text as this description, adding only your intent/target framing. Never paste another item's src/data or its id, and do not name upstream languages or wire a pipeline: just describe what you want and let the generator identify the languages and compose.
 
-Generation runs asynchronously: this returns immediately with an item_id and status "generating". Call render_item(item_id) to retrieve and display the result.`,
+Generation runs asynchronously: this returns immediately with an item_id and status "generating". Call render_item(item_id) to retrieve and display the result.
+
+What this does and doesn't do: it authors content in the user's Graffiticode workspace only. The platform routes the request to the best-fitting language and may compose languages for one item (e.g. a Learnosity item with an embedded spreadsheet). It never writes to an external system — in particular it never saves to a Learnosity item bank; the user does that from the item's page in the Graffiticode console. Its only outward effect: a fetch-and-shape-data item reads the public HTTPS URLs it names.`,
   inputSchema: {
     type: "object",
     properties: {
@@ -363,7 +370,9 @@ The language is auto-detected from the item. Conversation history is preserved, 
 
 Write the modification in English, as with create_item; content destined for the item itself may be in any language.
 
-Like create_item, generation runs asynchronously: this returns immediately with status "generating". Call render_item(item_id) to retrieve and display the updated result.`,
+Like create_item, generation runs asynchronously: this returns immediately with status "generating". Call render_item(item_id) to retrieve and display the updated result.
+
+What this does and doesn't do: it revises an item the user owns, in their Graffiticode workspace only — including recording a response in a survey item, which is the item's own content. It never writes to an external system: it never saves to a Learnosity item bank (the user does that from the item's page in the Graffiticode console), so never call it to "save" anything outside Graffiticode. Its only outward effect: a fetch-and-shape-data item may re-read the public HTTPS URLs it names.`,
   inputSchema: {
     type: "object",
     properties: {
@@ -1277,6 +1286,23 @@ function detectForwardedArtifact(description: string): string | null {
   return null;
 }
 
+/**
+ * Authoring may only run where its no-external-writes guarantee holds.
+ *
+ * MCP authoring never writes outside Graffiticode: core-backend.ts passes core's
+ * trusted `{ externalWrites: false }`. That only exists in-process: the GraphQL
+ * backend mode can't carry it (the console can't tell an MCP request from any
+ * other caller). So a deployed service (Cloud Run sets K_SERVICE) refuses to
+ * author unless GRAFFITICODE_BACKEND=core, which production sets (deploy.json).
+ * It fails closed on a misconfiguration; tests and local development, where
+ * K_SERVICE is unset, keep both modes.
+ */
+export function assertAuthoringBackend(): void {
+  if (process.env.K_SERVICE && !coreBackendEnabled()) {
+    throw new Error("Authoring is unavailable: this server must run with GRAFFITICODE_BACKEND=core.");
+  }
+}
+
 export async function handleCreateItem(
   ctx: ToolContext,
   args: {
@@ -1287,6 +1313,7 @@ export async function handleCreateItem(
   }
 ): Promise<unknown> {
   const { language, description, name, continue_from_item_id } = args;
+  assertAuthoringBackend();
 
   const misuse = detectForwardedArtifact(description);
   if (misuse) {
@@ -1370,6 +1397,7 @@ export async function handleUpdateItem(
   args: { item_id: string; modification: string }
 ): Promise<unknown> {
   const { item_id, modification } = args;
+  assertAuthoringBackend();
 
   if (coreBackendEnabled()) {
     // The shared preparation in core: the same contextual prompt, source and
