@@ -146,10 +146,6 @@ const typeDefs = `
     task: Task
     generationStatus: String
     generationError: String
-    # A failed generation's code, and for a wrong-tool MCP request the language
-    # it belongs to (core generation-jobs.ts JobFailure).
-    generationErrorCode: String
-    generationRoutedLang: String
     generationStartedAt: String
     # Set while a v2 generation job runs (its absolute deadline); null otherwise.
     # A v2 item is reported failed only from durable state, never by staleness.

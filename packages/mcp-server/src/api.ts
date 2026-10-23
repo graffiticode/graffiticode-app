@@ -397,10 +397,6 @@ export interface Item {
   // Async-generation status. Absent/null ⇒ legacy/ready.
   generationStatus?: "generating" | "ready" | "failed" | null;
   generationError?: string | null;
-  // Set on a failed generation: its code, and for a wrong-tool request (a
-  // pinned MCP create tool) the language it belongs to.
-  generationErrorCode?: string | null;
-  generationRoutedLang?: string | null;
   generationStartedAt?: string | null;
   // Set while a v2 generation job runs (Phase 3.5): its absolute deadline. An
   // item is reported failed only by the console's durable state.
@@ -547,8 +543,6 @@ export async function getItemWithTask(options: {
         claimToken
         generationStatus
         generationError
-        generationErrorCode
-        generationRoutedLang
         generationStartedAt
         generationDeadlineAt
         generationChars

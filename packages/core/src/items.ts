@@ -729,10 +729,6 @@ export async function getItems({ auth, lang, mark, client }) {
         upstreamLangs: Array.isArray(data.upstreamLangs) ? data.upstreamLangs : [],
         generationStatus: data.generationStatus ?? null,
         generationError: data.generationError ?? null,
-        // Why a restricted (MCP) generation failed, machine-readable, and for a
-        // wrong-tool request the language it belongs to (generation-jobs.ts).
-        generationErrorCode: data.generationErrorCode ?? null,
-        generationRoutedLang: data.generationRoutedLang ?? null,
         generationStartedAt: data.generationStartedAt ? String(data.generationStartedAt) : null,
         generationDeadlineAt: data.generationDeadlineAt ? String(data.generationDeadlineAt) : null,
         generationChars: typeof data.generationChars === "number" ? data.generationChars : null,
@@ -870,8 +866,6 @@ export async function getItem({ auth, id, includeSpec = false, connectionFields 
       // Absent status ⇒ legacy/synchronous item, treated as ready by clients.
       generationStatus: data.generationStatus ?? null,
       generationError: data.generationError ?? null,
-      generationErrorCode: data.generationErrorCode ?? null,
-      generationRoutedLang: data.generationRoutedLang ?? null,
       generationStartedAt: data.generationStartedAt ? String(data.generationStartedAt) : null,
       generationDeadlineAt: data.generationDeadlineAt ? String(data.generationDeadlineAt) : null,
       // The SINGLE-item resolver, which is the one the MCP polls. Adding this field

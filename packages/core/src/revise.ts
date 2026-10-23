@@ -7,7 +7,6 @@ import { getTask, readItemData } from "./tasks.js";
 import { resolveAuth, type RequestCredentials } from "./auth.js";
 import { startGeneration } from "./generation.js";
 import { NotFoundError } from "./errors.js";
-import { assertOperationPermits, type Operation } from "./operations.js";
 
 type HelpEntry = {
   user: string;
@@ -115,9 +114,9 @@ export async function createFromDescription(
   ctx: RequestCredentials & Record<string, unknown>,
   { lang, description, name, siblingOf, client, clientKind, geoCountry, idempotency }:
     { lang: string; description: string; name?: string; siblingOf?: string; idempotency?: unknown } & Hints,
-  // The restricted MCP operation (core/operations.ts); only the in-process MCP
-  // backend passes it.
-  trusted: { operation?: Operation | null } = {},
+  // `{ externalWrites: false }` from the in-process MCP backend only
+  // (generation.ts startGeneration).
+  trusted: { externalWrites?: false } = {},
 ) {
   const misuse = detectForwardedArtifact(description);
   if (misuse) throw new Error(misuse);
@@ -140,13 +139,11 @@ export async function createFromDescription(
 export async function reviseItem(
   ctx: RequestCredentials & Record<string, unknown>,
   { itemId, modification, client, clientKind, geoCountry, idempotency }: { itemId: string; modification: string; idempotency?: unknown } & Hints,
-  trusted: { operation?: Operation | null } = {},
+  trusted: { externalWrites?: false } = {},
 ) {
   const auth = await resolveAuth(ctx);
   const item: any = await getItem({ auth, id: itemId, connectionFields: false });
   if (!item) throw new NotFoundError(`Item not found: ${itemId}`);
-  // Early and friendly; the reservation re-checks against its own snapshot.
-  if (trusted.operation) assertOperationPermits(trusted.operation, item.lang);
   const currentSrc = item.taskId ? ((await getTask({ auth, id: item.taskId }))?.src ?? null) : null;
   const prompt = buildContextualPrompt(parseHelp(item.help), modification);
   const currentData = await currentDataFor(auth, item.taskId);
