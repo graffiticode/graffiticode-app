@@ -10,10 +10,14 @@ import { resolveAuth } from "./auth.js";
 import { adoptWorkspaceFromSibling } from "./claims.js";
 import { reserveGeneration } from "./generation-jobs.js";
 import { assertItemCreateAllowed } from "./access.js";
+import type { Operation } from "./operations.js";
 
 // startCodeGeneration: reserve a v2 job (with the item shell, for a create) and
 // wake the console's worker. Serves create_item and update_item.
-export async function startGeneration(ctx: any, args: any) {
+// `trusted` carries what only an in-process caller may set: the restricted MCP
+// operation (core/operations.ts). It is a separate argument, never read from
+// `args`, because GraphQL and REST hand their request input straight to `args`.
+export async function startGeneration(ctx: any, args: any, trusted: { operation?: Operation | null } = {}) {
   const {
     itemId,
     siblingOf,
@@ -106,6 +110,7 @@ export async function startGeneration(ctx: any, args: any) {
       auth, itemId, lang, name, client, prompt, modification, currentSrc, currentData,
       ...(baseTaskId !== undefined ? { baseTaskId } : {}),
       sessionNamespace: ctx.sessionNamespace, sessionUuid: ctx.sessionUuid, workspaceKey, idempotency,
+      operation: trusted.operation ?? null,
     });
     return {
       itemId: reserved.itemId,

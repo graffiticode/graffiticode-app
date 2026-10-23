@@ -36,6 +36,7 @@ import { accountFirstCompletion, billingRefs } from "./billing.js";
 import { newItemDoc } from "./items.js";
 import { bindClaim, readClaim, type IdempotencyClaim } from "./idempotency.js";
 import { NEVER, processEffectsFor, recordEffect, connectionIntent, recordConnectionWrite, type ConnectionIntent } from "./effects.js";
+import { assertOperationPermits, permittedUpstreams, type Operation } from "./operations.js";
 
 export const JOB_DEADLINE_MS = 45 * 60_000;
 export const LEASE_MS = 3 * 60_000;
@@ -60,7 +61,9 @@ export type JobPrincipal =
   | { kind: "user"; uid: string }
   | { kind: "freePlan"; sessionNamespace: string | null; sessionUuid: string | null };
 
-export type JobFailure = { code: string; retryable: boolean; message: string };
+// `routedLang`: the language a pinned (wrong-tool) request belongs to, so the
+// transport can name the right tool after the job has failed asynchronously.
+export type JobFailure = { code: string; retryable: boolean; message: string; routedLang?: string | null };
 
 export type JobDispatch = {
   state: GenerationPointer["state"];
@@ -97,6 +100,15 @@ export type JobEnvelope = {
   deadlineAt: number;
   // User jobs: the act-as grant for this job (never a token).
   actAsGrant: string | null;
+  // RESTRICTED jobs (operations.ts): set only from the in-process MCP backend,
+  // never from GraphQL or REST. Absent on older envelopes, which keep today's
+  // behaviour: external writes on, language unpinned, no operation.
+  operation?: Operation | null;
+  // false: the worker never records or performs a connection write.
+  externalWrites?: boolean;
+  // true: the scope gate refuses a request for another language (wrong_tool)
+  // instead of switching to it.
+  pinLanguage?: boolean;
 };
 
 export type GenerationJobDoc = { envelope: JobEnvelope; dispatch: JobDispatch };
@@ -141,6 +153,8 @@ function pointerFields(generationId: string, state: GenerationPointer["state"], 
     generation: { id: generationId, state },
     generationStatus: "generating",
     generationError: null,
+    generationErrorCode: null,
+    generationRoutedLang: null,
     generationStartedAt: now,
     generationChars: 0,
     // Present while a v2 job runs: its absolute deadline. Clients report the
@@ -158,7 +172,7 @@ function pointerFields(generationId: string, state: GenerationPointer["state"], 
  */
 export async function reserveGeneration({
   auth, itemId, lang, name, client, prompt, modification, currentSrc, currentData, baseTaskId,
-  sessionNamespace, sessionUuid, workspaceKey, idempotency, now = Date.now(),
+  sessionNamespace, sessionUuid, workspaceKey, idempotency, operation = null, now = Date.now(),
 }: {
   auth: Principal;
   itemId?: string | null;
@@ -176,6 +190,9 @@ export async function reserveGeneration({
   workspaceKey?: string | null;
   // A REST Idempotency-Key claim, bound to this job in the same commit.
   idempotency?: IdempotencyClaim | null;
+  // A restricted MCP operation (operations.ts). Callers pass it only from the
+  // in-process MCP backend's trusted argument, never from request input.
+  operation?: Operation | null;
   now?: number;
 }): Promise<{ itemId: string; generationId: string }> {
   const generationId = randomUUID();
@@ -211,6 +228,9 @@ export async function reserveGeneration({
     createdAt: now,
     deadlineAt,
     actAsGrant,
+    operation: operation ?? null,
+    externalWrites: operation ? false : true,
+    pinLanguage: operation ? true : false,
   });
   const dispatch: JobDispatch = {
     state: "reserved",
@@ -226,6 +246,7 @@ export async function reserveGeneration({
   await db().runTransaction(async (tx) => {
     const key = await readClaim(tx, idempotency);
     if (!itemId) {
+      if (operation) assertOperationPermits(operation, lang);
       bindClaim(tx, idempotency, key, { itemId: id, generationId });
       tx.set(itemRef, { ...newItemDoc({ auth, id, lang, name, client, timestamp: now }), ...pointerFields(generationId, "reserved", deadlineAt, now) });
       tx.set(jobRef(generationId), { envelope: envelope(null), dispatch });
@@ -235,6 +256,14 @@ export async function reserveGeneration({
     if (!snap.exists) throw new NotFoundError(`Item not found: ${itemId}`);
     const item = snap.data();
     assertNoActiveGeneration(item);
+    // Against THIS snapshot, the one the job is reserved from: a caller's
+    // earlier read can't be raced past by a change in between.
+    if (operation) {
+      assertOperationPermits(operation, item.lang);
+      if (String(item.lang) !== String(lang).replace(/^L/i, "")) {
+        throw new ConflictError("item_changed", "This item changed since the revision was prepared. Read it again, then retry.");
+      }
+    }
     const current = item.taskId ?? null;
     if (baseTaskId !== undefined && (baseTaskId ?? null) !== current) {
       throw new ConflictError("item_changed", "This item changed since the revision was prepared. Read it again (get_item), then retry.");
@@ -276,6 +305,8 @@ function failureFields(failure: JobFailure) {
   return {
     generationStatus: "failed",
     generationError: failure.message,
+    generationErrorCode: failure.code,
+    generationRoutedLang: failure.routedLang ?? null,
     generationStartedAt: null,
     generationChars: null,
     generationDeadlineAt: null,
@@ -470,6 +501,8 @@ export async function completeJob(generationId: string, owner: string, auth: Pri
       help: appendHelpEntry(item.help ?? "[]", env.modification, result.taskId, new Date(now)),
       generationStatus: "ready",
       generationError: null,
+      generationErrorCode: null,
+      generationRoutedLang: null,
       generationStartedAt: null,
       generationChars: null,
       generationDeadlineAt: null,
@@ -575,17 +608,24 @@ export async function runJobV2(generationId: string): Promise<{ status: number; 
       currentData: parseCurrentData(env.currentData),
       itemId: env.itemId,
       client: env.client ?? undefined,
+      pinLanguage: env.pinLanguage === true,
+      // Restricted jobs compose only with their operation's upstreams, existing
+      // ones included; null keeps the unrestricted fence.
+      allowedUpstreams: env.operation ? [...permittedUpstreams(env.operation, env.lang)] : null,
     });
     holding();
     if (result.errors?.length || !result.taskId) {
       const message = result.errors?.map((e: any) => e.message).join("\n") || "No taskId returned";
       const code = result.errors?.find((e: any) => e.code)?.code ?? "generation_failed";
-      await failJob(generationId, owner, { code, retryable: false, message }, auth);
+      const routedLang = result.errors?.find((e: any) => e.routedLang)?.routedLang ?? null;
+      await failJob(generationId, owner, { code, retryable: false, message, ...(routedLang ? { routedLang } : {}) }, auth);
       await processEffectsFor(generationId);
       return { status: 200, body: { status: "failed", error: message } };
     }
     const lang = result.language && result.language !== env.lang ? result.language : env.lang;
-    const connection = await connectionIntent(auth, lang, result.taskCode);
+    // A restricted (MCP) job never writes externally: no intent, so completeJob
+    // records no connection_write and the sweeper has nothing to send.
+    const connection = env.externalWrites === false ? null : await connectionIntent(auth, lang, result.taskCode);
     holding();
     await completeJob(generationId, owner, auth, result, connection);
     // Right after the commit, as the user we already act as; the sweeper
@@ -695,6 +735,9 @@ export async function retryGeneration({ auth, itemId, idempotency, now = Date.no
     sessionUuid: env.principal.kind === "freePlan" ? env.principal.sessionUuid : null,
     workspaceKey: env.workspaceKey,
     idempotency,
+    // A retry of a restricted job stays restricted: same operation, so no
+    // external writes, a pinned language and the same composition limit.
+    operation: env.operation ?? null,
     now,
   });
 }

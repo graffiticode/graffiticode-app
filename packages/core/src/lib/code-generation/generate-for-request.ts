@@ -97,6 +97,29 @@ async function assertRevisionsRemaining(auth: AuthArg, itemId?: string): Promise
   }
 }
 
+/**
+ * Which upstream languages a generation may compose with (the fence below).
+ *
+ * Unrestricted: the head language's `composesWith`, plus any upstream the
+ * existing item already binds (grandfathered, so narrowing an edge never strands
+ * live content). Restricted (`allowedUpstreams` is an array; a core/operations.ts
+ * MCP operation): only the head's `composesWith` edges the operation declares,
+ * and nothing grandfathered, so an operation can't keep or regenerate an
+ * upstream it doesn't declare. COMPOSITION_ENABLED=false permits nothing.
+ */
+export function compositionPermits({ headLang, currentSrc, allowedUpstreams }: {
+  headLang: string;
+  currentSrc?: string | null;
+  allowedUpstreams?: string[] | null;
+}): { permits: string[]; grandfathered: string[] } {
+  if (process.env.COMPOSITION_ENABLED === "false") return { permits: [], grandfathered: [] };
+  if (Array.isArray(allowedUpstreams)) {
+    return { permits: composesWithFor(headLang).filter((lang) => allowedUpstreams.includes(lang)), grandfathered: [] };
+  }
+  const grandfathered = currentSrc ? extractLangIds(currentSrc, true) : [];
+  return { permits: [...composesWithFor(headLang), ...grandfathered], grandfathered };
+}
+
 export async function generateCodeForRequest({
   auth,
   prompt,
@@ -130,6 +153,16 @@ export async function generateCodeForRequest({
   // runs inside the server, where mutating process.env.SCOPE_GATE_ENABLED would disable the gate
   // for every concurrent user request.
   skipScopeGate = false,
+  // RESTRICTED jobs (core/operations.ts; MCP tools, one operation each). With
+  // pinLanguage, a request the scope gate routes to ANOTHER language fails with
+  // code `wrong_tool` and that `routedLang`, rather than being generated in a
+  // language the caller's tool doesn't declare.
+  pinLanguage = false,
+  // With allowedUpstreams (an array), composition is limited to exactly these
+  // upstream languages, and the exception for upstreams an existing item already
+  // uses is off: a restricted operation can't keep, or regenerate, an upstream it
+  // doesn't declare. null keeps the unrestricted fence.
+  allowedUpstreams = null as string[] | null,
 }) {
   const rid = generateRequestId();
 
@@ -424,6 +457,21 @@ export async function generateCodeForRequest({
         console.log(`[routing] rid=${rid} scope-gate lang=${langLog} inScope=${route.inScope} routedLang=${route.routedLang ? "L" + route.routedLang : "none"}${route.reason ? ` reason=${route.reason}` : ""}`);
         ragLog(rid, "preflight.classify", { lang: langLog, inScope: route.inScope, routedLang: route.routedLang, reason: route.reason });
         if (route.inScope === false) {
+          if (pinLanguage && route.routedLang && route.routedLang !== language) {
+            // A restricted tool never changes language: say which one fits.
+            console.log(`[routing] rid=${rid} preflight.wrong_tool lang=${langLog} routedLang=L${route.routedLang}`);
+            ragLog(rid, "preflight.wrong_tool", { lang: langLog, routedLang: route.routedLang, reason: route.reason });
+            const reason = route.reason ? ` ${route.reason}` : "";
+            return {
+              src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null,
+              errors: [{
+                message: `This request is for a different kind of content (L${route.routedLang}) than this tool makes (L${language}).${reason}`,
+                code: "wrong_tool",
+                routedLang: route.routedLang,
+              }],
+              upstreamLangs: [], rid,
+            };
+          }
           if (route.routedLang && route.routedLang !== language) {
             console.log(`[routing] rid=${rid} preflight.reroute from=${langLog} to=L${route.routedLang} reason=${route.reason}`);
             ragLog(rid, "preflight.reroute", { from: langLog, to: route.routedLang, reason: route.reason });
@@ -583,10 +631,12 @@ export async function generateCodeForRequest({
       // refuse to save a one-word change to an item that has worked for months.
       // Deprecating an edge must stop NEW ones, never strand live content.
       // extractLangIds reads the source text directly — no second parse.
-      const grandfathered = currentSrc ? extractLangIds(currentSrc, true) : [];
-      const permits = process.env.COMPOSITION_ENABLED === "false"
-        ? []
-        : [...composesWithFor(headLang), ...grandfathered];
+      //
+      // Except for a restricted job (allowedUpstreams set): its operation declares
+      // exactly which upstreams it may compose with, so nothing is grandfathered
+      // and the declared edges are intersected with the language's own fence.
+      const restricted = Array.isArray(allowedUpstreams);
+      const { permits, grandfathered } = compositionPermits({ headLang, currentSrc, allowedUpstreams });
       if (grandfathered.length > 0) {
         ragLog(rid, "composition.grandfathered", { headLang, langs: grandfathered });
       }
@@ -622,7 +672,12 @@ export async function generateCodeForRequest({
           return {
             src: null, taskId: null, language, description: null, changeSummary: null,
             model, provider, tier, usage: null,
-            errors: [{ message: `${detail} Try describing the item as a single language, or splitting it into separate items.` }],
+            errors: [{
+              message: `${detail} Try describing the item as a single language, or splitting it into separate items.`,
+              // Restricted jobs say why in a machine-readable way: an upstream the
+              // operation doesn't declare, existing or new.
+              ...(restricted && fenced.dropped.length > 0 ? { code: "upstream_not_permitted" } : {}),
+            }],
             upstreamLangs: [], rid,
           };
         }
