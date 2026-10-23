@@ -9,7 +9,7 @@
  * what a client receives, for a free-plan and a signed-in caller.
  */
 import assert from "node:assert/strict";
-import test from "node:test";
+import test, { mock } from "node:test";
 import Ajv from "ajv";
 
 delete process.env.GRAFFITICODE_BACKEND;
@@ -41,9 +41,12 @@ const DATA = {
 };
 
 // The console's GraphQL, answered per operation.
+// Which state the stubbed console reports for the item (a test can make it
+// still-generating).
+let itemState: Record<string, unknown> = {};
 globalThis.fetch = (async (_url: string, init: { body: string }) => {
   const { query } = JSON.parse(init.body);
-  const data = /GetItemWithTask/.test(query) ? { item: ITEM }
+  const data = /GetItemWithTask/.test(query) ? { item: { ...ITEM, ...itemState } }
     : /GetData/.test(query) ? { data: JSON.stringify(DATA) }
     : /StartCodeGeneration/.test(query) ? { startCodeGeneration: { itemId: "item-1", status: "generating", workspaceNamespace: null } }
     : {};
@@ -150,4 +153,66 @@ test("render_item carries a fresh render_id in its widget hydration only; get_it
   const get = (await handleToolCall({ auth: SIGNED_IN, clientKind: "openai-mcp", declaresUi: true } as never, "get_item", { item_id: "item-1" })) as Record<string, unknown>;
   assert.equal(renderIdOf(get), undefined);
   assert.equal("render_id" in get, false);
+});
+
+// While an item is still being made, a proven widget host is told to show
+// progress only: on 2026-10-23 ChatGPT wrote the spreadsheet as a table from its
+// own request while render_item said "generating", then the widget mounted under
+// it. create/update and render_item are quiet for such a host; get_item and
+// every other client keep the old wording.
+const QUIET = /Show one brief progress update.*Do not reproduce, preview, or simulate the item's contents in chat\. Call render_item\("item-1"\) to continue waiting\./;
+const msgOf = (r: Record<string, unknown>) => String((r.structuredContent as Record<string, unknown>).message);
+const OTHERS = [
+  { clientKind: "claude-code", declaresUi: false },
+  { clientKind: "codex-mcp-client", declaresUi: true },
+];
+
+test("create_item and update_item: quiet for a rendering host, unchanged for other clients", async () => {
+  const create = await call("create_item", SIGNED_IN, { language: "L0176", description: "A multiple choice question about photosynthesis." });
+  const update = await call("update_item", SIGNED_IN, { item_id: "item-1", modification: "Make it harder." });
+  assert.match(msgOf(create), QUIET);
+  assert.match(msgOf(update), QUIET);
+  for (const client of OTHERS) {
+    const c = await call("create_item", SIGNED_IN, { language: "L0176", description: "A multiple choice question about photosynthesis." }, client);
+    const u = await call("update_item", SIGNED_IN, { item_id: "item-1", modification: "Make it harder." }, client);
+    assert.match(msgOf(c), /^Generation started\./, client.clientKind);
+    assert.match(msgOf(u), /^Generation started\./, client.clientKind);
+  }
+});
+
+/** Run a retrieval against a still-generating item, fast-forwarding its poll deadline. */
+async function stillGenerating(tool: string, client = { clientKind: "openai-mcp", declaresUi: true }) {
+  itemState = { generationStatus: "generating", generationChars: 800, task: null, taskId: null };
+  mock.timers.enable({ apis: ["setTimeout", "Date"], now: Date.now() });
+  try {
+    const pending = call(tool, SIGNED_IN, { item_id: "item-1" }, client);
+    let done = false;
+    void pending.then(() => { done = true; }, () => { done = true; });
+    for (let i = 0; i < 400 && !done; i++) {
+      await new Promise((r) => setImmediate(r));
+      mock.timers.tick(500);
+    }
+    return await pending;
+  } finally {
+    mock.timers.reset();
+    itemState = {};
+  }
+}
+
+test("render_item still generating: quiet for a rendering host, keeping the progress", async () => {
+  const res = await stillGenerating("render_item");
+  const sc = res.structuredContent as Record<string, unknown>;
+  assert.equal(sc.status, "generating");
+  assert.match(msgOf(res), QUIET);
+  assert.match(msgOf(res), /~200 tokens written/, "the progress fragment is kept");
+  assert.ok(validRenderItem(sc), JSON.stringify(validRenderItem.errors));
+});
+
+test("still generating: get_item, and render_item for other clients, keep the old wording", async () => {
+  const get = await stillGenerating("get_item");
+  assert.match(msgOf(get), /^Still generating.*call get_item\(item_id\) again/);
+  for (const client of OTHERS) {
+    const r = await stillGenerating("render_item", client);
+    assert.match(msgOf(r), /^Still generating.*call render_item\(item_id\) again/, client.clientKind);
+  }
 });
