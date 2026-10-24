@@ -58,7 +58,11 @@
         }
       ],
       "env": {
-        "GENERATION_PROTOCOL": "v2"
+        "GENERATION_PROTOCOL": "v2",
+        "ANTHROPIC_FEDERATION_RULE_ID": "fdrl_015e3sipxUnp5R2KC9Cpkng5",
+        "ANTHROPIC_ORGANIZATION_ID": "ed802a9e-2ede-486d-8d53-b7c33539106a",
+        "ANTHROPIC_SERVICE_ACCOUNT_ID": "svac_01QLoHvFLSei6QT2DCGMkPKU",
+        "ANTHROPIC_WORKSPACE_ID": "wrkspc_01XKyhFYQNasXfYUX334uiEw"
       },
       "secrets": {
         "ACT_AS_GRANT_SECRET": "ACT_AS_GRANT_SECRET:1",
