@@ -61,7 +61,8 @@
         "GENERATION_PROTOCOL": "v2"
       },
       "secrets": {
-        "ACT_AS_GRANT_SECRET": "ACT_AS_GRANT_SECRET:1"
+        "ACT_AS_GRANT_SECRET": "ACT_AS_GRANT_SECRET:1",
+        "INTERNAL_API_KEY": "INTERNAL_API_KEY:2"
       },
       "verify": {
         "module": "verify/console.mjs"
@@ -137,7 +138,8 @@
         "INTERNAL_JOB_SECRET": "INTERNAL_JOB_SECRET:1",
         "FREE_PLAN_API_KEY": "FREE_PLAN_API_KEY:4",
         "FREE_PLAN_NAMESPACE_SALT": "FREE_PLAN_NAMESPACE_SALT:2",
-        "ACT_AS_GRANT_SECRET": "ACT_AS_GRANT_SECRET:1"
+        "ACT_AS_GRANT_SECRET": "ACT_AS_GRANT_SECRET:1",
+        "INTERNAL_API_KEY": "INTERNAL_API_KEY:2"
       },
       "smoke": [
         {
@@ -192,7 +194,9 @@
         }
       ],
       "env": {},
-      "secrets": {},
+      "secrets": {
+        "INTERNAL_API_KEY": "INTERNAL_API_KEY:2"
+      },
       "smoke": [
         {
           "path": "/",
