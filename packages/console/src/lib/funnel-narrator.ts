@@ -30,6 +30,7 @@ import axios from "axios";
 import { ANTHROPIC_MODELS } from "@graffiticode-app/core/lib/llm-models";
 import type { Digest, SplitDigest, RecentWindow } from "./funnel-digest";
 import { ptRange } from "./funnel-digest";
+import { anthropicAuthHeaders, anthropicCredentialsConfigured } from "@graffiticode-app/core/lib/anthropic-auth";
 
 /**
  * Opus, not a cheaper tier. The whole job is the judgment call — "is 3 items a
@@ -262,11 +263,10 @@ export async function narrate(
   split: SplitDigest,
   baseline: { recent?: RecentWindow[] },
 ): Promise<{ text: string; brief: string } | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
   const brief = buildBrief(split, baseline);
 
-  if (!apiKey) {
-    console.warn("[funnel-narrator] ANTHROPIC_API_KEY not set; sending plain counts");
+  if (!anthropicCredentialsConfigured()) {
+    console.warn("[funnel-narrator] Anthropic credentials not configured; sending plain counts");
     return null;
   }
 
@@ -289,7 +289,7 @@ export async function narrate(
         timeout: TIMEOUT_MS,
         headers: {
           "Content-Type": "application/json",
-          "x-api-key": apiKey,
+          ...(await anthropicAuthHeaders()),
           "anthropic-version": "2023-06-01",
         },
       },

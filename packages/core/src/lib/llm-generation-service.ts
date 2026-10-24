@@ -24,6 +24,7 @@ import {
   estimateTokens,
   exhausted,
 } from "./request-budget.js";
+import { anthropicAuthHeaders, anthropicCredentialsConfigured } from "./anthropic-auth.js";
 
 export interface StreamOptions {
   /** Language id — selects the family ordering. Not caller-selectable beyond this. */
@@ -597,13 +598,12 @@ async function requestAnthropic({
   options: StreamOptions;
   onChunk?: (chunk: string) => void;
 }): Promise<ProviderRequestResult> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
+  if (!anthropicCredentialsConfigured()) {
     return {
       content: "",
       usage: EMPTY_USAGE(),
       failure: new ProviderFailure(
-        "ANTHROPIC_API_KEY is not configured",
+        "Anthropic credentials are not configured (no federation, no ANTHROPIC_API_KEY)",
         "anthropic",
         true,
         undefined,
@@ -686,7 +686,7 @@ async function requestAnthropic({
       {
         headers: {
           "Content-Type": "application/json",
-          "x-api-key": apiKey,
+          ...(await anthropicAuthHeaders()),
           "anthropic-version": "2023-06-01",
         },
         responseType: "stream",

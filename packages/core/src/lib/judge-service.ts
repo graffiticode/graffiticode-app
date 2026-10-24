@@ -30,6 +30,7 @@ import {
 } from "./llm-models.js";
 import { getJudgeConfig } from "./rag-config.js";
 import { coreConfig } from "../config.js";
+import { anthropicAuthHeaders, anthropicCredentialsConfigured } from "./anthropic-auth.js";
 
 // Must cover the WHOLE reason-before-score response: the <analysis> block (every
 // requirement enumerated and each formula traced) AND the JSON verdict that
@@ -415,8 +416,8 @@ function resolveJudgeModel(model: string | undefined): string | null {
   if (!model) return null;
   const provider = inferProviderFromModel(model);
   if (!provider) return null;
-  const key = provider === "openai" ? process.env.OPENAI_API_KEY : process.env.ANTHROPIC_API_KEY;
-  return key ? model : null;
+  const configured = provider === "openai" ? Boolean(process.env.OPENAI_API_KEY) : anthropicCredentialsConfigured();
+  return configured ? model : null;
 }
 
 /** The quality-tier model for a family — the default judge for that family. */

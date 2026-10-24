@@ -6,6 +6,7 @@ import {
   type RequestBudget,
   charge as chargeBudget,
 } from "./request-budget.js";
+import { anthropicAuthHeaders, anthropicCredentialsConfigured } from "./anthropic-auth.js";
 
 // Hard bound on composition depth: head + at most (MAX_STAGES-1) upstream
 // stages. Keeps chain length sane.
@@ -154,9 +155,8 @@ export async function findBestLanguages({
       return { suggestions: [] };
     }
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      console.warn("[language-router] ANTHROPIC_API_KEY not set");
+    if (!anthropicCredentialsConfigured()) {
+      console.warn("[language-router] Anthropic credentials not configured");
       return { suggestions: [] };
     }
 
@@ -186,7 +186,7 @@ If none fit, return {"suggestions": []}`,
       },
       {
         headers: {
-          "x-api-key": apiKey,
+          ...(await anthropicAuthHeaders()),
           "anthropic-version": "2023-06-01",
           "content-type": "application/json",
         },
@@ -324,9 +324,8 @@ The request names ${branded.length === 1 ? "a product that" : "a platform whose 
       : r.inScope ? { inScope: false, routedLang: evalLang, reason: `request names a brand served by L${evalLang}` }
       : r;
   try {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      console.warn("[routing] ANTHROPIC_API_KEY not set; fail-open (in-scope)");
+    if (!anthropicCredentialsConfigured()) {
+      console.warn("[routing] Anthropic credentials not configured; fail-open (in-scope)");
       return verdict(FAIL_OPEN);
     }
     const all = await listLanguages({ enrich: true });
@@ -438,7 +437,7 @@ The request names ${branded.length === 1 ? "a product that" : "a platform whose 
         },
         {
           headers: {
-            "x-api-key": apiKey,
+            ...(await anthropicAuthHeaders()),
             "anthropic-version": "2023-06-01",
             "content-type": "application/json",
           },
@@ -558,8 +557,7 @@ export async function splitRequest({
 }): Promise<string[] | null> {
   if (sequence.length <= 1) return null;
   try {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) return null;
+    if (!anthropicCredentialsConfigured()) return null;
 
     const all = await listLanguages({ enrich: true });
     const roster = sequence
@@ -604,7 +602,7 @@ Return JSON only, exactly ${sequence.length} stages, in the same order:
       },
       {
         headers: {
-          "x-api-key": apiKey,
+          ...(await anthropicAuthHeaders()),
           "anthropic-version": "2023-06-01",
           "content-type": "application/json",
         },
