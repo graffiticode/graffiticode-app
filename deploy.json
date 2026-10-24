@@ -64,6 +64,7 @@
         "ANTHROPIC_SERVICE_ACCOUNT_ID": "svac_01QLoHvFLSei6QT2DCGMkPKU",
         "ANTHROPIC_WORKSPACE_ID": "wrkspc_01XKyhFYQNasXfYUX334uiEw"
       },
+      "removeEnv": ["ANTHROPIC_API_KEY"],
       "secrets": {
         "ACT_AS_GRANT_SECRET": "ACT_AS_GRANT_SECRET:1",
         "INTERNAL_API_KEY": "INTERNAL_API_KEY:2"
