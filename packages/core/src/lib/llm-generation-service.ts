@@ -612,6 +612,27 @@ async function requestAnthropic({
       ),
     };
   }
+  // The auth header, resolved BEFORE the request so a credential failure fails over to the other provider. A
+  // federation exchange that fails throws with no HTTP response, and inside the request's try its message matched
+  // none of failoverableProviderError's patterns: Claude being unauthenticated would have failed the generation
+  // instead of rolling over to OpenAI.
+  let authHeaders: Record<string, string>;
+  try {
+    authHeaders = await anthropicAuthHeaders();
+  } catch (error: any) {
+    return {
+      content: "",
+      usage: EMPTY_USAGE(),
+      failure: new ProviderFailure(
+        `Anthropic authentication failed: ${error?.message || String(error)}`,
+        "anthropic",
+        true,
+        undefined,
+        "authentication_error",
+        "authentication_error",
+      ),
+    };
+  }
 
   const usage = EMPTY_USAGE();
   let content = "";
@@ -686,7 +707,7 @@ async function requestAnthropic({
       {
         headers: {
           "Content-Type": "application/json",
-          ...(await anthropicAuthHeaders()),
+          ...authHeaders,
           "anthropic-version": "2023-06-01",
         },
         responseType: "stream",
