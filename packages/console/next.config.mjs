@@ -73,10 +73,8 @@ const nextConfig = {
       },
     ],
   },
-  // Make environment variables available to the client
-  env: {
-    ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
-  },
+  // No `env` block: it inlined ANTHROPIC_API_KEY into the client bundle when the key was present at build
+  // time. Every reader is server-side and reads process.env at runtime.
 };
 
 export default nextConfig;

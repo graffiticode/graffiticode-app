@@ -5,6 +5,7 @@ import admin from '@graffiticode-app/core/utils/db/index';
 import { buffer } from 'micro';
 import { STRIPE_API_VERSION, priceIdToPlan, includedItemsFor, getPlan, overageDollarsToItems, defaultOverageCapFor, defaultOverageCapUsd, DEFAULT_PLAN } from '@graffiticode-app/core/lib/plans-config';
 import { emitPlanChanged, emitEvent, actor } from '@graffiticode-app/core/lib/funnel-events';
+import { verifyStripeEvent } from '../../../lib/stripe-webhook-verify';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
   apiVersion: STRIPE_API_VERSION,
@@ -84,7 +85,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const buf = await buffer(req);
     const sig = req.headers['stripe-signature'] as string;
 
-    event = stripe.webhooks.constructEvent(buf, sig, webhookSecret);
+    // The previous secret is accepted during a signing-secret roll (stripe-webhook-verify.ts).
+    event = verifyStripeEvent(stripe, buf, sig, [webhookSecret, process.env.STRIPE_WEBHOOK_SECRET_PREVIOUS]);
   } catch (err) {
     console.error('Webhook signature verification failed:', err);
     return res.status(400).json({ error: 'Webhook signature verification failed' });
