@@ -15,6 +15,7 @@ import { readDialectInstructions, modelRejectsTemperature } from "./code-generat
 import { modeTierFor } from "./model-priority.js";
 import { modelForProvider } from "./llm-models.js";
 import { recordTokenUsage } from "./token-usage-service.js";
+import { anthropicAuthHeaders, anthropicCredentialsConfigured } from "./anthropic-auth.js";
 
 // Translation is faithfulness-critical and constrained (annotated src + instructions + the
 // completeness contract fully determine the output), and get_spec sits in the hot path — so a
@@ -107,14 +108,13 @@ export interface CoverageReport {
 interface ClaudeCallArgs {
   system: string;
   user: string;
-  apiKey: string;
   model: string;
   rid?: string;
   itemId?: string | null;
   auth?: { uid: string };
 }
 
-async function callClaudeForSpec({ system, user, apiKey, model, rid, itemId, auth }: ClaudeCallArgs): Promise<{ content: string; usage?: any }> {
+async function callClaudeForSpec({ system, user, model, rid, itemId, auth }: ClaudeCallArgs): Promise<{ content: string; usage?: any }> {
   const resp = await axios.post(
     "https://api.anthropic.com/v1/messages",
     {
@@ -129,7 +129,7 @@ async function callClaudeForSpec({ system, user, apiKey, model, rid, itemId, aut
     {
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": apiKey,
+        ...(await anthropicAuthHeaders()),
         "anthropic-version": "2023-06-01",
       },
     },
@@ -266,9 +266,8 @@ export async function generateSpec({ auth, taskId, rid, itemId }: { auth: any; t
 
   const annSrc = unparse(task.code, lexicon || {}, { hints });
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    throw new Error("ANTHROPIC_API_KEY not configured; cannot generate spec");
+  if (!anthropicCredentialsConfigured()) {
+    throw new Error("Anthropic credentials not configured; cannot generate spec");
   }
 
   // A dialect may ship a per-language spec-directive.md to override the global
@@ -277,7 +276,7 @@ export async function generateSpec({ auth, taskId, rid, itemId }: { auth: any; t
   const directive = specDirective?.trim() || SPEC_DIRECTIVE;
   const system = `${instructions}\n\n${directive}`;
   const model = specModelFor(lang);
-  const { content: spec } = await callClaudeForSpec({ system, user: withCompiledPaths(annSrc, compiled), apiKey, model, rid, itemId, auth });
+  const { content: spec } = await callClaudeForSpec({ system, user: withCompiledPaths(annSrc, compiled), model, rid, itemId, auth });
   const coverage = assertCoverage(spec, task.code);
 
   return { spec: spec.trim(), lang, itemId: taskId, coverage, model };
