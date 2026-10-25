@@ -67,7 +67,8 @@
       "removeEnv": ["ANTHROPIC_API_KEY"],
       "secrets": {
         "ACT_AS_GRANT_SECRET": "ACT_AS_GRANT_SECRET:1",
-        "INTERNAL_API_KEY": "INTERNAL_API_KEY:2"
+        "INTERNAL_API_KEY": "INTERNAL_API_KEY:2",
+        "OPENAI_API_KEY": "OPENAI_API_KEY:1"
       },
       "verify": {
         "module": "verify/console.mjs"
