@@ -158,7 +158,7 @@ Corpus items live in `users/{EVAL_UID}/items`; personal accounts should never ho
 
 ## Local Development
 
-1. Configure `.env.local` with API keys (ANTHROPIC_API_KEY, OPENAI_API_KEY, Firebase config, etc.). As of 2026-10-26 the repo-root `.env.local` holds **no** model-provider key (the old ones were dead and removed): add your own dev keys before anything that generates.
+1. Configure `.env.local` with API keys (ANTHROPIC_API_KEY, OPENAI_API_KEY, Firebase config, etc.). The repo-root `.env.local` holds **no** model-provider key, on purpose: changes are tested in production, not here. A local run that generates takes the dev key from the shell (see Provider keys below).
 2. `npm run dev`
 3. Run Graffiticode API/auth servers separately (see graffiticode/graffiticode repo) — they run on `localhost:3100` and `localhost:4100`
 
@@ -166,4 +166,4 @@ Corpus items live in `users/{EVAL_UID}/items`; personal accounts should never ho
 
 **Language package refresh:** `npm run refresh` copies `.tgz` files from sibling `../l0002` and `../l0011` directories — use when iterating on language packages locally.
 
-**Provider keys — production vs local.** Production has no static Anthropic key: the `console` service uses Workload Identity Federation, and the old `graffiticode-console` key is deleted. OpenAI comes from Secret Manager (`OPENAI_API_KEY:2`). Never put a production key in `.env.local`. Details and traps (including the now-stale `ANTHROPIC_CONSOLE_KEY_IDS`): skill `admin-scripts`.
+**Provider keys — production vs local.** Production has no static Anthropic key: the `console` service uses Workload Identity Federation, and the old `graffiticode-console` key is deleted. OpenAI comes from Secret Manager (`OPENAI_API_KEY:2`). Federation only works inside Google Cloud (its identity token comes from the metadata server), so locally the only credential is `ANTHROPIC_API_KEY` — and `.env.local` keeps none. The tools that still generate from your machine are evals (`npm run eval`, required before any `MODEL_PRIORITY` change), escalated corpus sweeps (`npm run corpus-sweep -- --langs …`) and corpus upkeep (incl. `generate-embeddings-from-examples`, which needs `OPENAI_API_KEY`): run them with the dev key from the shell — `ANTHROPIC_API_KEY=$(cat ~/.anthropic.dev.key) npm run eval` — a workspace-scoped key on its own service account, never one on the production `graffiticode-console` account. Details: skill `admin-scripts`.
