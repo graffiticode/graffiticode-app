@@ -373,7 +373,7 @@ Write the modification in English, as with create_item; content destined for the
 
 Like create_item, generation runs asynchronously: this returns immediately with status "generating". Call render_item(item_id) to retrieve and display the updated result.
 
-What this does and doesn't do: it revises an item the user owns, in their Graffiticode workspace only — including recording a response in a survey item, which is the item's own content. It never writes to an external system: it never saves to a Learnosity item bank (the user does that from the item's page in the Graffiticode console), so never call it to "save" anything outside Graffiticode. Its only outward effect: a fetch-and-shape-data item may re-read the public HTTPS URLs it names.`,
+What this does and doesn't do: it revises an item in the user's Graffiticode workspace only. It never writes to an external system — in particular it never saves to a Learnosity item bank; the user does that from the item's page in the Graffiticode console. Its only outward effect: a fetch-and-shape-data item may re-read the public HTTPS URLs it names.`,
   inputSchema: {
     type: "object",
     properties: {

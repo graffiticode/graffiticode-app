@@ -330,8 +330,13 @@ test("create_item and update_item state that they never write externally", () =>
     assert.match(d, /Learnosity item bank/, name);
     assert.match(d, /Graffiticode console/, name);
   }
+  // update_item's statement stays a description, not an instruction to the
+  // model: the OpenAI scan held back the version that said "never call it to
+  // 'save'…" (and mentioned recording survey responses) while create_item's
+  // plainer paragraph passed. Steering lives in the skills.
   const update = String((tools as ToolRecord[]).find((t) => t.name === "update_item")!.description);
-  assert.match(update, /never call it to "save"/);
+  assert.doesNotMatch(update, /never call it/);
+  assert.doesNotMatch(update, /survey/);
 });
 
 test("a deployed server refuses to author outside core mode; tests and local dev are unaffected", async () => {
