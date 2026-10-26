@@ -35,6 +35,7 @@
     "corpus-rebaseline": "npx tsx scripts/corpus-rebaseline.ts",
     "backfill-provenance": "npx tsx scripts/backfill-corpus-provenance.ts",
     "check-min-instances": "npx tsx scripts/check-min-instances.ts",
+    "gcp-cost": "npx tsx scripts/gcp-daily-cost.ts",
     "billing-uncertain": "npx tsx scripts/billing-uncertain.ts",
     "generation-drain-check": "npx tsx scripts/generation-drain-check.ts",
     "enable-generation-v2": "npx tsx scripts/enable-generation-v2.ts",

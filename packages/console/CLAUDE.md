@@ -158,7 +158,7 @@ Corpus items live in `users/{EVAL_UID}/items`; personal accounts should never ho
 
 ## Local Development
 
-1. Configure `.env.local` with API keys (ANTHROPIC_API_KEY, OPENAI_API_KEY, Firebase config, etc.)
+1. Configure `.env.local` with API keys (ANTHROPIC_API_KEY, OPENAI_API_KEY, Firebase config, etc.). As of 2026-10-26 the repo-root `.env.local` holds **no** model-provider key (the old ones were dead and removed): add your own dev keys before anything that generates.
 2. `npm run dev`
 3. Run Graffiticode API/auth servers separately (see graffiticode/graffiticode repo) — they run on `localhost:3100` and `localhost:4100`
 
@@ -166,4 +166,4 @@ Corpus items live in `users/{EVAL_UID}/items`; personal accounts should never ho
 
 **Language package refresh:** `npm run refresh` copies `.tgz` files from sibling `../l0002` and `../l0011` directories — use when iterating on language packages locally.
 
-**Anthropic key split — dev vs prod.** Two org API keys: `graffiticode-console` is **production only** (plain env var on the `console` Cloud Run service — do NOT put it in `.env.local`), and `graffiticode-console-dev` is what `.env.local`'s `ANTHROPIC_API_KEY` holds, so `npm run dev` spends there. Anything measuring **production** spend must read `ANTHROPIC_CONSOLE_KEY_IDS` rather than resolving `ANTHROPIC_API_KEY`. Details and traps: skill `admin-scripts`.
+**Provider keys — production vs local.** Production has no static Anthropic key: the `console` service uses Workload Identity Federation, and the old `graffiticode-console` key is deleted. OpenAI comes from Secret Manager (`OPENAI_API_KEY:2`). Never put a production key in `.env.local`. Details and traps (including the now-stale `ANTHROPIC_CONSOLE_KEY_IDS`): skill `admin-scripts`.
