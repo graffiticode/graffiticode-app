@@ -8,11 +8,20 @@ server to OpenAI's app directory (Apps SDK, `platform.openai.com/plugins`) as a
 > pick-up-here document. It holds the critical path, the decisions owed, what is verified and
 > what is not. This file is the procedure; that one is the state.
 
-**Status (2026-09-15).** v1.0.0 was **approved 2026-08-14**. v2.0.0 was **rejected
-2026-08-30** — "one or more test cases did not produce correct results." No resubmission has
-been filed. What changed since the rejection is recorded in §10; read it before reusing any
-checklist below, because two things the reviewer sees are different now (ChatGPT gets a
-widget, and the expected tool-call path is shorter).
+**Status (2026-10-26).** History so far:
+- v1.0.0 was **approved 2026-08-14**.
+- v2.0.0 was **rejected 2026-08-30**: "one or more test cases did not produce correct results"
+  (§10).
+- **v2.1.0 is live** in the directory, with no auth.
+
+**2.2.2** is built and adds mixed (optional) OAuth (§0). Two portal-side items block it:
+- the app's Authentication setting still reads "No authentication", and only OpenAI support can
+  change it;
+- a manual-review appeal for `update_item`'s held definition is open, and MCP scans are paused
+  until it is decided.
+
+The status doc linked above holds the details and the critical path. Read §10 before reusing any
+checklist below: the reviewer now sees a widget, and the expected tool-call path is shorter.
 
 - **Publisher:** Artcompiler (business identity verification).
 - **MCP endpoint:** `https://mcp.graffiticode.org/mcp` (Streamable HTTP).
@@ -44,9 +53,11 @@ widget, and the expected tool-call path is shorter).
   logged `codex-mcp-client` and `openai-mcp`. Check the `[widget] tools/list` log line during
   the review window and record it here.
 - **Legal:** privacy `https://mcp.graffiticode.org/privacy`, terms
-  `https://mcp.graffiticode.org/terms`, support `support@graffiticode.org` (the plugin
-  manifest's `supportURL` is `mailto:support@graffiticode.org`, set in
-  `packages/skills/plugin.meta.json`).
+  `https://mcp.graffiticode.org/terms`, support `support@graffiticode.org` (the reviewer
+  contact). The plugin manifest's `supportURL` is the support forum,
+  `https://forum.graffiticode.org/c/support/57`, set in `packages/skills/plugin.meta.json`. That
+  is the value v2.1.0 shipped and the portal accepted, and the packager requires an https URL
+  there.
 - **Listing copy:** [`openai-listing-copy.md`](./openai-listing-copy.md) is the canonical,
   versioned source for every public publisher field (category, tagline, description, starter
   prompts). The portal is **not** the source of truth — change both in the same sitting.
