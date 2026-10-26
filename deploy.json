@@ -68,7 +68,10 @@
       "secrets": {
         "ACT_AS_GRANT_SECRET": "ACT_AS_GRANT_SECRET:1",
         "INTERNAL_API_KEY": "INTERNAL_API_KEY:2",
-        "OPENAI_API_KEY": "OPENAI_API_KEY:2"
+        "OPENAI_API_KEY": "OPENAI_API_KEY:2",
+        "STRIPE_SECRET_KEY": "STRIPE_SECRET_KEY:1",
+        "STRIPE_WEBHOOK_SECRET": "STRIPE_WEBHOOK_SECRET:1",
+        "STRIPE_WEBHOOK_SECRET_PREVIOUS": "STRIPE_WEBHOOK_SECRET_PREVIOUS:1"
       },
       "verify": {
         "module": "verify/console.mjs"
