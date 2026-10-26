@@ -15,6 +15,7 @@ export GRAFFITICODE_APP_CREDENTIALS=~/graffiticode-app-key.json # graffiticode-a
 
 **graffiticode project** (API data):
 - `npx tsx scripts/clear-compile.ts <taskId>` - Delete a compile record
+- `npm run gcp-cost [-- --days N | --start/--end YYYY-MM-DD] [--project <id>] [--by-sku] [--csv f.csv]` - **Daily GCP cost of each Cloud Run service and Compute Engine resource**, from the detailed billing export (`graffiticode.billing_export`, created 2026-10-26, backfilled from 2026-08-01). Net of credits, so it adds up to the invoice; days in `America/Los_Angeles` like the invoice. Default: last 7 days, graffiticode + graffiticode-app. The export lags usage by hours, so the latest day is partial (`*`). Needs only `bq` with your gcloud login.
 
 **graffiticode-app project** (console data):
 - `npx tsx scripts/get-app-names.ts` - List app names from items
@@ -32,13 +33,12 @@ export GRAFFITICODE_APP_CREDENTIALS=~/graffiticode-app-key.json # graffiticode-a
   - `--verbose` - Stream build output to terminal
 - `./scripts/set-free-plan-secrets.sh` - Push `FREE_PLAN_API_KEY` and `FREE_PLAN_NAMESPACE_SALT` from `.env.local` into Secret Manager and remount on the `console` Cloud Run service. Re-running rotates (creates a new secret version) and rolls a new revision. Rotating the salt invalidates active free-plan namespaces.
 
-## Anthropic key split — dev vs prod (set up 2026-07-28)
+## Provider keys — production vs local (as of 2026-10-26)
 
-Two org API keys:
-- **`graffiticode-console`** (`apikey_01HXtW4…`) — **production only.** Carried as a plain env var on the `console` Cloud Run service. Do NOT put it in `.env.local`.
-- **`graffiticode-console-dev`** (`apikey_01N4UM…`) — local dev. This is what `.env.local`'s `ANTHROPIC_API_KEY` holds, so `npm run dev` spends here.
+- **Production has no static Anthropic key.** The `console` service authenticates to the Claude API with Workload Identity Federation; the `graffiticode-console` key (`apikey_01HXtW4…`) was deleted at Anthropic and is removed from every release (`removeEnv`, 24e534f). OpenAI is mounted from Secret Manager (`OPENAI_API_KEY:2`, recreated in the Artcompiler org).
+- **`.env.local` holds no model-provider key.** Its `ANTHROPIC_API_KEY` (`graffiticode-console-dev`, `apikey_01N4UM…`) and both of its `OPENAI_API_KEY` lines returned 401 on 2026-10-26 and were removed. A local script that generates (corpus sweep, evals, `npm run dev`) now fails with a missing key: put a working dev key in `.env.local` (Anthropic: mint one in the Console; OpenAI: a key from the Artcompiler org), never a production one.
 
-`.env.local` previously held the *production* key, so every local generation billed against production. Anything that must measure **production** provider spend reads `ANTHROPIC_CONSOLE_KEY_IDS=graffiticode-console` from `.env.local` rather than resolving `ANTHROPIC_API_KEY` (which now names the dev key) — today that is `fetch-daily-usage.ts`. (`cost-per-item.ts` no longer reads provider spend at all; `audit-token-counts.ts` takes the whole org and attributes per key.) Two traps worth knowing: a shell-exported `ANTHROPIC_API_KEY` **shadows `.env.local`** in every script using the guarded env loader (`if (!(key in process.env))`) — `fetch-daily-usage.ts` uses an overwriting loader and does not — and the Admin API has **no create-key endpoint**, so minting a key is Console-only (rename/disable are scriptable via `POST /v1/organizations/api_keys/{id}`).
+Anything that must measure **production** provider spend reads `ANTHROPIC_CONSOLE_KEY_IDS=graffiticode-console` from `.env.local` rather than resolving `ANTHROPIC_API_KEY` — today that is `fetch-daily-usage.ts`. That key is deleted, so since the move to federation this measures nothing for production; it needs revisiting before it is trusted. (`cost-per-item.ts` no longer reads provider spend at all; `audit-token-counts.ts` takes the whole org and attributes per key.) Two traps worth knowing: a shell-exported `ANTHROPIC_API_KEY` **shadows `.env.local`** in every script using the guarded env loader (`if (!(key in process.env))`) — `fetch-daily-usage.ts` uses an overwriting loader and does not — and the Admin API has **no create-key endpoint**, so minting a key is Console-only (rename/disable are scriptable via `POST /v1/organizations/api_keys/{id}`).
 
 ## Deploy config
 
