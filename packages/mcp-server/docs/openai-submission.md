@@ -44,9 +44,11 @@ widget, and the expected tool-call path is shorter).
   logged `codex-mcp-client` and `openai-mcp`. Check the `[widget] tools/list` log line during
   the review window and record it here.
 - **Legal:** privacy `https://mcp.graffiticode.org/privacy`, terms
-  `https://mcp.graffiticode.org/terms`, support `support@graffiticode.org` (the plugin
-  manifest's `supportURL` is `mailto:support@graffiticode.org`, set in
-  `packages/skills/plugin.meta.json`).
+  `https://mcp.graffiticode.org/terms`, support `support@graffiticode.org` (the reviewer
+  contact). The plugin manifest's `supportURL` is the support forum,
+  `https://forum.graffiticode.org/c/support/57`, set in `packages/skills/plugin.meta.json`. That
+  is the value v2.1.0 shipped and the portal accepted, and the packager requires an https URL
+  there.
 - **Listing copy:** [`openai-listing-copy.md`](./openai-listing-copy.md) is the canonical,
   versioned source for every public publisher field (category, tagline, description, starter
   prompts). The portal is **not** the source of truth — change both in the same sitting.

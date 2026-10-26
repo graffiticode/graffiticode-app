@@ -1,193 +1,92 @@
 # ChatGPT listing refresh — where we are
 
-**Pick-up-here document.** Written 2026-09-16 at the end of a long working session. It records
-state and decisions, not procedure: the runbook is [`openai-submission.md`](./openai-submission.md)
-(§10 tracks the rejection findings, §11 the widget-caching trap) and the canonical copy is
+**Pick-up-here document.** It records state and decisions, not procedure. The procedure is in the
+runbook, [`openai-submission.md`](./openai-submission.md): §0 covers OAuth, §10 the rejection
+findings, §11 the widget-caching trap. The canonical listing copy is
 [`openai-listing-copy.md`](./openai-listing-copy.md). **Update this file whenever the state
-changes**; a status doc that has gone stale is worse than none, as §11 records at length.
+changes**; as §11 records at length, a stale status doc is worse than none. Last rewritten
+2026-10-26. The sections from "Capability is not activation" down are September findings and
+still hold.
 
 ---
 
-## Pick up here — evening of 2026-09-19
+## Pick up here — 2026-10-26
 
-**All 5+3 test cases passed in ChatGPT.** Ready for portal submission.
+**v2.1.0 is live in the directory without auth. The next version, 2.2.2, adds mixed (optional)
+OAuth and is built, but two portal-side steps block it:**
+1. the app's Authentication setting, and
+2. a manual review of `update_item` that is still open.
 
-### What's done
+Neither can be solved in code.
 
-1. ✅ **5+3 test cases passed** (2026-09-18):
-   - Positive #1: L0180 quiz ✅
-   - Positive #2: L0179 invoice (1ms `list_languages`!) ✅
-   - Positive #3: L0176 Learnosity ✅
-   - Positive #4: L0173 chart + `update_item` refine ✅
-   - Positive #5: L0181 flashcards via `get_spec` ✅
-   - Negative #1: "What's a bar chart?" — no tool call ✅
-   - Negative #2: "Book me a flight" — declined ✅
-   - Negative #3: Cross-language item_id — used `get_spec` correctly ✅
-
-2. ✅ **Critical fix deployed** (`mcp-service-00205-dn2`): `list_languages` now fetches the full
-   cached catalog and filters client-side, eliminating per-search-term cache misses that were
-   causing timeouts in ChatGPT. Measured: 1ms vs 300-500ms+ before.
-
-3. ✅ **Widget clarified** (`mcp-service-00206-rk6`): `get_item` no longer carries widget metadata.
-   Widget is on `render_item` only — `get_item` returns raw src/data for programmatic clients.
-
-4. ✅ **Scan Tools simulation** (2026-09-19):
-   | Check | Result |
-   |-------|--------|
-   | Tool count | 7 ✅ |
-   | Widget marker | `render_item` only ✅ |
-   | `get_item` widget | none (just `securitySchemes`) ✅ |
-   | Widget URI | `widget-mcp.fb346b4c.html` ✅ |
-
-5. ✅ **ZIP verified:**
-   ```
-   packages/skills/dist/graffiticode-plugin-2.1.0.zip
-     ref    f2c3035 (2026-09-19)
-     sha256 7c7ae8527b36c6edec9be7ecbcb8372fb518e4c18077b4662d2f2eac0dc4faa2
-   ```
-   Copy: subtitle `Assessments, diagrams and more` (30/30), 3-paragraph description with
-   Learnosity Author/Data API, 3 starter prompts (invoice, concept web, Learnosity assessment).
-
-### What's left — portal submission
-
-Follow the checklist below.
-
-**Live right now:** `mcp-service-00209-mf7` (commit `144f237`). **Reconnect before testing** —
-clients cache connection metadata.
-
----
-
-## Pre-submission checklist
-
-Run through this before clicking Submit in the portal.
-
-### 1. Verify infrastructure
-
-```bash
-# Health check
-curl -s https://mcp.graffiticode.org/health | jq .
-# Expected: {"status":"ok"}
-
-# Confirm min/max instances (session state requires single instance)
-gcloud run services describe mcp-service --project graffiticode-app --region us-central1 \
-  --format="yaml(spec.template.metadata.annotations)" 2>/dev/null | grep -E "minScale|maxScale"
-# Expected: minScale: '1', maxScale: '1'
-```
-
-### 2. Verify the ZIP
-
-```bash
-# Confirm SHA matches recorded artifact
-shasum -a 256 ../skills/dist/graffiticode-plugin-2.1.0.zip
-# Expected: a428f4155024df1272c65377c6bd9a1b9e74880d447a16d01700004a9f88fd97
-
-# Spot-check contents
-cd ../skills && unzip -l dist/graffiticode-plugin-2.1.0.zip
-# Expected: plugin.json, mcp.json, .app.json, skills/{render,assessments,learnosity}/SKILL.md
-```
-
-### 3. Portal: Upload and Scan Tools
-
-1. Open the **v2 draft** at platform.openai.com
-2. Set version to **2.1.0**
-3. Upload `packages/skills/dist/graffiticode-plugin-2.1.0.zip`
-4. Click **Scan Tools**
-5. **Wait for scan to complete**, then verify:
-
-| Check | Expected |
-|-------|----------|
-| Tool count | **7** (create_item, update_item, render_item, get_item, get_spec, list_languages, get_language_info) |
-| Widget marker | On `render_item` **ONLY** (not `get_item`) |
-| Widget URI format | `widget-mcp.<hash>.html` (NOT `widget-oai` or `form-widget`) |
-| CSP | `resourceDomains` (bundle origin) + `frameDomains` = `https://l0176.graffiticode.org` only (since 2026-10-22, for L0176) |
-
-### 4. Verify scan hit the live server
-
-```bash
-# Check logs for the scan's tools/list call (within last few minutes)
-gcloud logging read 'resource.labels.service_name="mcp-service" AND textPayload:"tools/list"' \
-  --project graffiticode-app --freshness=10m --limit=3 \
-  --format="value(timestamp,textPayload)"
-```
-
-Look for a `[widget] tools/list` line showing the current widget hash. If the hash in the
-portal snapshot doesn't match, the scan read a stale cache — wait and rescan.
-
-### 5. Final checks before Submit
-
-- [ ] Version is **2.1.0**
-- [ ] All 7 tools visible with correct schemas
-- [ ] Widget appears in preview for `render_item` only
-- [ ] Starter prompts are the 3 from the ZIP (invoice, concept web, Learnosity)
-- [ ] Category is **Productivity**
-- [ ] Legal links resolve: `/privacy`, `/terms`
-
-### 6. Submit
-
-1. **Freeze** the metadata
-2. Click **Submit for Review**
-3. Record submission timestamp here: `_______________`
-
-### 7. After approval
-
-1. Click **Publish** (apps do not auto-list)
-2. Verify listing appears in directory
-3. Test the 3 starter prompts from a fresh install
-4. Update this doc with the approval date
-
----
-
-## Status at a glance
-
-**2026-09-18, 19:19 UTC — the widget renders inline in ChatGPT.** A person asked for a
-five-question quiz through the workspace plugin on `mcp-service-00200-l8w` and it mounted
-unprompted (`boot` → `mounted`, no `dump`). It mounts in Claude and Codex too. What blocked it for
-two days was not the host: `@graffiticode/l0180-view@0.1.0` had no activity support, so a
-multi-question quiz reached a Form that printed the payload instead of rendering it. Fixed by
-publishing `l0180-view@0.2.0` and the `@graffiticode/l0180` core it depends on. Full account and
-the beacon method in `openai-submission.md` §11.
+### Status at a glance
 
 | | |
 |---|---|
-| Live in the directory | **v2.1.0** (Jeff, 2026-10-22; this table predates that). Its CSP is its submission snapshot, which has no `frameDomains`, so framed L0176 falls back to the card there until a resubmission declares `https://l0176.graffiticode.org` |
-| Last submission | **v2.0.0, REJECTED 2026-08-30** — "one or more test cases did not produce correct results" |
-| The v2 draft | **still editable in the portal** (read back 2026-09-16). This is what resubmits unless changed |
-| Resubmission | **not filed.** Blocked on one thing: nobody has run the 5+3 test cases in ChatGPT |
-| Server | `mcp-service-00196-jcc` (2026-09-16). Carries `e2365df` — quiz summary + Learnosity ✓ |
-| Console | `console-00618-4gk` (2026-09-16), carries the catalog-search work |
+| Live in the directory | **v2.1.0**, app `asdk_app_6a5a7c2760248191a8c61bb2b6c26ac9`, Authentication **"No authentication"**. Its CSP is its submission snapshot, which has no `frameDomains`, so framed L0176 falls back to the card until a resubmission declares `https://l0176.graffiticode.org` |
+| Next version | **2.2.2**, `packages/skills/dist/graffiticode-plugin-2.2.2.zip`, sha256 `a0804ff59294800289ba041db476acb017a09e5a5806b189fc35984e7eaa866d`. Matches what `npm run package` builds from `main` @ `36a8862`. **Not uploaded/submitted yet** (as far as this doc knows). The `-2.2.2-v2.zip` beside it is the `--dev` workspace build; never submit it |
+| Server | `mcp-service-rmvpm8szz-123e07` (2026-10-26, `main` @ `36a8862`), 100% of traffic. Rollback: `npm run rollback -- mcp --env production --release rmvpm8szz-123e07` |
+| Tool definitions in the portal | Daily scan auto-published every new definition except **`update_item`**, which was held: "This new tool definition needs further review before it can be published." No reason was given. ChatGPT serves `update_item`'s previous definition until this clears |
+| Manual review | **Appeal filed 2026-10-26** for `update_item`. **MCP scans are paused** until it is decided or withdrawn. Tool-definition changes deployed meanwhile don't reach ChatGPT |
+| Auth decision | **Mixed** (decided 2026-10-22). Anonymous free-plan use keeps working alongside Graffiticode sign-in. Runbook §0 |
+| Server OAuth | **Verified live 2026-10-26.** Both discovery documents are served: `/.well-known/oauth-protected-resource[/mcp]` and `/.well-known/oauth-authorization-server`. Client registration is dynamic (DCR) at `/oauth/register`, PKCE S256, scope `graffiticode`. An unauthenticated `initialize` returns 200, which mixed auth requires. Every tool declares `securitySchemes` `[noauth, oauth2(graffiticode)]` |
 
----
+### The critical path
 
-## The critical path
+1. **Get the app's Authentication changed to optional OAuth.**
+   - Settings: OAuth, optional; dynamic client registration; issuer
+     `https://mcp.graffiticode.org`; scope `graffiticode`.
+   - The portal's MCP page shows the value but no control for editing it, and the documented
+     route (auth in `mcp.json` + Upload new version) is the one the portal rejects for this app
+     (see "Packaging rules" below).
+   - **Ask OpenAI support.** The appeal doesn't cover it: its dialog says "App settings are not
+     included."
+   - *Yours.*
+2. **Wait for the `update_item` appeal.**
+   - What the appeal argued: the tool edits only the caller's own item, and never writes
+     externally. `destructiveHint` is deliberate, because MCP exposes no revert. The changes from
+     the published definition are `oauth2` added beside `noauth`, an optional output `summary`,
+     and one paragraph stating the boundary.
+   - What the scanner saw: the description was reworded in PR #59 to match `create_item`'s,
+     which published. #59 dropped a survey-response clause and a "never call it to 'save'"
+     instruction to the model. That wording was deployed before the appeal, but the scanner had
+     not rescanned it.
+   - Once the appeal is decided, **Rescan** and confirm `update_item` shows Published.
+3. **Test in our own workspace first** (runbook §5a). Upload 2.2.2 as a workspace plugin, which
+   enforces the CSP the way the directory will. Check:
+   - sign-in;
+   - that anonymous use still works;
+   - the framed L0176 preview (dev mode doesn't enforce the CSP, so only this run proves it).
+4. **Submit 2.2.2.** In order:
+   - Scan Tools;
+   - upload the ZIP;
+   - listing copy and the 5+3 tests;
+   - freeze metadata;
+   - Submit for Review;
+   - on approval, **Publish**.
 
-Submitting as **v2.1.0**, rescanned in the still-editable v2 draft.
+   *Yours.*
 
-1. ~~**Deploy `e2365df`**~~ — **done 2026-09-16**, revision `mcp-service-00196-jcc`. Verified
-   live: a 3-question quiz now returns all three questions with ✓ answer keys. The widget hash
-   moved to **`2656b7bd`** as expected, so every client's cached build is one behind again.
-2. ~~**Build the plugin ZIP**~~ — **done 2026-09-17**, `npm run package` in
-   `packages/skills`. The build refuses an uncommitted or stale ref, so it always describes
-   a pushed commit. Record the artifact SHA-256 in `openai-submission.md` §2.
-3. ~~**Refresh §6's 5+3 test cases**~~ — **done 2026-09-17.** Rewritten around the current
-   catalog, every positive executed against production that day with its outcome recorded.
-   Two behaviours they depend on were fixed the same day: the `get_spec` bridge (case 5) and the
-   phantom "already rendered" claim.
-4. **Run the 5+3 by hand in ChatGPT**, on a build whose hash you have checked. This is the
-   whole ballgame: the rejection said test cases failed, and two of the five never reached the
-   server at all. *Yours — no agent can do it.*
-5. **Rescan and resubmit.** Open the v2 draft, set 2.1.0, upload the ZIP, **run Scan Tools**,
-   then freeze and submit. *Yours.*
+### Packaging rules the portal enforces (learned 2026-10-22, each from a rejection)
 
-**Step 5's scan is what surfaces the widget, and nothing else does.** The v2 draft's metadata
-was captured on 2026-08-18, before OpenAI clients got widget metadata at all (2026-08-31, with
-the mount fixes of 09-11 and 09-15). Resubmitting without rescanning ships the August contract
-under a new number. Confirm in the scan result that the widget marker lands on `render_item`
-only (not `get_item` — that tool returns raw data for programmatic clients), and that the
-imported UI resource URI is a `widget-mcp.<hash>.html` one —
-a retired `widget-oai`/`form-widget` pointer would make every `resources/read` in review throw
-`Resource retired` (`src/server.ts:928`).
+`packages/skills/scripts/build-plugin.mjs` now encodes all of these, and the build fails rather than
+shipping a ZIP the portal will refuse.
 
-Everything else — latency, routing, the widget race, the catalog search — is done and verified.
+| Rule | Portal message |
+|---|---|
+| `plugin.json` `name` must be the listing's assigned name, `app-6a5a7c2760248191a8c61bb2b6c26ac9` (set in `plugin.meta.json`) | "Plugin name must match the existing plugin" |
+| Version must go up for an update (`packages/skills/package.json`) | — |
+| **No `.app.json`.** The plugin is standalone and connects through `mcp.json` | "Plugins with .app.json cannot be submitted. Declare an MCP server URL instead" |
+| So the plugin carries its own `interface.websiteURL`, `supportURL`, `privacyPolicyURL`, `termsOfServiceURL`, `composerIcon`/`logo` (`assets/icon.png`, 384×384) | "Website URL is required", … "App icon required" |
+| **No auth in `mcp.json`.** Because `name` is the app's id, the app owns the connection, even without `.app.json`. Rejected twice (2.1.1 and 2.2.0; the 2.2.0 ZIP is kept as `dist/REJECTED-auth-override-…`) | "This app already has authentication configured. Remove the ZIP's auth override…" |
+| Skills ship at `skills/<id>/SKILL.md` (Agent Plugins §6.1 fixed location). The first 2.1.1 builds put them at the root and would have installed with no skills | — |
+
+### Done in September (kept for the record)
+
+5+3 test cases passed in ChatGPT on 2026-09-18. `list_languages` became a client-side filter
+over the cached catalog. The widget moved to `render_item` only. Scan Tools was simulated on
+2026-09-19. That work shipped as v2.1.0. Its 2.1.0-specific pre-submission checklist is
+superseded by runbook §§1–5 and the critical path above.
 
 ---
 
@@ -407,6 +306,9 @@ Nothing here should be re-derived. Everything else should be treated as unknown.
 | ChatGPT served the current build | 2026-09-16 16:21 UTC | read the legacy URI, which maps to current — see below |
 | Demo sequence end to end | 2026-09-16 | quiz 13.6s → add cloze ~20s → flashcards via `get_spec` ~25-30s |
 | Quiz summary + answer key, in production | 2026-09-16, rev `00196` | 3 questions listed, each with its ✓ correct option |
+| Server OAuth surface (discovery, DCR, PKCE S256, scope; anonymous `initialize` = 200) | 2026-10-26, rev `rmvpm8szz-123e07` | all served; see Pick up here |
+| 2.2.2 ZIP is reproducible from `main` | 2026-10-26, `36a8862` | `--dry-run` sha256 equals the recorded `a0804ff5…866d` |
+| `update_item` description live after #59 | 2026-10-26, rev `rmvpm8szz-123e07` | `tools/list` returns the reworded paragraph |
 
 **The rule that makes those dates meaningful:** a render proves nothing unless you know which
 build the client loaded. Check before concluding anything:
