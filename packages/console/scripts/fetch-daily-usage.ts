@@ -1,31 +1,39 @@
 #!/usr/bin/env node
 
-// Fetch previous day's usage from the Anthropic Admin API, filtered to the
-// console's API key (ANTHROPIC_API_KEY in .env.local), and save to a JSON file.
-// Usage: npx tsx scripts/fetch-daily-usage.ts
-// Requires: ANTHROPIC_ADMIN_KEY environment variable
+// Fetch a day's production Anthropic usage from the Admin API's usage report and
+// save it to data/daily-usage/usage-<date>.json (read by revenue-vs-cost.ts).
+// Usage: npx tsx scripts/fetch-daily-usage.ts [--date YYYY-MM-DD] [--tz IANA_TIMEZONE]
+// Requires: ANTHROPIC_ADMIN_KEY (from the shell or .env.local)
+//
+// "Production" is the console's identity, which changed on 2026-10-24: until
+// then it called Claude with the `graffiticode-console` API key; since then it
+// authenticates with Workload Identity Federation, and the usage report
+// attributes that traffic to a service account instead of a key. A day is the
+// sum of both, so days on either side of the switch (and the day of it) count
+// correctly. Override with ANTHROPIC_CONSOLE_KEY_IDS (key ids or names) and
+// ANTHROPIC_CONSOLE_SERVICE_ACCOUNT_IDS (svac_ ids), comma-separated.
 
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { resolve } from 'path';
 
-// Load .env.local
-const envPath = resolve(process.cwd(), '.env.local');
-try {
-  for (const line of readFileSync(envPath, 'utf-8').split('\n')) {
-    const match = line.match(/^\s*([^#=]+?)\s*=\s*(.*)\s*$/);
-    if (match) process.env[match[1]] = match[2];
-  }
-} catch {}
+// Load .env.local: this directory's, else the repo root's.
+for (const envPath of [resolve(process.cwd(), '.env.local'), resolve(process.cwd(), '../../.env.local')]) {
+  try {
+    for (const line of readFileSync(envPath, 'utf-8').split('\n')) {
+      const match = line.match(/^\s*([^#=]+?)\s*=\s*(.*)\s*$/);
+      if (match) process.env[match[1]] = match[2];
+    }
+    break;
+  } catch {}
+}
+
+// The console's production identities (not secrets: ids that name them).
+const CONSOLE_KEY_IDS = ['apikey_01HXtW4mos89SZwqN4NznJ1c']; // graffiticode-console, deleted 2026-10-24
+const CONSOLE_SERVICE_ACCOUNT_IDS = ['svac_01QLoHvFLSei6QT2DCGMkPKU']; // the console's federation service account
 
 const ADMIN_KEY = process.env.ANTHROPIC_ADMIN_KEY;
 if (!ADMIN_KEY) {
   console.error('Error: ANTHROPIC_ADMIN_KEY environment variable not set');
-  process.exit(1);
-}
-
-const API_KEY = process.env.ANTHROPIC_API_KEY;
-if (!API_KEY) {
-  console.error('Error: ANTHROPIC_API_KEY environment variable not set');
   process.exit(1);
 }
 
@@ -49,46 +57,29 @@ async function apiFetch(url: string): Promise<any> {
   throw new Error('Failed after 3 retries');
 }
 
-// Find the API key ID to snapshot.
-//
-// ANTHROPIC_CONSOLE_KEY_IDS wins when set: since local dev moved onto its own
-// key, ANTHROPIC_API_KEY names the DEV key, and matching against it would
-// quietly snapshot developer traffic instead of production's.
-//
-// Otherwise fall back to matching the key value against partial hints, which
-// look like "sk-ant-api03-mR3...sQAA" — prefix before "..." and suffix after.
-async function findApiKeyId(): Promise<{ id: string; name: string } | null> {
-  const wanted = (process.env.ANTHROPIC_CONSOLE_KEY_IDS || '')
-    .split(',').map(s => s.trim()).filter(Boolean);
+const list = (v: string | undefined) => (v || '').split(',').map(x => x.trim()).filter(Boolean);
 
+// The key ids and service account ids whose usage counts as production. Key
+// names in ANTHROPIC_CONSOLE_KEY_IDS resolve through the org's key list; ids are
+// taken as given, since a deleted key's id still labels its past usage.
+async function resolveIdentities(): Promise<{ apiKeyIds: string[]; serviceAccountIds: string[] }> {
+  const wanted = process.env.ANTHROPIC_CONSOLE_KEY_IDS ? list(process.env.ANTHROPIC_CONSOLE_KEY_IDS) : CONSOLE_KEY_IDS;
+  const apiKeyIds = wanted.filter(w => w.startsWith('apikey_'));
+  const names = wanted.filter(w => !w.startsWith('apikey_')).map(n => n.toLowerCase());
   let afterId: string | undefined;
-  do {
+  while (names.length) {
     const params = new URLSearchParams({ limit: '100' });
     if (afterId) params.set('after_id', afterId);
     const data = await apiFetch(`https://api.anthropic.com/v1/organizations/api_keys?${params}`);
-    if (wanted.length > 0) {
-      for (const key of data.data || []) {
-        if (wanted.includes(key.id) ||
-            wanted.some(w => w.toLowerCase() === String(key.name || '').toLowerCase())) {
-          return { id: key.id, name: key.name };
-        }
-      }
-      afterId = data.has_more ? data.last_id : undefined;
-      continue;
-    }
     for (const key of data.data || []) {
-      const hint = key.partial_key_hint || '';
-      const dotIdx = hint.indexOf('...');
-      if (dotIdx === -1) continue;
-      const prefix = hint.slice(0, dotIdx);
-      const suffix = hint.slice(dotIdx + 3);
-      if (API_KEY!.startsWith(prefix) && API_KEY!.endsWith(suffix)) {
-        return { id: key.id, name: key.name };
-      }
+      if (names.includes(String(key.name || '').toLowerCase())) apiKeyIds.push(key.id);
     }
     afterId = data.has_more ? data.last_id : undefined;
-  } while (afterId);
-  return null;
+    if (!afterId) break;
+  }
+  const serviceAccountIds = process.env.ANTHROPIC_CONSOLE_SERVICE_ACCOUNT_IDS
+    ? list(process.env.ANTHROPIC_CONSOLE_SERVICE_ACCOUNT_IDS) : CONSOLE_SERVICE_ACCOUNT_IDS;
+  return { apiKeyIds: [...new Set(apiKeyIds)], serviceAccountIds };
 }
 
 type TokenStats = { input: number; cached_input: number; cache_creation: number; output: number; web_searches: number };
@@ -129,31 +120,28 @@ async function main() {
 
   console.log(`Fetching usage for ${dateStr}...`);
 
-  // Resolve API key ID, try filtered first, fall back to all keys if empty
-  const apiKey = await findApiKeyId();
-  const baseParams = { starting_at: startingAt, ending_at: endingAt, bucket_width: '1h', 'group_by[]': 'model' };
-  let report: any;
-  let usedAllKeys = false;
-
-  if (apiKey) {
-    console.log(`  Filtering to key: ${apiKey.name} (${apiKey.id})`);
-    const params = new URLSearchParams({ ...baseParams, 'api_key_ids[]': apiKey.id });
-    console.log(`  Range: ${startingAt} to ${endingAt}`);
-    report = await apiFetch(`https://api.anthropic.com/v1/organizations/usage_report/messages?${params}`);
-    const hasData = (report.data || []).some((b: any) => b.results && b.results.length > 0);
-    if (!hasData) {
-      console.log('  No usage data for this key, falling back to all keys');
-      const allParams = new URLSearchParams(baseParams);
-      report = await apiFetch(`https://api.anthropic.com/v1/organizations/usage_report/messages?${allParams}`);
-      usedAllKeys = true;
-    }
-  } else {
-    console.log('  Could not match API key, using usage for all keys');
-    const params = new URLSearchParams(baseParams);
-    console.log(`  Range: ${startingAt} to ${endingAt}`);
-    report = await apiFetch(`https://api.anthropic.com/v1/organizations/usage_report/messages?${params}`);
-    usedAllKeys = true;
+  // One unfiltered report grouped by identity, kept where the row's key or
+  // service account is production's. (Filtering on both key and service
+  // account would match neither: a request carries one or the other.)
+  const ids = await resolveIdentities();
+  if (!ids.apiKeyIds.length && !ids.serviceAccountIds.length) {
+    console.error('Error: no production identity resolved; set ANTHROPIC_CONSOLE_KEY_IDS or ANTHROPIC_CONSOLE_SERVICE_ACCOUNT_IDS');
+    process.exit(1);
   }
+  console.log(`  Production: keys ${ids.apiKeyIds.join(', ') || '(none)'}; service accounts ${ids.serviceAccountIds.join(', ') || '(none)'}`);
+  console.log(`  Range: ${startingAt} to ${endingAt}`);
+  const params = new URLSearchParams({ starting_at: startingAt, ending_at: endingAt, bucket_width: '1h', limit: '168' });
+  for (const g of ['model', 'api_key_id', 'service_account_id']) params.append('group_by[]', g);
+  const report: any = { data: [] };
+  for (let page: string | undefined, first = true; first || page; first = false) {
+    if (page) params.set('page', page);
+    const chunk = await apiFetch(`https://api.anthropic.com/v1/organizations/usage_report/messages?${params}`);
+    report.data.push(...(chunk.data || []));
+    page = chunk.has_more ? chunk.next_page : undefined;
+  }
+  const isProduction = (r: any) => (r.api_key_id && ids.apiKeyIds.includes(r.api_key_id)) ||
+    (r.service_account_id && ids.serviceAccountIds.includes(r.service_account_id));
+  for (const bucket of report.data) bucket.results = (bucket.results || []).filter(isProduction);
 
   // Summarize
   let totalInput = 0, totalCachedInput = 0, totalCacheCreation = 0, totalOutput = 0, totalWebSearches = 0;
@@ -187,7 +175,7 @@ async function main() {
     date: dateStr,
     fetched_at: now.toISOString(),
     period: { starting_at: startingAt, ending_at: endingAt },
-    api_key: apiKey && !usedAllKeys ? { id: apiKey.id, name: apiKey.name } : { id: 'all', name: 'all keys' },
+    identities: { api_key_ids: ids.apiKeyIds, service_account_ids: ids.serviceAccountIds },
     totals: {
       uncached_input_tokens: totalInput,
       cached_input_tokens: totalCachedInput,
