@@ -97,6 +97,7 @@
         }
       ],
       "retireTags": true,
+      "minInstances": 0,
       "baselines": [
         {
           "milestone": "R1",
