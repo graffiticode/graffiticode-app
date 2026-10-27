@@ -371,6 +371,72 @@ test("the REAL L0179 shape renders as a table", () => {
   assert.doesNotMatch(md, /font-weight/);
 });
 
+// Starter prompt 1's invoice, captured from production 2026-10-27 (item
+// RsQnJFSrzyf9CvHZDBa1). Its summary used to print `=B2*C2` and an unformatted
+// `10`, and the model read formulas back to the user.
+const INVOICE_CELLS = {
+  A1: { text: "Description", "font-weight": "bold" },
+  B1: { text: "Qty", "font-weight": "bold" },
+  C1: { text: "Unit Price", "font-weight": "bold" },
+  D1: { text: "Line Total", "font-weight": "bold" },
+  A2: { text: "Widget" }, B2: { text: "2" }, C2: { text: "10", format: "$#,##0.00" }, D2: { text: "=B2*C2", format: "$#,##0.00" },
+  A3: { text: "Gadget" }, B3: { text: "3" }, C3: { text: "15", format: "$#,##0.00" }, D3: { text: "=B3*C3", format: "$#,##0.00" },
+  A4: { text: "Gizmo" }, B4: { text: "1" }, C4: { text: "25", format: "$#,##0.00" }, D4: { text: "=B4*C4", format: "$#,##0.00" },
+  A5: { text: "Grand Total", "font-weight": "bold" }, B5: {}, C5: {},
+  D5: { text: "=SUM(D2:D4)", "font-weight": "bold", format: "$#,##0.00" },
+};
+const sheetOf = (cells: Record<string, unknown>) =>
+  describeItem("L0179", { language: "L0179", data: { data: { interaction: { type: "table", cells } }, errors: [] } });
+
+test("a sheet's summary shows computed, formatted values, not formulas", () => {
+  const c = sheetOf(INVOICE_CELLS);
+  assert.equal(c.kind, "table");
+  if (c.kind !== "table") return;
+  assert.deepEqual(c.headers, ["Description", "Qty", "Unit Price", "Line Total"]);
+  assert.deepEqual(c.rows, [
+    ["Widget", "2", "$10.00", "$20.00"],
+    ["Gadget", "3", "$15.00", "$45.00"],
+    ["Gizmo", "1", "$25.00", "$25.00"],
+    ["Grand Total", "", "", "$90.00"],
+  ]);
+  assert.doesNotMatch(contentToMarkdown(c), /=/);
+});
+
+test("formula evaluation: precedence, aggregates, percent and grouping formats", () => {
+  const c = sheetOf({
+    A1: { text: "1200" }, A2: { text: "300" }, A3: { text: "Note" },
+    B1: { text: "=A1+A2*2" },
+    B2: { text: "=AVERAGE(A1:A3)", format: "#,##0" },
+    B3: { text: "=A2/A1", format: "0.0%" },
+    B4: { text: "=-(A1-A2)^1", format: "$#,##0.00" },
+    B5: { text: "=MAX(A1,A2,5000)/COUNT(A1:A3)" },
+  });
+  assert.equal(c.kind, "table");
+  if (c.kind !== "table") return;
+  // Row 1 holds values, so there is no header and every row is data.
+  assert.deepEqual(c.rows.map((r) => r[1]), [
+    "1800",
+    "750", // text in a range is skipped, as a spreadsheet does
+    "25.0%",
+    "-$900.00",
+    "2500",
+  ]);
+});
+
+test("a formula it can't evaluate keeps its raw text rather than a wrong number", () => {
+  const c = sheetOf({
+    A1: { text: "Label" }, B1: { text: "Value" },
+    A2: { text: "x" }, B2: { text: "=VLOOKUP(A2,C1:D9,2)" },
+    A3: { text: "y" }, B3: { text: "=B4" },
+    A4: { text: "z" }, B4: { text: "=B3" }, // cycle
+    A5: { text: "w" }, B5: { text: "=A2*2" }, // text in arithmetic
+    A6: { text: "v" }, B6: { text: "=LOG10(100)" }, // looks like a ref
+  });
+  assert.equal(c.kind, "table");
+  if (c.kind !== "table") return;
+  assert.deepEqual(c.rows.map((r) => r[1]), ["=VLOOKUP(A2,C1:D9,2)", "=B4", "=B3", "=A2*2", "=LOG10(100)"]);
+});
+
 test("a container that holds no cell addresses is not mistaken for a sheet", () => {
   // `interaction` present but keyed by something else entirely — must fall
   // through rather than produce a table of nonsense.
@@ -535,10 +601,12 @@ test("a label/value sheet keeps its first row as data", () => {
   const table = content as { headers: string[]; rows: string[][]; totalRows: number };
   assert.deepEqual(table.headers, ["", ""], "no caption is invented from the data");
   assert.equal(table.totalRows, 4, "all four rows survive");
-  assert.deepEqual(table.rows[0], ["Current Savings", "100000"]);
+  // Formats are applied and formulas evaluated, as the sheet itself shows them.
+  assert.deepEqual(table.rows[0], ["Current Savings", "$100,000"]);
   const md = contentToMarkdown(content);
-  assert.match(md, /Current Savings \| 100000/);
-  assert.match(md, /Projected Savings \| =B1/);
+  assert.match(md, /Current Savings \| \$100,000/);
+  assert.match(md, /Annual Return \| 7%/);
+  assert.match(md, /Projected Savings \| 761225\.5 /);
 });
 
 test("a captioned sheet still gets its header", () => {
@@ -553,7 +621,7 @@ test("the ready summary tells the model to show the contents AND the link", () =
   const summary = buildReadySummary("Simple Retirement Calculator", "L0179",
     "https://app.graffiticode.org/form/abc", undefined, CALCULATOR);
   // The sheet itself reaches a client that can render no widget.
-  assert.match(summary, /Current Savings \| 100000/);
+  assert.match(summary, /Current Savings \| \$100,000/);
   assert.match(summary, /form\/abc/);
 });
 

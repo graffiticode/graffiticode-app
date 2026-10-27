@@ -186,12 +186,32 @@ Shorter fallback if the field tightens (35): `Quizzes, sheets, diagrams, and mor
 | # | Prompt | Chars | Language | Verified output |
 |---|---|---|---|---|
 | 1 | `Create an invoice with line items, quantity, unit price, a line total per row, and a grand total, formatted as currency.` | 120 | **L0179** | per-row `=B2*C2`, `=SUM(D2:D4)` grand total, and `format "$0.00"` on the money columns — re-verified against production 2026-09-17 |
-| 2 | `Create a concept web explaining how rain forms.` | 47 | L0169 | 5 assessed nodes + populated 6-concept drag tray |
+| 2 | `Create a concept web on how rain forms that students complete by dragging terms into place.` | 91 | **L0183** | 5 blank nodes, 7-term drag tray with 2 distractors (one costs a point), scored out of 5 — verified against production 2026-10-27 (see below) |
 | 3 | `Create a Learnosity water cycle assessment: one multiple-choice and one fill-in-the-blank, answers marked.` | 106 | L0176 | MCQ with correct option marked + `clozetext` with `{{response}}`, signed payload |
 
 Every prompt above was executed against production before submission — see the
 "Prompt verification" section. **The prompt TEXT is unchanged and still correct; what went
 stale was the language behind prompt 1** — see the re-verification immediately below.
+
+### Re-verification — 2026-10-27
+
+All three prompts were run verbatim through `create_item` → `get_item` against production.
+- **Prompts 1 and 3** still produce what the table records. Prompt 1's grand total is now
+  `$#,##0.00`, so the old note that L0179 produces no currency format no longer applies.
+- **Prompt 2 changed.** L0169 left the catalog, and on its successor **L0183** the old wording,
+  `Create a concept web explaining how rain forms.`, produced a pre-filled 4-node chain with no
+  interaction. That chain is the same inert-diagram failure that retired v1's photosynthesis
+  prompt (see "L0169 prompt mode"). Naming the task ("that students complete by dragging terms
+  into place") restores the assessment on L0183. Two caveats on that output:
+  - "Collection" is a weak fit for *how rain forms*;
+  - the instructions mention an order on a hub-and-spoke web.
+
+  Neither blocks the prompt.
+- **Prompt 3's display in ChatGPT is still unproven.** The framed L0176 preview needs 2.2.x's
+  `frameDomains`, and so far it has only been seen in developer mode (runbook §5a).
+
+The new prompt 2 ships in plugin **2.2.3**. Its `starter` case in `scripts/eval-routing.ts` now
+uses the new wording; `--only starter` has not been re-run against it.
 
 ### Re-verification — 2026-09-15
 

@@ -194,6 +194,218 @@ function findCellMap(data: Record<string, unknown>): {
 }
 
 /**
+ * What a cell SHOWS, as a spreadsheet would: formulas evaluated, number formats
+ * applied.
+ *
+ * The table used to print each cell's raw `text`, so an invoice reached chat as
+ * `| Widget | 2 | 10 | =B2*C2 |` — the model read formulas back to the user, and a
+ * host whose widget didn't mount showed them too. The widget computes values;
+ * this is the transcript's equivalent.
+ *
+ * Deliberately small: arithmetic, cell refs and ranges, and SUM / AVERAGE / MIN /
+ * MAX / COUNT, which covers what the generators write for totals. Anything else —
+ * an unknown function, a cycle, text in arithmetic — keeps the raw text, which is
+ * exactly the old behaviour, so a formula this can't read is never shown as a
+ * wrong number.
+ */
+function cellDisplay(cells: Record<string, unknown>): (ref: string) => string {
+  const rawText = (ref: string) => {
+    const c = cells[ref];
+    return isRecord(c) ? String(c.text ?? "") : c == null ? "" : String(c);
+  };
+  const format = (ref: string) => {
+    const c = cells[ref];
+    return isRecord(c) && typeof c.format === "string" ? c.format : undefined;
+  };
+  const memo = new Map<string, number>();
+  const visiting = new Set<string>();
+
+  // A cell's numeric value. Empty is 0; non-numeric text is NaN (skipped by the
+  // aggregates, an error in arithmetic); a formula is evaluated, once.
+  const valueOf = (ref: string): number => {
+    if (memo.has(ref)) return memo.get(ref)!;
+    const t = rawText(ref).trim();
+    let v: number;
+    if (!t) v = 0;
+    else if (t.startsWith("=")) {
+      if (visiting.has(ref)) throw new Error("cycle");
+      visiting.add(ref);
+      try {
+        v = evalFormula(t.slice(1), valueOf);
+      } finally {
+        visiting.delete(ref);
+      }
+    } else v = parseNumber(t);
+    memo.set(ref, v);
+    return v;
+  };
+
+  return (ref: string) => {
+    const t = rawText(ref);
+    const fmt = format(ref);
+    if (!t.trim().startsWith("=") && !fmt) return t;
+    try {
+      const v = valueOf(ref);
+      if (!Number.isFinite(v)) return t;
+      return formatNumber(v, fmt);
+    } catch {
+      return t;
+    }
+  };
+}
+
+/** "1,200", "$10", "15%" -> number; anything else -> NaN. */
+function parseNumber(text: string): number {
+  const t = text.trim();
+  const m = /^([-+]?)\s*[$£€]?\s*([\d,]*\.?\d+)\s*(%?)$/.exec(t);
+  if (!m) return NaN;
+  const n = Number(m[2].replace(/,/g, "")) * (m[1] === "-" ? -1 : 1);
+  return m[3] ? n / 100 : n;
+}
+
+/**
+ * Apply a spreadsheet number format of the common shapes: `$#,##0.00`, `#,##0`,
+ * `0.0%`, `€0.00`. An unrecognised format shows the plain number rather than a
+ * guess at what the format meant.
+ */
+function formatNumber(n: number, fmt: string | undefined): string {
+  // No format: a spreadsheet's General shows a readable figure, not every float
+  // digit (=B1*(1+B3)^B2 is 761225.5042662042). Two decimals at or above 1, four
+  // significant digits below it so a small rate doesn't round to 0.
+  const plain = () =>
+    String(Math.abs(n) >= 1 || n === 0 ? Math.round(n * 100) / 100 : Number(n.toPrecision(4)));
+  if (!fmt) return plain();
+  const m = /^([^#0.,%]*)([#0,]*0)(?:\.(0+))?(%?)([^#0.,%]*)$/.exec(fmt);
+  if (!m) return plain();
+  const [, prefix, intPart, decimals = "", pct, suffix] = m;
+  const v = pct ? n * 100 : n;
+  const body = Math.abs(v).toLocaleString("en-US", {
+    minimumFractionDigits: decimals.length,
+    maximumFractionDigits: decimals.length,
+    useGrouping: intPart.includes(","),
+  });
+  return `${v < 0 ? "-" : ""}${prefix}${body}${pct}${suffix}`;
+}
+
+/** Column letters -> 1-based index: A=1, Z=26, AA=27. */
+function colIndex(col: string): number {
+  return [...col].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0);
+}
+
+function colName(i: number): string {
+  let s = "";
+  for (; i > 0; i = Math.floor((i - 1) / 26)) s = String.fromCharCode(65 + ((i - 1) % 26)) + s;
+  return s;
+}
+
+const AGGREGATES: Record<string, (xs: number[]) => number> = {
+  SUM: (xs) => xs.reduce((a, b) => a + b, 0),
+  AVERAGE: (xs) => {
+    if (!xs.length) throw new Error("#DIV/0!");
+    return xs.reduce((a, b) => a + b, 0) / xs.length;
+  },
+  MIN: (xs) => (xs.length ? Math.min(...xs) : 0),
+  MAX: (xs) => (xs.length ? Math.max(...xs) : 0),
+  COUNT: (xs) => xs.length,
+};
+
+/**
+ * Evaluate a formula body (no leading `=`). Recursive descent over
+ * + - * / ^, unary minus, parentheses, numbers, refs, ranges and AGGREGATES.
+ * Throws on anything it doesn't recognise; the caller falls back to raw text.
+ */
+function evalFormula(src: string, valueOf: (ref: string) => number): number {
+  const tokens = src.match(/\$?[A-Z]+\$?\d+(?::\$?[A-Z]+\$?\d+)?|[A-Z]+(?=\s*\()|\d*\.?\d+|[-+*/^(),]|\S/gi) ?? [];
+  let pos = 0;
+  const peek = () => tokens[pos];
+  const take = (expected?: string) => {
+    const t = tokens[pos++];
+    if (t === undefined || (expected && t !== expected)) throw new Error("syntax");
+    return t;
+  };
+
+  const rangeRefs = (token: string): string[] => {
+    const [a, b] = token.replace(/\$/g, "").toUpperCase().split(":");
+    const p = parseCellRef(a);
+    const q = parseCellRef(b ?? a);
+    if (!p || !q) throw new Error("ref");
+    const refs: string[] = [];
+    const [c0, c1] = [colIndex(p.col), colIndex(q.col)].sort((x, y) => x - y);
+    const [r0, r1] = [p.row, q.row].sort((x, y) => x - y);
+    if ((c1 - c0 + 1) * (r1 - r0 + 1) > 10000) throw new Error("range too large");
+    for (let c = c0; c <= c1; c++) for (let r = r0; r <= r1; r++) refs.push(`${colName(c)}${r}`);
+    return refs;
+  };
+
+  const finite = (v: number) => {
+    if (!Number.isFinite(v)) throw new Error("#VALUE!");
+    return v;
+  };
+
+  const primary = (): number => {
+    const t = take();
+    if (t === "(") {
+      const v = expr();
+      take(")");
+      return v;
+    }
+    if (t === "-") return -primary();
+    if (t === "+") return primary();
+    if (/^\d*\.?\d+$/.test(t)) return Number(t);
+    const fn = AGGREGATES[t.toUpperCase()];
+    if (fn && peek() === "(") {
+      take("(");
+      const xs: number[] = [];
+      if (peek() !== ")") {
+        for (;;) {
+          if (/^\$?[A-Z]+\$?\d+(:\$?[A-Z]+\$?\d+)?$/i.test(peek() ?? "")) {
+            // Refs inside an aggregate skip text, as a spreadsheet does.
+            for (const ref of rangeRefs(take())) {
+              const v = valueOf(ref);
+              if (Number.isFinite(v)) xs.push(v);
+            }
+          } else xs.push(finite(expr()));
+          if (peek() !== ",") break;
+          take(",");
+        }
+      }
+      take(")");
+      return fn(xs);
+    }
+    // `LOG10(` tokenizes like a ref; read as one it would silently be an empty cell.
+    if (/^\$?[A-Z]+\$?\d+$/i.test(t) && peek() !== "(") return finite(valueOf(t.replace(/\$/g, "").toUpperCase()));
+    throw new Error(`unsupported: ${t}`);
+  };
+  const power = (): number => {
+    const base = primary();
+    if (peek() === "^") {
+      take();
+      return Math.pow(base, power());
+    }
+    return base;
+  };
+  const term = (): number => {
+    let v = power();
+    while (peek() === "*" || peek() === "/") {
+      const op = take();
+      const r = power();
+      if (op === "/" && r === 0) throw new Error("#DIV/0!");
+      v = op === "*" ? v * r : v / r;
+    }
+    return v;
+  };
+  const expr = (): number => {
+    let v = term();
+    while (peek() === "+" || peek() === "-") v = take() === "+" ? v + term() : v - term();
+    return v;
+  };
+
+  const v = expr();
+  if (pos !== tokens.length) throw new Error("trailing input");
+  return finite(v);
+}
+
+/**
  * Turn a compiled cell map into a table.
  *
  * Cells are keyed by address (`{ A1: { text }, … }`), which is a rendering detail
@@ -209,10 +421,11 @@ function cellsToTable(
 
   const byRow = new Map<number, Map<string, string>>();
   const cols = new Set<string>();
+  const display = cellDisplay(cells);
   for (const [ref, cell] of Object.entries(cells)) {
     const at = parseCellRef(ref);
     if (!at) continue;
-    const text = isRecord(cell) ? String(cell.text ?? "") : String(cell ?? "");
+    const text = isRecord(cell) ? display(ref) : String(cell ?? "");
     if (!byRow.has(at.row)) byRow.set(at.row, new Map());
     byRow.get(at.row)!.set(at.col, text);
     cols.add(at.col);

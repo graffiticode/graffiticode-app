@@ -306,7 +306,7 @@ const CASES: Case[] = [
       "and a grand total, formatted as currency.",
     expect: "L0179",
   },
-  { tag: "starter", prompt: "Create a concept web explaining how rain forms.", expect: "L0183" },
+  { tag: "starter", prompt: "Create a concept web on how rain forms that students complete by dragging terms into place.", expect: "L0183" },
   {
     tag: "starter",
     prompt:

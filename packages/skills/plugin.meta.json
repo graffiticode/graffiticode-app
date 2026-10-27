@@ -11,7 +11,7 @@
     "longDescription": "Graffiticode is a platform of specialized agents, each purpose-built for one kind of task and each producing a real, editable artifact rather than text in a chat window.\n\nToday's agents create interactive quizzes and assessment items — multiple choice, fill-in-the-blank, hot text, sequencing and matching — plus flashcard decks, spreadsheets and budgets, charts, and concept maps. Describe what you want in plain English; the matching agent validates your request against a formal task language and returns a structured result you can refine, re-render, and keep.\n\nFor teams working in Learnosity, Graffiticode also authors Learnosity-compatible assessment items and writes integration recipes for the Author API and the Data API — embedding an item authoring UX, or reading and writing an item bank server to server. New agents are added to the catalog over time.",
     "defaultPrompt": [
       "Create an invoice with line items, quantity, unit price, a line total per row, and a grand total, formatted as currency.",
-      "Create a concept web explaining how rain forms.",
+      "Create a concept web on how rain forms that students complete by dragging terms into place.",
       "Create a Learnosity water cycle assessment: one multiple-choice and one fill-in-the-blank, answers marked."
     ],
     "websiteURL": "https://graffiticode.org",
