@@ -18,6 +18,7 @@
 // logging the line or sending an SMS; `&at=<ISO time>` checks the window
 // ending 15 minutes before that time instead of now.
 import type { NextApiRequest, NextApiResponse } from "next";
+import { randomBytes } from "node:crypto";
 import { formatAlert, runCheck } from "../../../lib/render-outcomes";
 import { sendSms } from "@graffiticode-app/core/lib/alert-sms";
 
@@ -39,7 +40,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // against renders whose outcome is known.
     const at = dry && typeof req.query.at === "string" ? new Date(req.query.at) : null;
     const now = at && !Number.isNaN(at.getTime()) ? at : new Date();
-    const result = await runCheck(now);
+    // ?test=unconfirmed (POST, with the secret): three synthetic renders with no
+    // beacon join this run, so the alert fires end to end (the logged line,
+    // its email, the SMS). The line carries `test` and a nonce to confirm by.
+    const test = !dry && req.query.test === "unconfirmed";
+    const result = await runCheck(now, test ? { injectUnconfirmed: 3, nonce: randomBytes(4).toString("hex") } : {});
     const { unconfirmedRenders, ...counts } = result;
     const summary = { ...counts, unconfirmedRids: unconfirmedRenders.map((r) => r.rid) };
 
