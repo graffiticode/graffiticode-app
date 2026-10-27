@@ -65,6 +65,7 @@
         "ANTHROPIC_WORKSPACE_ID": "wrkspc_01XKyhFYQNasXfYUX334uiEw"
       },
       "removeEnv": ["ANTHROPIC_API_KEY", "VALID_INVITE_CODES"],
+      "removeSecrets": ["STRIPE_WEBHOOK_SECRET_PREVIOUS"],
       "secrets": {
         "ACT_AS_GRANT_SECRET": "ACT_AS_GRANT_SECRET:1",
         "FREE_PLAN_API_KEY": "FREE_PLAN_API_KEY:4",
@@ -79,8 +80,7 @@
         "INTERNAL_API_KEY": "INTERNAL_API_KEY:2",
         "OPENAI_API_KEY": "OPENAI_API_KEY:2",
         "STRIPE_SECRET_KEY": "STRIPE_SECRET_KEY:1",
-        "STRIPE_WEBHOOK_SECRET": "STRIPE_WEBHOOK_SECRET:1",
-        "STRIPE_WEBHOOK_SECRET_PREVIOUS": "STRIPE_WEBHOOK_SECRET_PREVIOUS:1"
+        "STRIPE_WEBHOOK_SECRET": "STRIPE_WEBHOOK_SECRET:1"
       },
       "verify": {
         "module": "verify/console.mjs"
