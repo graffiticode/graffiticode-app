@@ -19,6 +19,7 @@
     "typecheck": "npm run build:core && npm run typecheck -w packages/console && npm run typecheck -w packages/mcp-server && npm run typecheck -w packages/openapi-server && npm --prefix packages/app run typecheck",
     "test": "npm run build:core && npm test -w packages/console && npm test -w packages/mcp-server && npm test -w packages/openapi-server",
     "deploy": "gc-deploy",
+    "gcp-cost": "npm run gcp-cost -w packages/console --",
     "rollback": "gc-deploy rollback",
     "install:app": "npm ci --prefix packages/app",
     "build:app": "npm --prefix packages/app run build",
