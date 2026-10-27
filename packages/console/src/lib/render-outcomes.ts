@@ -173,9 +173,19 @@ export interface CheckResult extends Correlation {
   to: string;
   inGrace: boolean;
   alert: boolean;
+  test?: { injected: number; nonce: string };
 }
 
-export async function runCheck(now: Date): Promise<CheckResult> {
+// A test run (P1 #2 E): `injectUnconfirmed` synthetic renders with no beacon
+// (rid `test-<nonce>-<n>`, never a real render id) join the real ones, so the
+// alert path runs end to end. The grace period doesn't hold a test back.
+export interface CheckOptions { injectUnconfirmed?: number; nonce?: string }
+
+export function syntheticRenders(n: number, nonce: string, at: Date): Render[] {
+  return Array.from({ length: n }, (_, i) => ({ rid: `test-${nonce}-${i + 1}`, at: at.toISOString(), clientKind: "test (P1 #2 E)" }));
+}
+
+export async function runCheck(now: Date, { injectUnconfirmed = 0, nonce = "" }: CheckOptions = {}): Promise<CheckResult> {
   const from = new Date(now.getTime() - WINDOW_START_MIN * 60_000);
   const to = new Date(now.getTime() - WINDOW_END_MIN * 60_000);
   const [renders, beacons, inGrace] = await Promise.all([
@@ -183,6 +193,11 @@ export async function runCheck(now: Date): Promise<CheckResult> {
     fetchOutcomeBeacons(from, new Date(Math.min(now.getTime(), to.getTime() + (WINDOW_END_MIN * 60 + BEACON_SLACK_S) * 1000))),
     inReleaseGrace(now),
   ]);
-  const c = correlate(renders, beacons);
-  return { ...c, from: from.toISOString(), to: to.toISOString(), inGrace, alert: shouldAlert(c, inGrace) };
+  const test = injectUnconfirmed > 0;
+  const c = correlate(test ? [...renders, ...syntheticRenders(injectUnconfirmed, nonce, to)] : renders, beacons);
+  return {
+    ...c, from: from.toISOString(), to: to.toISOString(), inGrace,
+    alert: shouldAlert(c, test ? false : inGrace),
+    ...(test ? { test: { injected: injectUnconfirmed, nonce } } : {}),
+  };
 }

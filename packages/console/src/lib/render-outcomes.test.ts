@@ -1,7 +1,7 @@
 // node:test via tsx: `npm test`.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { correlate, formatAlert, parseBeacon, shouldAlert, type Render } from "./render-outcomes";
+import { correlate, formatAlert, parseBeacon, shouldAlert, syntheticRenders, type Render } from "./render-outcomes";
 
 // Verbatim from production (mcp-service, 2026-10-27).
 const LINES = {
@@ -55,4 +55,12 @@ test("the alert text names the counts, window and first renders", () => {
   const c = correlate([render("aaaaaaaa-0000-4000-8000-000000000000"), render("bbbbbbbb-0000-4000-8000-000000000000"), render("cccccccc-0000-4000-8000-000000000000")], []);
   assert.equal(formatAlert(c, new Date("2026-10-27T20:00:00Z"), new Date("2026-10-27T21:00:00Z")),
     "Graffiticode: 3 of 3 widget renders unconfirmed (no outcome beacon), 20:00-21:00Z. L0186 aaaaaaaa, L0186 bbbbbbbb, L0186 cccccccc");
+});
+
+test("a test run's synthetic renders are unconfirmed, never real ids, and trip the alert", () => {
+  const fake = syntheticRenders(3, "c0ffee01", new Date("2026-10-27T23:00:00Z"));
+  assert.deepEqual(fake.map((r) => r.rid), ["test-c0ffee01-1", "test-c0ffee01-2", "test-c0ffee01-3"]);
+  const c = correlate([render("7dc232eb-c795-4b0e-a868-817c42bfdd6b"), ...fake], [parseBeacon(LINES.mounted)!]);
+  assert.deepEqual([c.renders, c.confirmed, c.unconfirmed], [4, 1, 3]);
+  assert.equal(shouldAlert(c, false), true);
 });
