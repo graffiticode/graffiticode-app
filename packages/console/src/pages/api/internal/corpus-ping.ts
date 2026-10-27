@@ -20,7 +20,7 @@
 // should be configured with no retry, and a red ping followed by a green one tomorrow is
 // a perfectly good outcome.
 //
-// GET with ?dry=1 runs the ping and returns the result WITHOUT sending an SMS or writing
+// GET with ?dry=1 (and the secret) runs the ping and returns the result WITHOUT sending an SMS or writing
 // the run log — the dev loop. `?langs=0175,0176` narrows the set, which is how to
 // exercise one language without paying for eleven.
 import type { NextApiRequest, NextApiResponse } from "next";
@@ -36,14 +36,14 @@ import { sendSms } from "@graffiticode-app/core/lib/alert-sms";
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const dry = req.query.dry === "1";
 
-  if (!dry) {
-    if (req.method !== "POST") {
-      return res.status(405).json({ error: "Method not allowed" });
-    }
-    const secret = process.env.INTERNAL_JOB_SECRET || "";
-    if (!secret || req.headers["x-internal-job-secret"] !== secret) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
+  if (!dry && req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+  // The secret even for a dry run: a dry run still does the work (and, for the
+  // pings and sweeps, spends real generation money).
+  const secret = process.env.INTERNAL_JOB_SECRET || "";
+  if (!secret || req.headers["x-internal-job-secret"] !== secret) {
+    return res.status(401).json({ error: "Unauthorized" });
   }
 
   // Explicit subset, for the dev loop and for re-checking one language after a fix.
