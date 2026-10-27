@@ -20,7 +20,7 @@
 // goes out instead, so the "every firing sends" guarantee is unconditional —
 // silence still means the job is broken and nothing else.
 //
-// GET with ?dry=1 renders a window without sending or advancing the cursor —
+// GET with ?dry=1 (and the secret) renders a window without sending or advancing the cursor —
 // the dev loop for the narrator, and it returns the brief the model was given
 // alongside both candidate messages. Accepts &from=<iso>&to=<iso> to replay any
 // historical window, and &narrate=0 to skip the API call entirely.
@@ -45,14 +45,14 @@ import { reportUrl } from "../../../lib/report-link";
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const dry = req.query.dry === "1";
 
-  if (!dry) {
-    if (req.method !== "POST") {
-      return res.status(405).json({ error: "Method not allowed" });
-    }
-    const secret = process.env.INTERNAL_JOB_SECRET || "";
-    if (!secret || req.headers["x-internal-job-secret"] !== secret) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
+  if (!dry && req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+  // The secret even for a dry run: a dry run still does the work (and, for the
+  // pings and sweeps, spends real generation money).
+  const secret = process.env.INTERNAL_JOB_SECRET || "";
+  if (!secret || req.headers["x-internal-job-secret"] !== secret) {
+    return res.status(401).json({ error: "Unauthorized" });
   }
 
   try {

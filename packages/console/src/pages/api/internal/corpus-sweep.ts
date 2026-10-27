@@ -19,7 +19,7 @@
 // No retry, for the same reason as the ping: every attempt spends generation money, and a
 // transient failure is a signal rather than something to paper over.
 //
-// GET with ?dry=1 runs it without sending or recording; ?langs= narrows the set.
+// GET with ?dry=1 (and the secret) runs it without sending or recording; ?langs= narrows the set.
 import type { NextApiRequest, NextApiResponse } from "next";
 import {
   SWEEP_LANGUAGES,
@@ -34,12 +34,14 @@ import { sweepReportUrl } from "../../../lib/report-link";
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const dry = req.query.dry === "1";
 
-  if (!dry) {
-    if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
-    const secret = process.env.INTERNAL_JOB_SECRET || "";
-    if (!secret || req.headers["x-internal-job-secret"] !== secret) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
+  if (!dry && req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+  // The secret even for a dry run: a dry run still does the work (and, for the
+  // pings and sweeps, spends real generation money).
+  const secret = process.env.INTERNAL_JOB_SECRET || "";
+  if (!secret || req.headers["x-internal-job-secret"] !== secret) {
+    return res.status(401).json({ error: "Unauthorized" });
   }
 
   const requested = typeof req.query.langs === "string"
