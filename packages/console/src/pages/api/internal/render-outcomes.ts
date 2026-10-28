@@ -3,10 +3,13 @@
 //
 //   gcloud scheduler jobs create http render-outcomes \
 //     --schedule="*/15 * * * *" --time-zone="UTC" \
-//     --uri="https://console.graffiticode.org/api/internal/render-outcomes" \
+//     --uri="https://console-<hash>-uc.a.run.app/api/internal/render-outcomes" \
 //     --http-method=POST \
 //     --headers="X-Internal-Job-Secret=<INTERNAL_JOB_SECRET>" \
 //     --attempt-deadline=120s
+//
+// The service's own origin, not console.graffiticode.org, which Cloudflare can
+// reset before the request arrives (see funnel-digest.ts).
 //
 // Auth reuses the INTERNAL_JOB_SECRET header, like corpus-ping and funnel-digest.
 //
