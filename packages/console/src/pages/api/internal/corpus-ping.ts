@@ -2,10 +2,14 @@
 //
 //   gcloud scheduler jobs create http corpus-ping \
 //     --schedule="15 6 * * *" --time-zone="America/Los_Angeles" \
-//     --uri="https://console.graffiticode.org/api/internal/corpus-ping" \
+//     --uri="https://console-<hash>-uc.a.run.app/api/internal/corpus-ping" \
 //     --http-method=POST \
 //     --headers="X-Internal-Job-Secret=<INTERNAL_JOB_SECRET>" \
 //     --attempt-deadline=1800s
+//
+// The service's own origin, not console.graffiticode.org: Cloudflare in front of
+// the custom domain cuts requests at 100s and can reset them outright (see
+// funnel-digest.ts). No retries: a retry is another paid run.
 //
 // Auth reuses the INTERNAL_JOB_SECRET shared header that /api/internal/funnel-digest and
 // /api/generate-job already validate, rather than adding a third scheme for one more job.
