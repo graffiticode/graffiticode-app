@@ -2,10 +2,15 @@
 //
 //   gcloud scheduler jobs create http corpus-sweep \
 //     --schedule="30 6 * * 1" --time-zone="America/Los_Angeles" \
-//     --uri="https://console.graffiticode.org/api/internal/corpus-sweep" \
+//     --uri="https://console-<hash>-uc.a.run.app/api/internal/corpus-sweep" \
 //     --http-method=POST \
 //     --headers="X-Internal-Job-Secret=<INTERNAL_JOB_SECRET>" \
 //     --attempt-deadline=1800s --max-retry-attempts=0
+//
+// The service's own origin, not console.graffiticode.org: Cloudflare gives up on
+// a request after 100s (a 524) while the sweep keeps running behind it, so the
+// scheduler logged failures for sweeps that had in fact completed. No retries,
+// because a retry starts a second full run of paid generations.
 //
 // Samples 10 prompts per language by rotation (~130 generations, ~6 min at concurrency 4, L0176 paced to its signing limit) and
 // compares each against the corpus entry it came from. Fits a request, so no Cloud Tasks.
