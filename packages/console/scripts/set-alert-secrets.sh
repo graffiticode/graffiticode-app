@@ -103,10 +103,15 @@ gcloud projects add-iam-policy-binding "${PROJECT}" \
 echo
 echo "Done. ${SERVICE} is rolling a new revision with the Twilio secrets mounted."
 echo
+# The service's own origin, not console.graffiticode.org: Cloudflare in front of
+# the custom domain can reset the request (see api/internal/funnel-digest.ts).
+SERVICE_URL="$(gcloud run services describe "${SERVICE}" --project "${PROJECT}" --region "${REGION}" --format='value(status.url)')"
+
 echo "Create the schedule (once):"
 echo "  gcloud scheduler jobs create http funnel-digest \\"
 echo "    --project ${PROJECT} --location ${REGION} \\"
 echo "    --schedule='2 8-20 * * *' --time-zone='America/Los_Angeles' \\"
-echo "    --uri='https://console.graffiticode.org/api/internal/funnel-digest' \\"
+echo "    --uri='${SERVICE_URL}/api/internal/funnel-digest' \\"
 echo "    --http-method=POST \\"
-echo "    --headers=\"X-Internal-Job-Secret=\${INTERNAL_JOB_SECRET}\""
+echo "    --headers=\"X-Internal-Job-Secret=\${INTERNAL_JOB_SECRET}\" \\"
+echo "    --max-retry-attempts=2"

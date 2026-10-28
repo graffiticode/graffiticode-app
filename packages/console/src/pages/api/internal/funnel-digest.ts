@@ -3,9 +3,16 @@
 //
 //   gcloud scheduler jobs create http funnel-digest \
 //     --schedule="2 8-20 * * *" --time-zone="America/Los_Angeles" \
-//     --uri="https://console.graffiticode.org/api/internal/funnel-digest" \
+//     --uri="https://console-<hash>-uc.a.run.app/api/internal/funnel-digest" \
 //     --http-method=POST \
-//     --headers="X-Internal-Job-Secret=<INTERNAL_JOB_SECRET>"
+//     --headers="X-Internal-Job-Secret=<INTERNAL_JOB_SECRET>" \
+//     --max-retry-attempts=2
+//
+// The service's own origin, not console.graffiticode.org: Cloudflare in front of
+// the custom domain reset the 2026-10-28 8:02 request before it reached the
+// service, and with no retries that hour's text was simply lost. A retry is safe
+// for any failure before the send, because the cursor hasn't moved; the one
+// duplicate case is a send that succeeds followed by a failed state write.
 //
 // Auth reuses the INTERNAL_JOB_SECRET shared header that /api/generate-job
 // already validates, rather than adding a second scheme for one more job.
@@ -132,8 +139,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({ ok: true, events: events.length, narrated: !!narration, ...result });
   } catch (err: any) {
     console.error("[funnel-digest] failed", err);
-    // 500 lets Cloud Scheduler retry. The cursor is untouched on this path, so a
-    // retry covers the same window rather than skipping it.
+    // 500 lets Cloud Scheduler retry (the job sets --max-retry-attempts; the
+    // default is none). The cursor is untouched on this path, so a retry covers
+    // the same window rather than skipping it.
     return res.status(500).json({ error: "digest_failed", details: String(err?.message ?? err) });
   }
 }
