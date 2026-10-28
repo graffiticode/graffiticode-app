@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 /**
- * Daily cost of each Cloud Run service and Compute Engine resource, from the
- * billing export.
+ * Daily cost of each Cloud Run service, Compute Engine resource and Artifact
+ * Registry location, from the billing export.
  *
  * Reads the detailed (resource-level) Cloud Billing export in
  * graffiticode.billing_export, which names the Cloud Run service or VM each
- * charge belongs to. Costs are net of credits (the free tier, sustained-use
+ * charge belongs to. Artifact Registry charges carry no resource name, so they
+ * are reported per location (multi-region `us`, or a region). Costs are net of credits (the free tier, sustained-use
  * discounts), so they add up to the invoice. Days are in the invoice's time zone,
  * America/Los_Angeles.
  *
@@ -57,6 +58,7 @@ for (const p of targets) {
 // and its disk as its disk.
 const kind = `CASE
     WHEN service.description = 'Cloud Run' THEN 'run'
+    WHEN service.description = 'Artifact Registry' THEN 'registry'
     WHEN sku.description LIKE '%Instance%' THEN 'vm'
     WHEN sku.description LIKE '%PD%' OR sku.description LIKE '%Storage%' OR sku.description LIKE '%Snapshot%' THEN 'disk'
     ELSE 'other' END`;
@@ -65,11 +67,12 @@ SELECT
   FORMAT_DATE('%F', DATE(usage_start_time, '${TZ}')) AS day,
   project.id AS project,
   ${kind} AS kind,
-  COALESCE(resource.name, '(no resource)') AS resource,
+  CASE WHEN service.description = 'Artifact Registry' THEN COALESCE(location.location, '(global)')
+    ELSE COALESCE(resource.name, '(no resource)') END AS resource,
   ${has("by-sku") ? "sku.description" : "''"} AS sku,
   SUM(cost) + SUM(IFNULL((SELECT SUM(c.amount) FROM UNNEST(credits) c), 0)) AS net
 FROM \`${TABLE}\`
-WHERE service.description IN ('Cloud Run', 'Compute Engine')
+WHERE service.description IN ('Cloud Run', 'Compute Engine', 'Artifact Registry')
   AND project.id IN (${targets.map(p => `'${p}'`).join(", ")})
   AND DATE(usage_start_time, '${TZ}') BETWEEN DATE '${start}' AND DATE '${end}'
 GROUP BY day, project, kind, resource, sku
@@ -114,7 +117,7 @@ if (flag("csv")) {
 // A table per project, widest-cost first; days as columns.
 const money = (n: number) => (Math.abs(n) < 0.005 ? "-" : n.toFixed(2));
 const dayHead = days.map(d => `${d.slice(5)}${partial(d) ? "*" : " "}`);
-console.log(`Cloud Run and Compute Engine, net of credits, ${start} to ${end} (${TZ}).` +
+console.log(`Cloud Run, Compute Engine and Artifact Registry, net of credits, ${start} to ${end} (${TZ}).` +
   (lastDay ? ` Export has usage through ${lastDay}; * = partial day.` : " The export has no usage yet."));
 for (const project of targets) {
   const mine = sorted.filter(l => l.project === project);
@@ -266,12 +269,12 @@ td.tot{font-weight:600}tr.foot td{font-weight:600;border-top:1px solid var(--axi
 #tip{position:fixed;pointer-events:none;background:var(--surface);color:var(--ink);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,.15);display:none;max-width:360px}
 </style></head><body><main>
 <h1>GCP Daily Cost</h1>
-<div class="sub">Cloud Run and Compute Engine, net of credits · ${start} to ${end} (${TZ})</div>
+<div class="sub">Cloud Run, Compute Engine and Artifact Registry, net of credits · ${start} to ${end} (${TZ})</div>
 <div class="tiles">${tiles}</div>
 ${sections.map(s => `<section><h2>${esc(s.project)} <span class="muted">· ${usd(s.total)}</span></h2>
-${s.mine.length ? `<ul class="legend">${legend(s)}</ul>${chart(s)}${table(s)}` : `<p class="muted">No Cloud Run or Compute Engine cost in this range.</p>`}
+${s.mine.length ? `<ul class="legend">${legend(s)}</ul>${chart(s)}${table(s)}` : `<p class="muted">No Cloud Run, Compute Engine or Artifact Registry cost in this range.</p>`}
 </section>`).join("\n")}
-<p class="note">${lastDay ? `The billing export has usage through ${lastDay}; days marked * are partial and drawn faded.` : "The billing export has no usage yet."} Compute Engine rows are labelled [vm], [disk] or [other]; Cloud Run rows are the service name. Generated ${new Date().toISOString()} by packages/console/scripts/gcp-daily-cost.ts.</p>
+<p class="note">${lastDay ? `The billing export has usage through ${lastDay}; days marked * are partial and drawn faded.` : "The billing export has no usage yet."} Compute Engine rows are labelled [vm], [disk] or [other]; Artifact Registry rows are [registry] and its location; Cloud Run rows are the service name. Generated ${new Date().toISOString()} by packages/console/scripts/gcp-daily-cost.ts.</p>
 </main><div id="tip"></div>
 <script>
 const tip=document.getElementById("tip");
