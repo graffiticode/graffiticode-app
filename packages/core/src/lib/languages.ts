@@ -214,8 +214,8 @@ export const LANGUAGES: Language[] = ([
   // being advertised to a generator that would otherwise author fresh content against them.
   //
   // eval 2026-08-25 (l0179/docs/eval-2026-08-25.md, two sweeps of 144 runs): all four variants
-  // compile 100% on both, so no MODEL_PRIORITY line — the fast models are within noise of each
-  // other. The controlled sweep (L0166's own cases run against L0179, near-identical retrieval)
+  // compile 100% on both, so no MODEL_PRIORITY line at the time — the fast models are within noise
+  // of each other. (It has one since 2026-10-29: haiku, on cost — see model-priority.ts.) The controlled sweep (L0166's own cases run against L0179, near-identical retrieval)
   // found the style neither helps nor hurts generation rate; what it buys is correctness a
   // compile-rate sweep cannot see.
   { id: "0179", name: "L0179", description: "Spreadsheets", routingHint: "Interactive spreadsheet authoring with tabular cell data, cell-level formatting, formulas (SUM, AVERAGE, ROUND, IF), parameterized values, and optional assessment validation with per-cell points. Supersedes L0166 — prefer this for all new spreadsheet content.", keywords: ["invoice", "budget", "ledger", "gradebook", "timesheet", "expenses", "totals"], domains: ["assessments", "sheets"] },
