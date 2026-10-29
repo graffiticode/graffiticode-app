@@ -22,16 +22,17 @@ Node ≥18.17.0 required.
 
 ## Commands
 
-There is no unit-test runner (no `npm test`); `test:streaming` is a manual `tsx` script. The real gate is: `npm run lint` and `npm run typecheck` must pass.
+`npm test` runs the `node:test` unit tests in `src/lib/*.test.ts` (it reads core from `dist`, so `npm run build:core` at the repo root first); `test:streaming` is a manual `tsx` script. The gate is: `npm run lint`, `npm run typecheck` and `npm test` must pass.
 
 **Any change to the code generator also runs the corpus ping** — `llm-generation-service.ts`, `code-generation-service.ts`, `code-generation/`, `model-priority.ts`, `llm-models.ts`, dialect instructions, **and env-var changes to the console service**.
 
 ```bash
-curl 'https://console.graffiticode.org/api/internal/corpus-ping?dry=1'             # the whole set, ~50s
-curl 'https://console.graffiticode.org/api/internal/corpus-ping?dry=1&langs=0176'  # while iterating
+S=$(gcloud secrets versions access latest --secret=INTERNAL_JOB_SECRET --project graffiticode-app)
+curl -H "X-Internal-Job-Secret: $S" 'https://console.graffiticode.org/api/internal/corpus-ping?dry=1'             # the whole set, ~50s
+curl -H "X-Internal-Job-Secret: $S" 'https://console.graffiticode.org/api/internal/corpus-ping?dry=1&langs=0176'  # while iterating
 ```
 
-`?dry=1` sends no SMS, writes no run log, skips auth. It costs one real generation per **turn** per language in `PING_LANGUAGES` (`src/lib/corpus-ping.ts`) — 12 languages as of 2026-09-30 (0184 replaced 0173, which is deprecated), and that list moves, so read it rather than trusting a number written here. Narrow with `&langs=` while iterating, but run the full set before calling it done.
+`?dry=1` sends no SMS and writes no run log, but still requires the `X-Internal-Job-Secret` header (it does real generations), so without it you get a 401. It costs one real generation per **turn** per language in `PING_LANGUAGES` (`src/lib/corpus-ping.ts`) — 13 languages as of 2026-10-29, and that list moves, so read it rather than trusting a number written here. Narrow with `&langs=` while iterating, but run the full set before calling it done.
 
 **A corpus example can be a conversation, and the ping replays it as one.** Turns come from the corpus doc's `messages` field — never from splitting `prompt` on blank lines, which would invent turns inside a passage-bearing L0175 request — and each later turn is an edit carrying the previous turn's source AND its compiled data model, under the same `itemId` (L0182 writes that id as `session-id`, and the session is what brings back the version this taker was shown). Every turn compiles, not just the last. Why it matters: 44 of L0182's 50 rows are two-turn (take a survey, then answer it), and replaying the joined text as a single create produced only the taking — which compiles, so the ping stayed green while the answering half, where every failure lives, was never exercised.
 
