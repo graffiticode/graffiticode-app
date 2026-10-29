@@ -343,10 +343,9 @@ export async function vectorSearch({
           ? new VectorValue(queryEmbedding)
           : queryEmbedding;
 
-    // Log the query text for analysis
+    // Lengths only: the privacy contract forbids logging prompt text.
     if (rid) {
       ragLog(rid, "vectorSearch.queryText", {
-        query: query,
         queryLength: query.length,
         embeddingDimensions: queryEmbedding.length,
       });
@@ -468,7 +467,6 @@ export async function hybridSearch({
         k: limit,
         lang,
         vectorWeight,
-        query: query,  // Log the query text
         queryLength: query.length,
       });
     }
