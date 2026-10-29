@@ -262,7 +262,7 @@ export async function getRelevantExamples({ prompt, lang, limit = 3, rid = null 
   try {
     if (rid) {
       ragLog(rid, "retrieval.start", {
-        query: searchQuery.substring(0, 100),
+        queryLength: searchQuery.length,
         fullPromptLength: prompt.length,
         lang,
         k: limit,
