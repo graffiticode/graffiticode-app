@@ -24,7 +24,7 @@ A **`wall_hit`** is a request refused by a limit — the headline signal for "de
 | `item_expired` | `buildItemExpiredError` | Free-plan item aged past its 48h TTL |
 | `plan_item_limit` | `checkItemCreateAllowed` → `assertItemCreateAllowed` | Hard-capped plan spent its included items |
 | `overage_cap` | same | Customer's own overage spend cap reached |
-| `non_english_request` | GUARDRAIL 0 in `generate-for-request.ts` | Prompt not written in English (only when `NON_ENGLISH_GATE=enforce`) |
+| `non_english_request` | GUARDRAIL 0 in `generate-for-request.ts` | Prompt not written in English. This `wall_hit` fires only when `NON_ENGLISH_GATE=enforce`; the same-named `non_english_request` *event* fires in shadow mode too (below) |
 
 `non_english_request` is the one wall with a **separate reporting event**, and the reason generalizes: `wall_hit` carries no `app`, so `isMcpOrigin` drops it from all three surfaces (see below). It also fires only in enforce mode, which would report zero during the shadow window that exists to measure it. So the demand signal is the headline event **`non_english_request`** — emitted in both modes, carrying `blocked`, `script`/`plang`, and an `app` stamp — and the `wall_hit` exists only to keep the refusal taxonomy complete. Any future wall that needs to show up in a report has the same two problems to solve.
 
