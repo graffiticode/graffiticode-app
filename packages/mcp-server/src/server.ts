@@ -445,8 +445,8 @@ const SSE_KEEPALIVE_MS = parseInt(process.env.SSE_KEEPALIVE_MS || "30000", 10);
  *
  * Distinct from the per-tool-call heartbeat in the CallTool handler, which sends
  * protocol notifications only while a tool is running: this covers every open
- * stream, including the idle standalone `GET /mcp` one that has no tool call
- * behind it and was therefore being cut at ~100s by Cloudflare (524).
+ * stream. It was written for the idle standalone `GET /mcp` stream, cut at ~100s
+ * by Cloudflare (524); that stream is no longer offered (GET gets 405).
  */
 function keepSseAlive(res: ServerResponse): void {
   startSseKeepalive(res, SSE_KEEPALIVE_MS);
@@ -1260,13 +1260,24 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       }
     }
 
+    // No standalone GET stream: 405, which the spec allows a server that never
+    // sends anything outside a request. Ours doesn't (tool-call progress rides the
+    // POST's own response stream). Codex clients held the GET open to Cloud Run's
+    // 300s timeout and reconnected around the clock (from 2026-10-25), and since a
+    // request in flight bills the instance's CPU, mcp-service billed 24h a day.
+    if (req.method === "GET") {
+      res.writeHead(405, { "Content-Type": "application/json", Allow: "POST, DELETE" });
+      res.end(JSON.stringify({ jsonrpc: "2.0", error: { code: -32000, message: "Method not allowed: this server offers no standalone SSE stream" }, id: null }));
+      return;
+    }
+
     // Check for existing session
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
 
     if (sessionId && transports.has(sessionId)) {
       // Reuse existing transport for this session. Started before handleRequest
-      // because a GET opens a long-lived stream the call doesn't return from until
-      // the client disconnects; the helper no-ops until the stream actually exists.
+      // because a POST's response stream lasts as long as its tool call; the
+      // helper no-ops until the stream actually exists.
       keepSseAlive(res);
       const transport = transports.get(sessionId)!;
       await transport.handleRequest(req, res);
