@@ -46,10 +46,23 @@ test("a request on a session the server does not hold gets 404 and a JSON-RPC er
   assert.equal(body.error.code, -32001);
 });
 
-test("a GET stream on a forgotten session gets 404 too", async () => {
-  const res = await fetch(URL, { headers: { ...HEADERS, "mcp-session-id": "forgotten" } });
-  assert.equal(res.status, 404);
-  await res.body?.cancel();
+// The server sends nothing outside a request, so it offers no standalone GET stream:
+// held open by Codex clients, those streams kept mcp-service's CPU billed all day.
+test("a GET stream gets 405, on a live session or a forgotten one", async () => {
+  const init = await post({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "initialize",
+    params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "0" } },
+  });
+  const live = init.headers.get("mcp-session-id")!;
+  await init.body?.cancel();
+  for (const session of [live, "forgotten"]) {
+    const res = await fetch(URL, { headers: { Accept: "text/event-stream", "mcp-session-id": session } });
+    assert.equal(res.status, 405);
+    assert.equal(res.headers.get("allow"), "POST, DELETE");
+    await res.body?.cancel();
+  }
 });
 
 test("initialize, which carries no session id, still starts a session", async () => {
