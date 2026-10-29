@@ -2,11 +2,10 @@
 /**
  * check-prompt-language.ts — exercise the non-English request detector.
  *
- * WHY THIS IS A SCRIPT AND NOT A TEST
- *   There is no unit-test runner in this repo, and `tsconfig` excludes
- *   `scripts/**` from typecheck — so BOTH gates are blind here. This file only
- *   means anything if it is actually RUN, and it exits non-zero on a miss so it
- *   can't pass by being ignored.
+ * The regression cases now live in src/lib/prompt-language.test.ts (run by
+ * `npm test`). This script remains for eyeballing ratios/markers and for ad hoc
+ * prompts; `tsconfig` excludes `scripts/**` from typecheck, so it only means
+ * anything if it is actually RUN, and it exits non-zero on a miss.
  *
  * The load-bearing case is `allow` on an ENGLISH prompt carrying Cyrillic
  * content. That is the regression the whole two-rule design exists to avoid; a
