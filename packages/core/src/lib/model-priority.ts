@@ -137,8 +137,10 @@ function orderOf(config: PriorityConfig | undefined): PriorityEntry[] {
  * hint is that you can see why it says what it says. An ordering without evidence
  * is a guess with extra steps, so do not add a line without one.
  *
- * Populate with `npm run eval -- --lang <id> --models <a>,<b> --judge`, and only
- * after `--calibrate` shows the judge agrees with human labels for that dialect.
+ * Populate with `npm run eval -- --lang <id> --models <a>,<b> --converge 5`. The judge is
+ * optional and usually uninformative: with compile and convergence at or near ceiling on
+ * every dialect measured so far, it has too little to discriminate (see 0176, 0175). Decide on
+ * convergence, stubs, cost, latency and cross-variant agreement, and cite them on the line.
  */
 export const MODEL_PRIORITY: Record<string, PriorityConfig> = {
   // "0166": ["anthropic", "openai"],  // eval YYYY-MM-DD: finalRate .94 vs .81
@@ -322,8 +324,97 @@ export const MODEL_PRIORITY: Record<string, PriorityConfig> = {
   // Author API failed open, which is the specific hazard the directive exists to prevent.
   "0177": { order: ["openai+balanced", "anthropic+balanced"], spec: "balanced" },
 
-  // NO ENTRY FOR 0179 — deliberately, and this note is here so the measurement is
-  // not repeated from scratch.
+  // FULL-CATALOG SWEEP 2026-10-29. Every language in graffiticode/languages with an eval set,
+  // run alike: sonnet-5 · haiku-4.5 · gpt-5.6-terra · gpt-5.6-luna, 3 trials per case,
+  // --converge 5, hold-out enforced (--allow-empty-corpus for 0003/0174, which have no corpus),
+  // vector retrieval as in production. Prompted by cost: in the week of 2026-10-23 the catalog
+  // languages (none of them in this table) ran on the default sonnet and cost $0.116/item, against
+  // $0.012 in a week dominated by 0176 on haiku. Columns: converged · $/run · p50, then what
+  // decided it. 0176 and 0177 were re-measured in the same sweep and their lines above hold.
+  //
+  // Judge NOT used, anywhere: compile and convergence are at or near ceiling on every dialect
+  // below, so a judge has too little to tell apart (see the note on 0176). The decision rests on
+  // convergence, stubs/zero-output, cost and latency, and on cross-variant AGREEMENT — the solo
+  // count (cases where one variant alone wrote a different program) is the only signal that
+  // catches a model compiling the wrong design on a dialect with no drift hook.
+  //
+  // The fallback avoids whichever model in the other family failed on that dialect, so it is not
+  // always the same tier as the primary — the same reasoning as 0176's +balanced.
+
+  // 0000 (22 cases, 0000-2026-10-29T19-21-02-097Z): terra 100% $0.0015 2.7s · luna 100% $0.0013
+  // 3.5s · sonnet 100% $0.0031 3.4s · haiku 95% $0.0011 — haiku never converged on ~3 of 66.
+  // terra over luna: luna is solo on 5 of 22 cases and the least self-consistent (58%); terra is
+  // 100% first-pass and fastest. Fallback balanced, away from haiku.
+  "0000": ["openai+balanced", "anthropic+balanced"],
+
+  // 0003 (12 cases, no corpus): haiku 100% $0.0007 2.4s · terra 100% $0.0010 · luna 100% $0.0010
+  // · sonnet 100% $0.0024. All converge; haiku cheapest and fastest, no variant solo more than twice.
+  "0003": ["anthropic+fast", "openai+balanced"],
+
+  // 0010 (20 cases): luna 100% $0.0009 3.3s · terra 100% $0.0012 · sonnet 100% $0.0019 · haiku 92%
+  // $0.0009 — haiku never converged on ~5 of 60 and stubbed 2. Three variants wrote the SAME program
+  // on 18 of 20 cases; luna matches haiku's price with none of its failures. Fallback away from haiku.
+  "0010": ["openai+fast", "anthropic+balanced"],
+
+  // 0174 (20 cases, no corpus): haiku 100% $0.0015 3.6s · terra 100% $0.0025 3.4s · luna 98%
+  // $0.0024 6.9s · sonnet 100% $0.0048. haiku 88% first-pass but every miss repaired in one turn,
+  // and the most self-consistent (85%). luna no cheaper than terra, slowest, and missed once.
+  "0174": ["anthropic+fast", "openai+balanced"],
+
+  // 0178 (22 cases): luna 82% $0.0025 4.1s · terra 79% $0.0050 · sonnet 76% $0.0145 (p90 37.6s)
+  // · haiku 71% $0.0019, 91% final compile, 3 zero-output runs. The only dialect where a cheaper
+  // variant measurably beat another: luna − haiku +11% converged, 95% CI [+1.5%, +21.2%]. No variant
+  // converges reliably; 22 of the residual warnings are unclassified in eval-warning-taxonomy.ts
+  // and counted as fixable, so the absolute rates are likely understated — the ordering is not.
+  "0178": ["openai+fast", "anthropic+balanced"],
+
+  // 0179 (22 cases): haiku 100% $0.0023 4.2s · luna 100% $0.0028 5.7s · sonnet 100% $0.0065
+  // 5.2s · terra 97% $0.0047 — terra returned NO code on 2 of 66 runs (output spent, nothing
+  // emitted), so it is kept out of the ordering entirely. Variants agree on only 3 of 22 programs
+  // (a sheet has many valid layouts), so agreement cannot flag a wrong design here; haiku is solo
+  // on 2 and the most self-consistent (89%). This supersedes "no entry" below: that sweep found the
+  // fast models within noise, and on a cost question within noise is the case for the cheaper one.
+  "0179": ["anthropic+fast", "openai+fast"],
+
+  // 0180 (25 cases): terra 100% $0.0024 2.9s, 100% first-pass, solo 0 · luna 100% $0.0019 4.3s ·
+  // sonnet 100% $0.0053 · haiku 100% $0.0019 but 79% first-pass and SOLO ON 8 OF 25 — e.g.
+  // `classify-conductors`, where it wrote a choice question and the other three the classification
+  // the prompt asked for. It compiles, so convergence cannot see it, and 0180 has no drift hook.
+  // haiku is avoided in both slots; terra over luna for first-pass and latency at +$0.0005.
+  "0180": ["openai+balanced", "anthropic+balanced"],
+
+  // 0181 (20 cases): haiku 100% $0.0011 2.5s · luna 100% $0.0013 · terra 100% $0.0020 · sonnet
+  // 100% $0.0033. haiku cheapest, fastest, 100% self-consistent and in step with sonnet (72%
+  // agreement); terra is solo on 4 (adds `instructions` unasked), luna on 2 (drops the title).
+  "0181": ["anthropic+fast", "openai+fast"],
+
+  // 0182 (20 cases): luna 100% $0.0015 · haiku 100% $0.0023 · terra 100% $0.0025 · sonnet 100%
+  // $0.0065. ~10% first-pass misses on every variant, all repaired in one turn. The variants wrote
+  // the same program on 14 of 20 cases and none is ever solo, so the cheapest one wins.
+  "0182": ["openai+fast", "anthropic+fast"],
+
+  // 0183 (21 cases): haiku 100% $0.0014 3.3s · terra 100% $0.0025 · luna 98% $0.0017, 1 stub ·
+  // sonnet 100% $0.0042. haiku cheapest and 97% self-consistent; terra is the fallback that never
+  // missed.
+  "0183": ["anthropic+fast", "openai+balanced"],
+
+  // 0184 (23 cases): terra 100% $0.0026 3.0s · luna 97% $0.0018, 1 zero-output · haiku 96%
+  // $0.0016, 83% first-pass · sonnet 100% $0.0048. Both fast variants fail to converge on a few
+  // runs; terra is the cheapest that does not, and the fastest. Fallback away from haiku.
+  "0184": ["openai+balanced", "anthropic+balanced"],
+
+  // 0185 (20 cases): haiku 100% $0.0017 2.8s · luna 100% $0.0020 4.2s · terra 98% $0.0022 ·
+  // sonnet 100% $0.0064, p90 14.4s. Narrow: luna has the better first-pass (85% vs 77%) and is solo
+  // once against haiku's 4, but haiku is 15% cheaper and faster. Low traffic; revisit if it grows.
+  "0185": ["anthropic+fast", "openai+fast"],
+
+  // NOT ENTERED from this sweep: 0013 — every variant "stubbed" every run, writing
+  // `snap item "<id>" {}..`; whether the empty options are the right answer or every model drops
+  // them is unresolved, and it does not separate the variants. 0014 left on the default by
+  // decision. 0186 has no eval set.
+
+  // HISTORY FOR 0179 — it had no entry until 2026-10-29 (above), and this note is here so the
+  // effort measurement is not repeated from scratch.
   //
   // `{ effort: { create: "low" } }` shipped on 2026-09-09 and was removed the same
   // day. It was justified as the fix for L0179's zero-output thinking spiral, and it

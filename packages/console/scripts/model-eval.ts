@@ -45,12 +45,13 @@
  *     one judge PER FAMILY on every candidate, reporting agreement and
  *     SELF-PREFERENCE (each judge's own-family mean minus other-family mean).
  *     A Claude judge ranking Claude against GPT is grading its own family, so a
- *     single-judge cross-family ordering is not defensible. Required before
- *     committing a MODEL_PRIORITY line.
+ *     single-judge cross-family QUALITY ranking is not defensible — use the panel
+ *     if a quality ranking is what you need.
  *
- *     NOT required for an --efforts run: every arm is the same model in the same
- *     family, so there is no self-preference axis for a panel to expose. That drops
- *     the most expensive part of a model eval from the effort question.
+ *     Neither is required to commit a MODEL_PRIORITY line. Generation is at or near
+ *     ceiling on every dialect measured (the 2026-10-29 full-catalog sweep), so a
+ *     judge has too little to discriminate; lines are set from convergence, stubs,
+ *     cost, latency and cross-variant agreement (see model-priority.ts).
  *
  * CONVERGENCE (--converge N) — the metric that matters for a dialect whose compile rate is
  * saturated. Compiling is table stakes; Graffiticode's actual advantage is that the compiler
@@ -311,7 +312,7 @@ function parseArgs(argv: string[]) {
     else if (v === "--judge") a.judge = true;
     else if (v === "--calibrate") a.calibrate = true;
     // --panel scores every candidate with one judge PER FAMILY and reports
-    // agreement + self-preference. Required before a cross-family ordering.
+    // agreement + self-preference. Optional: see the --panel note in the header.
     else if (v === "--panel") { a.panel = true; a.judge = true; }
     // Deliberately measure retrieval-assisted performance (see eval-holdout.ts).
     else if (v === "--allow-leak") a.allowLeak = true;
@@ -1503,7 +1504,7 @@ async function main() {
   console.log(`\nWrote ${allRuns.length} runs${judgements ? " + judge scores" : ""} + summary → ${outPath}`);
   console.log(`Checkpoint (per-run, written as the sweep ran): ${ckptPath}`);
   if (judgements && !args.panel) {
-    console.log("NOTE: single-judge scores. Re-run with --panel before setting a cross-family ordering.");
+    console.log("NOTE: single-judge scores rank a judge's own family; use --panel for a cross-family quality ranking.");
   }
 }
 
