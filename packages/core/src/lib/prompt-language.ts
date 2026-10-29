@@ -48,6 +48,12 @@ const MIN_LETTERS = 12;
 const LATIN_RATIO_FLOOR = 0.5;
 /** Distinct non-English marker words needed to call a Latin-script prompt. */
 const OTHER_MARKERS_REQUIRED = 2;
+/**
+ * Distinct English marker words that overrule Rule A. A real non-English
+ * instruction scores 0 here; the English-instruction-heavy-content prompts
+ * Rule A misfired on in production scored 6–11 in their first 300 chars.
+ */
+const ENGLISH_MARKERS_OVERRIDE = 3;
 
 // Non-Latin blocks worth naming. Order matters only for reporting a single
 // dominant script; the ratio test itself is Latin-vs-everything.
@@ -181,6 +187,17 @@ export function classifyPromptLanguage(text: string): PromptLanguageResult {
   }
 
   // RULE A — the script itself settles it. Catches ru/zh/ja/ko/ar/he/el/hi/th.
+  //
+  // Unless the instruction is visibly English. The ratio counts letters, not
+  // words, so an English instruction quoting a lot of non-Latin content sinks
+  // below the floor — and Han sinks fastest, one letter per word. Real
+  // non-English instructions carry essentially no English function words, so a
+  // handful of distinct ones means the instruction is English and the non-Latin
+  // text is content. The cost is fail-open: a non-English instruction quoting an
+  // English sentence can pass, which the gate's stance already accepts.
+  if (latinRatio < LATIN_RATIO_FLOOR && englishMarkers >= ENGLISH_MARKERS_OVERRIDE) {
+    return { ...base, verdict: "english" };
+  }
   if (latinRatio < LATIN_RATIO_FLOOR) {
     return { ...base, verdict: "non_english" };
   }
