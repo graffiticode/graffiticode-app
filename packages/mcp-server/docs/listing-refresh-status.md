@@ -12,7 +12,7 @@ still hold.
 
 ## Pick up here — 2026-10-26
 
-**v2.1.0 is live in the directory without auth. The next version, 2.2.2, adds mixed (optional)
+**v2.1.0 is live in the directory without auth. The next version, 2.2.3, adds mixed (optional)
 OAuth and is built, but two portal-side steps block it:**
 1. the app's Authentication setting, and
 2. a manual review of `update_item` that is still open.
@@ -24,8 +24,8 @@ Neither can be solved in code.
 | | |
 |---|---|
 | Live in the directory | **v2.1.0**, app `asdk_app_6a5a7c2760248191a8c61bb2b6c26ac9`, Authentication **"No authentication"**. Its CSP is its submission snapshot, which has no `frameDomains`, so framed L0176 falls back to the card until a resubmission declares `https://l0176.graffiticode.org` |
-| Next version | **2.2.2**, `packages/skills/dist/graffiticode-plugin-2.2.2.zip`, sha256 `a0804ff59294800289ba041db476acb017a09e5a5806b189fc35984e7eaa866d`. Matches what `npm run package` builds from `main` @ `36a8862`. **Not uploaded/submitted yet** (as far as this doc knows). The `-2.2.2-v2.zip` beside it is the `--dev` workspace build; never submit it |
-| Server | `mcp-service-rmvpm8szz-123e07` (2026-10-26, `main` @ `36a8862`), 100% of traffic. Rollback: `npm run rollback -- mcp --env production --release rmvpm8szz-123e07` |
+| Next version | **2.2.3**, `packages/skills/dist/graffiticode-plugin-2.2.3.zip`, sha256 `980ed7b835ce6f4cb4fe17e240f340171e39a302c041bb5a1a70b023af0e44e6`, built from `main` @ `b0ffb5e` (2026-10-27). It differs from 2.2.2 only in starter prompt 2, which now names the drag task; see `openai-listing-copy.md`, re-verification 2026-10-27. **Not uploaded/submitted yet** (as far as this doc knows). Older 2.2.x ZIPs in `dist/` are superseded, and `-v2` builds are `--dev` workspace builds; never submit either |
+| Server | `mcp-service-rmvr0gteo-293e70` (2026-10-27, `main` @ `b0ffb5e`), 100% of traffic. Adds computed values in sheet summaries. Rollback: `npm run rollback -- mcp --env production --release rmvr0gteo-293e70`. The first deploy attempt failed in the build on the timing test `widget-l0179-reseed` ("L0179 settles after mount…", 1 rebuild vs 0); the retry passed |
 | Tool definitions in the portal | Daily scan auto-published every new definition except **`update_item`**, which was held: "This new tool definition needs further review before it can be published." No reason was given. ChatGPT serves `update_item`'s previous definition until this clears |
 | Manual review | **Appeal filed 2026-10-26** for `update_item`. **MCP scans are paused** until it is decided or withdrawn. Tool-definition changes deployed meanwhile don't reach ChatGPT |
 | Auth decision | **Mixed** (decided 2026-10-22). Anonymous free-plan use keeps working alongside Graffiticode sign-in. Runbook §0 |
@@ -52,12 +52,12 @@ Neither can be solved in code.
      instruction to the model. That wording was deployed before the appeal, but the scanner had
      not rescanned it.
    - Once the appeal is decided, **Rescan** and confirm `update_item` shows Published.
-3. **Test in our own workspace first** (runbook §5a). Upload 2.2.2 as a workspace plugin, which
+3. **Test in our own workspace first** (runbook §5a). Upload 2.2.3 as a workspace plugin, which
    enforces the CSP the way the directory will. Check:
    - sign-in;
    - that anonymous use still works;
    - the framed L0176 preview (dev mode doesn't enforce the CSP, so only this run proves it).
-4. **Submit 2.2.2.** In order:
+4. **Submit 2.2.3.** In order:
    - Scan Tools;
    - upload the ZIP;
    - listing copy and the 5+3 tests;
@@ -309,6 +309,7 @@ Nothing here should be re-derived. Everything else should be treated as unknown.
 | Server OAuth surface (discovery, DCR, PKCE S256, scope; anonymous `initialize` = 200) | 2026-10-26, rev `rmvpm8szz-123e07` | all served; see Pick up here |
 | 2.2.2 ZIP is reproducible from `main` | 2026-10-26, `36a8862` | `--dry-run` sha256 equals the recorded `a0804ff5…866d` |
 | `update_item` description live after #59 | 2026-10-26, rev `rmvpm8szz-123e07` | `tools/list` returns the reworded paragraph |
+| Starter prompts against the live tools | 2026-10-27 | all three generate; prompt 2 reworded (see listing copy); invoice summary shows `$20.00`…`$90.00` on rev `rmvr0gteo-293e70` |
 
 **The rule that makes those dates meaningful:** a render proves nothing unless you know which
 build the client loaded. Check before concluding anything:

@@ -14,7 +14,7 @@ server to OpenAI's app directory (Apps SDK, `platform.openai.com/plugins`) as a
   (§10).
 - **v2.1.0 is live** in the directory, with no auth.
 
-**2.2.2** is built and adds mixed (optional) OAuth (§0). Two portal-side items block it:
+**2.2.3** is built and adds mixed (optional) OAuth (§0). Two portal-side items block it:
 - the app's Authentication setting still reads "No authentication", and only OpenAI support can
   change it;
 - a manual-review appeal for `update_item`'s held definition is open, and MCP scans are paused
@@ -156,7 +156,8 @@ Checklist for the ZIP:
 | 2.1.0 | `f2c3035` (2026-09-19) | `7c7ae8527b36c6edec9be7ecbcb8372fb518e4c18077b4662d2f2eac0dc4faa2` | not yet |
 | 2.2.0 | `db25c01` (2026-10-22), no ZIP auth override; mixed auth set in the portal app | `5c5a5de0b5e122d4c002403bff7fd4b829becbcce03d11dd897f0a06b18b2a05` | not yet |
 | 2.2.1 | `98e2135` (2026-10-23), authoring contract: Learnosity saves in the console, never `update_item` | `421f947a3a72398a37c15bca5db60a315cfa2652a821da9b0af061d44634a1c7` | never: superseded by 2.2.2 |
-| 2.2.2 | `7ce98f8` (2026-10-23), skills call render_item after create/update; free-plan Learnosity saves go through the claim | `a0804ff59294800289ba041db476acb017a09e5a5806b189fc35984e7eaa866d` | not yet |
+| 2.2.2 | `7ce98f8` (2026-10-23), skills call render_item after create/update; free-plan Learnosity saves go through the claim | `a0804ff59294800289ba041db476acb017a09e5a5806b189fc35984e7eaa866d` | never: superseded by 2.2.3 |
+| 2.2.3 | `b0ffb5e` (2026-10-27), starter prompt 2 names the drag task, so it yields an assessment on L0183 | `980ed7b835ce6f4cb4fe17e240f340171e39a302c041bb5a1a70b023af0e44e6` | not yet |
 
 Rebuild that ref to compare: `npm run package -- --ref 7e4945f --dry-run` prints the same
 SHA-256 or the artifact is not what this table claims.
