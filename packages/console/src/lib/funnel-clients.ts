@@ -92,6 +92,10 @@ const CRAWLER_NAMES = new Set([
   // camelCase defeats \bharvest\b, which would otherwise be a rule that never
   // fires against the only harvester we have actually seen.
   "mcpharvest",
+  // Calls get_item / render_item / get_spec / get_language_info with NO
+  // arguments, in pairs, about four times a day. On 2026-10-29→30 it was all 8
+  // of the window's tool errors and read as user success falling to 82%.
+  "brickbluebot",
 ]);
 
 /**

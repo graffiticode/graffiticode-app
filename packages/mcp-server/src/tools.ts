@@ -2037,12 +2037,35 @@ export async function handleGetLanguageInfo(
   };
 }
 
+/**
+ * The tool's own `inputSchema.required`, checked before any handler runs. The
+ * SDK does not validate arguments against the schema, so a call with no
+ * arguments reached the handlers and failed inside them: get_language_info with
+ * "Cannot read properties of undefined (reading 'replace')", get_item and
+ * render_item with "Item not found: undefined", get_spec with a GraphQL
+ * variable error (a scanner, BrickBlueBot, did this daily from 2026-10-29).
+ * Reading the schema keeps the rule in one place, so a new required field
+ * needs no second edit here.
+ */
+export function missingRequiredArgs(toolName: string, args: Record<string, unknown> | undefined): string[] {
+  const tool = tools.find(t => t.name === toolName);
+  const required = (tool?.inputSchema as { required?: string[] } | undefined)?.required ?? [];
+  return required.filter(key => {
+    const value = args?.[key];
+    return typeof value !== "string" || value.trim() === "";
+  });
+}
+
 // Tool handler router
 export async function handleToolCall(
   ctx: ToolContext,
   toolName: string,
   args: Record<string, unknown>
 ): Promise<unknown> {
+  const missing = missingRequiredArgs(toolName, args);
+  if (missing.length) {
+    throw new Error(`Missing required argument${missing.length > 1 ? "s" : ""}: ${missing.join(", ")}. See the ${toolName} input schema.`);
+  }
   switch (toolName) {
     case "create_item":
       return handleCreateItem(ctx, args as { language: string; description: string; name?: string });
