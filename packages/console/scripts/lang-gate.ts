@@ -9,8 +9,8 @@
  * about to write, and writes nothing when it fails.
  *
  * WHERE THE GATE IS. In the language's checkout beside this one: the monorepo layout
- * (`../../graffiticode/languages/l{lang}`) first, then the old sibling-repo layout
- * (`../../l{lang}`). A language without a `check-corpus` script has no gate and passes through.
+ * (`graffiticode/languages/l{lang}`, beside graffiticode-app) first, then the old sibling-repo
+ * layout (`l{lang}`, beside graffiticode-app). A language without a `check-corpus` script has no gate and passes through.
  * The gate compiles with the language's built code, so build the language first; a gate that
  * cannot run counts as a failure, never a pass.
  */
@@ -22,11 +22,14 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/** Where a language's checkout may be, in order. */
+/** Where a language's checkout may be, in order. This file is
+ *  graffiticode-app/packages/console/scripts, so the checkouts beside graffiticode-app are four
+ *  levels up. (Two levels — the depth this had when the console was its own repo — resolves
+ *  inside graffiticode-app/packages, finds nothing, and lets every batch through ungated.) */
 export function gateDirs(langCode: string): string[] {
   return [
-    path.resolve(__dirname, `../../graffiticode/languages/l${langCode}`),
-    path.resolve(__dirname, `../../l${langCode}`),
+    path.resolve(__dirname, `../../../../graffiticode/languages/l${langCode}`),
+    path.resolve(__dirname, `../../../../l${langCode}`),
   ];
 }
 
