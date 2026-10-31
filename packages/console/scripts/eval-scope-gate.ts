@@ -79,6 +79,11 @@ const CASES: Case[] = [
   { tag: "figjam", lang: "0186", want: "in", prompt: "Add a flowchart from Start through a Valid? decision to Save or Report error to my FigJam board https://www.figma.com/board/ABC123/Flows." },
   { tag: "figjam", lang: "0183", want: "0186", prompt: "Make a FigJam brainstorm board with a central Idea sticky and six stickies around it." },
   { tag: "figjam", lang: "0186", want: "0184", prompt: "Bar chart of monthly revenue: January 120, February 132, March 101, April 134." },
+  // L0187 (declarative FigJam boards) is hidden until the plugin draws positioned boards, so it is
+  // never a reroute target; named directly, it holds boards described by content and organization.
+  { tag: "figjam-declarative", lang: "0187", want: "in", prompt: "A kanban board with To do, Doing and Done columns, two notes in each." },
+  { tag: "figjam-declarative", lang: "0187", want: "in", prompt: "A flowchart: Fetch data, a Valid? decision, then Save or Report error, with a dashed Retry back to Fetch." },
+  { tag: "figjam-declarative", lang: "0187", want: "0184", prompt: "Bar chart of monthly revenue: January 120, February 132, March 101, April 134." },
 ];
 
 const arg = (name: string) => {
