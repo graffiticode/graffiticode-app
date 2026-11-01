@@ -1,0 +1,78 @@
+[
+  {
+    "id": "sticky-grid-single-section",
+    "prompt": "Make a board with one section titled \"Allergen Watchlist\" holding six yellow sticky notes in two rows: Peanut, Tree nut, Sesame, Shellfish, Soy, Mustard."
+  },
+  {
+    "id": "flowchart-terminator-process-decision",
+    "prompt": "Draw a flowchart for a library hold: a terminator \"Hold placed\", a process \"Check shelf\", a decision \"On shelf?\", then a process \"Pull and notify\" off the yes branch and a process \"Request from branch library\" off the no branch, ending in a terminator \"Hold ready\". Label the decision arrows yes and no."
+  },
+  {
+    "id": "engineering-shapes-pipeline",
+    "prompt": "Build a data pipeline diagram left to right using engineering shapes: a file shape \"sensor_dump.csv\", a queue shape \"ingest-queue\", a process shape \"Normalize units\", a database shape \"readings_db\" and a folder shape \"Monthly archives\", joined by arrows in that order."
+  },
+  {
+    "id": "multi-page-tabs",
+    "prompt": "A board for a community garden planning session with three pages: \"Plot Map\", \"Planting Calendar\" and \"Volunteer Roles\". Put a heading text and two stickies on each page."
+  },
+  {
+    "id": "hub-to-every-node",
+    "prompt": "Put a sticky reading \"Night sky unit\" in the middle of the page and five stickies around it saying Moon phases, Constellations, Light pollution, Telescopes and Meteor showers, with a line from the middle sticky to every one of them."
+  },
+  {
+    "id": "dashed-elbow-connectors",
+    "prompt": "Two process boxes, \"Draft contract\" at the top and \"Legal review\" below it, joined by a solid elbowed arrow, plus a dashed elbowed arrow going back up from \"Legal review\" to \"Draft contract\" labelled \"revisions\"."
+  },
+  {
+    "id": "curved-connector-with-points",
+    "prompt": "Place a sticky \"Harbour\" at x 0 y 0 and a sticky \"Lighthouse\" at x 900 y 0, and join them with a curved arrow that is routed through the points (300, -250) and (600, -250)."
+  },
+  {
+    "id": "reaction-stamps-on-ideas",
+    "prompt": "Three idea stickies in a row \u2014 \"Longer lunch break\", \"Standing desks\", \"Friday demo hour\" \u2014 and under each one put a thumbs-up reaction stamp, with a heart stamp under \"Standing desks\" as well."
+  },
+  {
+    "id": "decorative-shapes-awards",
+    "prompt": "Make a recognition board: a star shape saying \"Top Volunteer\", a shield shape saying \"Safety Streak 90 Days\" and a speech bubble saying \"Nice work, trail crew!\", arranged side by side across the top of the page."
+  },
+  {
+    "id": "explicit-coordinates-floor-plan",
+    "prompt": "Lay out four rectangles by coordinates: \"Reception\" at x 0 y 0, \"Exam Room 1\" at x 400 y 0, \"Exam Room 2\" at x 400 y 300, and \"Supply Closet\" at x 0 y 300, each 320 wide and 220 tall."
+  },
+  {
+    "id": "colours-outlines-opacity",
+    "prompt": "A board with three stickies in a row: \"Blocked\" in red, \"At risk\" in orange and \"On track\" in green, and beneath them a grey rectangle saying \"Legend\" with a black outline at 50% opacity."
+  },
+  {
+    "id": "text-sizes-headings",
+    "prompt": "A single page with free text \"Watershed Field Trip\" in large type at the top, \"Saturday, 9am\u20132pm\" in medium type below it, and \"Bring boots and a refillable bottle\" in small type under that."
+  },
+  {
+    "id": "input-output-shapes-form",
+    "prompt": "A flowchart of a loan application using input/output parallelograms: \"Enter applicant details\" input/output, then a process \"Run credit check\", then a decision \"Score above 650?\", then an input/output \"Print approval letter\" on yes and an input/output \"Print denial notice\" on no."
+  },
+  {
+    "id": "arrowheads-both-ends",
+    "prompt": "Two rounded rectangles, \"Kitchen staff\" on the left and \"Front of house\" on the right, joined by a line with an arrowhead at both ends labelled \"ticket updates\"."
+  },
+  {
+    "id": "attachment-sides-connector",
+    "prompt": "Put a process box \"Order received\" at x 0 y 0 and a process box \"Warehouse pick\" at x 0 y 400, and connect them with a straight arrow leaving the bottom side of \"Order received\" and entering the top side of \"Warehouse pick\"."
+  },
+  {
+    "id": "fan-out-to-list",
+    "prompt": "A rounded rectangle \"Weekly newsletter\" on the left with arrows fanning out to four stickies on the right: \"Members\", \"Donors\", \"Board\" and \"Press list\"."
+  },
+  {
+    "id": "three-column-sections-kanban",
+    "prompt": "A board with three sections side by side titled \"Backlog\", \"In Progress\" and \"Shipped\"; put the stickies \"Rewrite tour script\", \"Fix gift shop signage\" in Backlog, \"Audio guide pilot\" in In Progress, and \"New ticket kiosk\", \"Members' night\" in Shipped."
+  },
+  {
+    "id": "pages-with-connectors-and-stamps",
+    "prompt": "A two-page board: page \"Current Route\" with stickies Depot, Stop A, Stop B, Depot joined by arrows in a loop, and page \"Proposed Route\" with stickies Depot, Stop B, Stop A, Depot joined the same way plus a thumbs-up stamp beside the title text \"Saves 12 minutes\"."
+  },
+  {
+    "id": "mixed-sections-connectors-colours",
+    "prompt": "Make a troubleshooting board with a section \"Symptoms\" holding three blue stickies \u2014 \"Printer offline\", \"Jobs stuck in queue\", \"Error 0x6100\" \u2014 and a section \"Checks\" to its right holding a diamond \"Cable seated?\" and a process \"Restart spooler\", with a dashed arrow from \"Jobs stuck in queue\" to \"Restart spooler\" labelled \"try first\"."
+  }
+]

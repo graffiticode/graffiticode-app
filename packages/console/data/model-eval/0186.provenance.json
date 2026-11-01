@@ -1,0 +1,134 @@
+{
+  "lang": "0186",
+  "authoredBy": "claude-opus-5",
+  "source": {
+    "endpoint": "https://console.graffiticode.org/api",
+    "query": "GetLanguageInfo (graffiticode-mcp-server/src/api.ts)",
+    "itemTypes": [
+      "figjam_board"
+    ],
+    "examplePromptCount": 5,
+    "authoringGuideChars": 548,
+    "usageGuideChars": 1629
+  },
+  "corpusAccess": "none — this script imports no Firestore client and never reads training_examples",
+  "mode": "create-only (no currentCode on any case)",
+  "usage": {
+    "input_tokens": 2678,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 2847,
+    "output_tokens_details": {
+      "thinking_tokens": 0
+    },
+    "service_tier": "standard",
+    "inference_geo": "global",
+    "speed": "standard"
+  },
+  "cases": [
+    {
+      "id": "sticky-grid-single-section",
+      "targets": "sticky notes grouped in a section",
+      "maxOverlapWithExamplePrompts": 0.167
+    },
+    {
+      "id": "flowchart-terminator-process-decision",
+      "targets": "flowchart shapes with labelled connectors",
+      "maxOverlapWithExamplePrompts": 0.222
+    },
+    {
+      "id": "engineering-shapes-pipeline",
+      "targets": "engineering shapes (file, queue, database, folder)",
+      "maxOverlapWithExamplePrompts": 0.167
+    },
+    {
+      "id": "multi-page-tabs",
+      "targets": "multiple pages shown as tabs",
+      "maxOverlapWithExamplePrompts": 0.364
+    },
+    {
+      "id": "hub-to-every-node",
+      "targets": "connector fanning to every node",
+      "maxOverlapWithExamplePrompts": 0.5
+    },
+    {
+      "id": "save-to-figjam-link",
+      "targets": "save-to-figjam with file link",
+      "maxOverlapWithExamplePrompts": 0.625
+    },
+    {
+      "id": "dashed-elbow-connectors",
+      "targets": "dashed and elbowed connectors",
+      "maxOverlapWithExamplePrompts": 0.167
+    },
+    {
+      "id": "curved-connector-with-points",
+      "targets": "curved connector routed through given points",
+      "maxOverlapWithExamplePrompts": 0.167
+    },
+    {
+      "id": "reaction-stamps-on-ideas",
+      "targets": "reaction stamps",
+      "maxOverlapWithExamplePrompts": 0.364
+    },
+    {
+      "id": "decorative-shapes-awards",
+      "targets": "decorative shapes (star, shield, speech bubble)",
+      "maxOverlapWithExamplePrompts": 0.167
+    },
+    {
+      "id": "explicit-coordinates-floor-plan",
+      "targets": "explicit layout by coordinates",
+      "maxOverlapWithExamplePrompts": 0.091
+    },
+    {
+      "id": "colours-outlines-opacity",
+      "targets": "colours, outlines and opacity",
+      "maxOverlapWithExamplePrompts": 0.273
+    },
+    {
+      "id": "text-sizes-headings",
+      "targets": "free text with text sizes",
+      "maxOverlapWithExamplePrompts": 0
+    },
+    {
+      "id": "input-output-shapes-form",
+      "targets": "input/output flowchart shape",
+      "maxOverlapWithExamplePrompts": 0.222
+    },
+    {
+      "id": "arrowheads-both-ends",
+      "targets": "connector arrowheads on both ends",
+      "maxOverlapWithExamplePrompts": 0.167
+    },
+    {
+      "id": "attachment-sides-connector",
+      "targets": "connector attachment sides",
+      "maxOverlapWithExamplePrompts": 0
+    },
+    {
+      "id": "fan-out-to-list",
+      "targets": "connector fanning out to a list of nodes",
+      "maxOverlapWithExamplePrompts": 0.182
+    },
+    {
+      "id": "three-column-sections-kanban",
+      "targets": "several sections side by side",
+      "maxOverlapWithExamplePrompts": 0.364
+    },
+    {
+      "id": "pages-with-connectors-and-stamps",
+      "targets": "multiple pages combining connectors and stamps",
+      "maxOverlapWithExamplePrompts": 0.333
+    },
+    {
+      "id": "mixed-sections-connectors-colours",
+      "targets": "sections, shapes, colours and a cross-section dashed connector",
+      "maxOverlapWithExamplePrompts": 0.273
+    }
+  ]
+}
