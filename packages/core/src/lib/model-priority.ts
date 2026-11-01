@@ -408,10 +408,21 @@ export const MODEL_PRIORITY: Record<string, PriorityConfig> = {
   // once against haiku's 4, but haiku is 15% cheaper and faster. Low traffic; revisit if it grows.
   "0185": ["anthropic+fast", "openai+fast"],
 
+  // 0186 (19 cases, eval 2026-11-01, same setup; set authored by eval-cases-from-mcp.ts, hold-out
+  // clean, proximity top1 mean .43): haiku 100% $0.0016 3.6s p90 5.4s · luna 100% $0.0025 4.7s ·
+  // terra 100% $0.0038 3.2s · sonnet 100% $0.0098, p90 22.4s. Every variant converges; haiku is
+  // 6x cheaper than sonnet, has the lowest tail, and is by far the most self-consistent (91% vs
+  // 37-67%), solo once (a stamp without `id`). No two variants wrote the same program on any case
+  // (board layout is free), so agreement cannot flag a wrong design here. Fallback luna: 100%
+  // first-pass and cheaper than terra, which is solo twice adding unasked fields (page tabs,
+  // connector sides). In production 0186 was the costliest language once the others moved
+  // ($0.26/item, 2026-10-30→11-01), and its sonnet calls failed over to terra on 4 of 11.
+  "0186": ["anthropic+fast", "openai+fast"],
+
   // NOT ENTERED from this sweep: 0013 — every variant "stubbed" every run, writing
   // `snap item "<id>" {}..`; whether the empty options are the right answer or every model drops
   // them is unresolved, and it does not separate the variants. 0014 left on the default by
-  // decision. 0186 has no eval set.
+  // decision. 0186 was entered on its own eval, above.
 
   // HISTORY FOR 0179 — it had no entry until 2026-10-29 (above), and this note is here so the
   // effort measurement is not repeated from scratch.
