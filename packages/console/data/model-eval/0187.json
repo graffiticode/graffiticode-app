@@ -1,0 +1,78 @@
+[
+  {
+    "id": "single-section-column-stickies",
+    "prompt": "Make a FigJam board with one titled section called \"Apiary chores \u2014 March\" holding a column of sticky notes: Check hive weights, Scrape burr comb, Replace mouse guards, Order new frames, Clean the smoker."
+  },
+  {
+    "id": "two-sections-row-comparison",
+    "prompt": "I need a comparison board with two titled sections side by side: \"Cargo bike delivery\" with sticky notes Low running cost, No parking fees and Limited to 40 kg, and \"Electric van delivery\" with sticky notes Carries pallets, All-weather and Needs depot charging."
+  },
+  {
+    "id": "grid-of-stickies",
+    "prompt": "Build a FigJam board titled \"Community garden plot owners\" with nine sticky notes arranged as a grid: Plot 1 Hana, Plot 2 Dmitri, Plot 3 Fatima, Plot 4 Owen, Plot 5 Priya, Plot 6 Lars, Plot 7 Noor, Plot 8 Tess, Plot 9 vacant."
+  },
+  {
+    "id": "process-flow-predefined-process",
+    "prompt": "Create a process flow for a sourdough bakery using predefined process shapes in order: Mix and autolyse, Bulk ferment, Shape loaves, Cold proof overnight, Bake in deck oven. Connect each step to the next with arrows."
+  },
+  {
+    "id": "decision-diamond-labelled-branches",
+    "prompt": "Draw a decision flow for a lighthouse lamp check: a rounded rectangle \"Run night test\", then a diamond \"Lamp lit?\", with a branch labelled Yes to \"Log as serviceable\" and a branch labelled No to \"Dispatch keeper\"."
+  },
+  {
+    "id": "dashed-return-connector",
+    "prompt": "A water treatment flow with the steps Intake screening, Coagulation, Sand filtration, Turbidity check and Release to mains, connected in order, plus a dashed connector from Turbidity check back to Coagulation labelled \"Re-treat\"."
+  },
+  {
+    "id": "self-loop-connector",
+    "prompt": "Make a board showing a pottery kiln firing: shapes Load kiln, Ramp to 1000C and Cool and unload connected in order, and give \"Ramp to 1000C\" a self-loop connector labelled \"Hold 20 min, re-check cone\"."
+  },
+  {
+    "id": "parallel-connectors-two-marks",
+    "prompt": "Diagram a ticket barrier and its validator as two rounded rectangles, with two separate connectors running between them: one from Barrier to Validator labelled \"Card presented\" and one from Validator back to Barrier labelled \"Open or reject\"."
+  },
+  {
+    "id": "thick-connector-emphasis",
+    "prompt": "Create a board with three squares \u2014 Quarry, Rail yard and Port terminal \u2014 connected Quarry to Rail yard to Port terminal, and make the Rail yard to Port terminal connector thick and labelled \"Main aggregate line\"."
+  },
+  {
+    "id": "system-diagram-database-shape",
+    "prompt": "Make a small system diagram for a library catalogue: rounded rectangles \"Search front end\" and \"Catalogue API\", and a database shape \"Holdings store\". Connect Search front end to Catalogue API labelled \"query\" and Catalogue API to Holdings store labelled \"SQL read\", with arrowheads on both."
+  },
+  {
+    "id": "free-text-heading-with-stickies",
+    "prompt": "A FigJam board with a free text heading reading \"Trail maintenance ideas \u2014 Ridgeway section\" and beneath it a row of sticky notes: Rebuild the stile at gate 4, Cut back bramble near the spring, Add a waymarker at the fork, Re-gravel the boggy stretch."
+  },
+  {
+    "id": "invisible-group-row",
+    "prompt": "Build a board for an orchestra seating plan: an invisible group holding three ellipses labelled First violins, Second violins and Violas arranged in a row, and below it another invisible group holding Cellos and Double basses in a row."
+  },
+  {
+    "id": "multi-page-tabs",
+    "prompt": "Make a three-page FigJam board for a rockpool survey. Page \"Field notes\" has sticky notes Tide was lower than forecast and Two new limpet species; page \"Specimen list\" has sticky notes Beadlet anemone, Shore crab and Snakelocks anemone; page \"Next steps\" has sticky notes Repeat at spring tide and Photograph the south gully."
+  },
+  {
+    "id": "document-and-parallelogram-shapes",
+    "prompt": "Create a payroll run flow: a parallelogram \"Import timesheets\", then a predefined process \"Calculate gross and deductions\", then a document shape \"Print payslips\", then a document shape \"File RTI submission\", connected in that order with arrows."
+  },
+  {
+    "id": "ellipse-terminators-flow",
+    "prompt": "Draw a flow for a radio station handover with an ellipse \"Start of shift\" at the beginning and an ellipse \"End of shift\" at the end, and between them the squares Check transmitter log, Load the playout queue and Brief the next presenter, all connected in sequence."
+  },
+  {
+    "id": "ordered-steps-sequence",
+    "prompt": "Make a board laying out a glacier survey in strict order: Set the GPS base station, Walk the ablation stake line, Record stake heights, Drill replacement stakes, Download the base station data. Each step should follow the one before it."
+  },
+  {
+    "id": "section-of-shapes",
+    "prompt": "A FigJam board with one titled section \"Signalling stages\" containing rounded rectangles Track circuit occupied, Interlocking checks route, Signal cleared to green and Train passes signal, stacked in a column."
+  },
+  {
+    "id": "coloured-stickies-by-category",
+    "prompt": "Build a board titled \"Harbour festival jobs\" with a row of three titled sections: \"Before\" with yellow sticky notes Book the brass band and Print the programme, \"On the day\" with green sticky notes Set up the stalls and Marshal the slipway, \"After\" with blue sticky notes Return the barriers and Send thank-you notes."
+  },
+  {
+    "id": "branching-merge-flow",
+    "prompt": "Make a decision flow for a bicycle puncture: square \"Remove the wheel\", diamond \"Tyre holds air?\", a branch labelled Yes to \"Refit the wheel\" and a branch labelled No to \"Patch or replace the tube\", then a connector from \"Patch or replace the tube\" to \"Refit the wheel\"."
+  }
+]
