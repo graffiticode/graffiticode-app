@@ -119,6 +119,20 @@ test("a free-plan v2 create runs as the trial account without act-as", async () 
   assert.equal(await doc(`effects/item:${g.itemId}:stripe_meter:creator`), undefined, "the trial is never metered");
 });
 
+test("the trial account signed in directly is counted but never metered", async () => {
+  // The console used as the trial account: a plain sign-in, no free-plan session.
+  const trial = { token: userToken("trial-uid") };
+  const t = ok(await generate(h, trial, {})).startCodeGeneration;
+  const it = await item(t.itemId, "trial-uid");
+  assert.equal(it.generationStatus, "ready");
+  assert.equal(it.billed, true);
+  assert.equal((await doc("usage/trial-uid")).currentMonthTotal, 1, "it still counts toward the trial's allowance");
+  assert.equal(await doc(`effects/item:${t.itemId}:stripe_meter:creator`), undefined, "the trial is never metered");
+  // An ordinary account's item, by the same path, is.
+  const a = ok(await generate(h, alice, {})).startCodeGeneration;
+  assert.ok(await doc(`effects/item:${a.itemId}:stripe_meter:creator`), "alice's item is metered");
+});
+
 test("redelivery after completion does nothing", async () => {
   const g = ok(await generate(h, alice, {})).startCodeGeneration;
   const { generationId } = h.jobPayloads[0];

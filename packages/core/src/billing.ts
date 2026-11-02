@@ -10,6 +10,15 @@ import { db } from "./db.js";
 import type { AuthArg } from "./types.js";
 import type { VersionSource } from "./versions.js";
 
+/**
+ * The shared free-plan trial account (FREE_PLAN_UID). Whatever path creates its items, a
+ * free-plan session or a direct sign-in, they are never reported to the Stripe meter.
+ */
+export function isTrialAccount(uid: string | undefined | null): boolean {
+  const trial = process.env.FREE_PLAN_UID;
+  return !!trial && uid === trial;
+}
+
 export function periodStartFor(subscription: { currentPeriodStart?: string | number } | undefined, now: Date): Date {
   return subscription?.currentPeriodStart
     ? new Date(subscription.currentPeriodStart)
@@ -263,6 +272,12 @@ export async function recordBillableItem({
       return;
     }
 
+    // The trial account signed in directly (the console used as that account) carries no
+    // free-plan session, so it arrives here as an ordinary account and is counted like one.
+    // It is still never invoiced: its Silver subscription exists only to carry the trial's
+    // allowance. Without this, those items reached the Stripe meter.
+    if (isTrialAccount(auth.uid)) return;
+
     // A sponsored item IS the customer's usage — it reached the funnel above and
     // it shows on their usage page — but nobody is invoiced for it, so it must
     // not reach the meter.
@@ -430,6 +445,8 @@ export function accountFirstCompletion(tx: admin.firestore.Transaction, {
     }
     return { events, effects };
   }
+  // The trial account signed in directly: counted, never metered (see recordBillableItem).
+  if (isTrialAccount(auth.uid)) return { events, effects };
   if (!billable) return { events, effects };
 
   effects.push({

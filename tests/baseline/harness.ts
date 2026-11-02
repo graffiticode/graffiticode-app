@@ -242,6 +242,8 @@ export async function start(): Promise<Harness> {
     NEXT_PUBLIC_FIREBASE_API_KEY: "baseline-firebase-web-key",
     FREE_PLAN_NAMESPACE_SALT: "baseline-salt",
     FREE_PLAN_API_KEY: FREE_PLAN_KEY,
+    // The trial account's uid, as production sets it: what the system-account checks key on.
+    FREE_PLAN_UID: TRIAL_UID,
     INTERNAL_JOB_SECRET: JOB_SECRET,
     ACT_AS_GRANT_SECRET: ACT_AS_SECRET,
     GENERATION_QUEUE_LOCAL: "1",

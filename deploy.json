@@ -59,6 +59,7 @@
       ],
       "env": {
         "GENERATION_PROTOCOL": "v2",
+        "FREE_PLAN_UID": "4b7045a1d379c4bfc98a3f036931afd0a82ffeed",
         "ANTHROPIC_FEDERATION_RULE_ID": "fdrl_015e3sipxUnp5R2KC9Cpkng5",
         "ANTHROPIC_ORGANIZATION_ID": "ed802a9e-2ede-486d-8d53-b7c33539106a",
         "ANTHROPIC_SERVICE_ACCOUNT_ID": "svac_01QLoHvFLSei6QT2DCGMkPKU",
