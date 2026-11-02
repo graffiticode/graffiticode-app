@@ -426,7 +426,13 @@ export const MODEL_PRIORITY: Record<string, PriorityConfig> = {
   // fidelity at +$0.0004 over haiku. Fallback is haiku, not sonnet: in production (2026-11-02, a
   // Claude Code user's long specs) sonnet thought 80-92 s per L0187 create, ~3.5 min an item with
   // repair. The eval's short cases did not reproduce that (sonnet p50 4.6 s), so check real latency.
-  "0187": ["openai+fast", "anthropic+fast"],
+  // 2026-11-02, revised the same day (quality and first-pass ahead of price, by owner decision):
+  // luna stripped every accent from a production Portuguese board ("nao e" for "não é") and
+  // needed a repair turn; on four non-English cases (pt-AO, es, fr, de; model-eval --set-dir,
+  // 2 trials) sonnet was 100% first-pass with 0% ASCII-stripped, luna 75% and 13%. The
+  // production slowness that pushed sonnet out was mostly repair turns from a routing bug,
+  // fixed in graffiticode#253/#256: NEDA then took sonnet one 84 s turn. luna stays as fallback.
+  "0187": ["anthropic", "openai+fast"],
 
   // NOT ENTERED from this sweep: 0013 — every variant "stubbed" every run, writing
   // `snap item "<id>" {}..`; whether the empty options are the right answer or every model drops
