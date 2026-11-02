@@ -419,6 +419,15 @@ export const MODEL_PRIORITY: Record<string, PriorityConfig> = {
   // ($0.26/item, 2026-10-30→11-01), and its sonnet calls failed over to terra on 4 of 11.
   "0186": ["anthropic+fast", "openai+fast"],
 
+  // 0187 (19 cases, eval 2026-11-02, same setup; set by eval-cases-from-mcp.ts, hold-out clean,
+  // proximity top1 mean .39): luna 100% $0.0019 4.7s, solo 0, agrees 53% (ties sonnet) · haiku 100%
+  // $0.0015 3.9s but SOLO ON 5 OF 19, agrees 35% — e.g. a rounded rectangle where the prompt said
+  // "square", a dropped ROW layout · terra 100% $0.0034, solo 2 · sonnet 100% $0.0046. luna for
+  // fidelity at +$0.0004 over haiku. Fallback is haiku, not sonnet: in production (2026-11-02, a
+  // Claude Code user's long specs) sonnet thought 80-92 s per L0187 create, ~3.5 min an item with
+  // repair. The eval's short cases did not reproduce that (sonnet p50 4.6 s), so check real latency.
+  "0187": ["openai+fast", "anthropic+fast"],
+
   // NOT ENTERED from this sweep: 0013 — every variant "stubbed" every run, writing
   // `snap item "<id>" {}..`; whether the empty options are the right answer or every model drops
   // them is unresolved, and it does not separate the variants. 0014 left on the default by

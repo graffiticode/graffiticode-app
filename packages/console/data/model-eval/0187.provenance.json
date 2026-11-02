@@ -1,0 +1,134 @@
+{
+  "lang": "0187",
+  "authoredBy": "claude-opus-5",
+  "source": {
+    "endpoint": "https://console.graffiticode.org/api",
+    "query": "GetLanguageInfo (graffiticode-mcp-server/src/api.ts)",
+    "itemTypes": [
+      "figjam_board"
+    ],
+    "examplePromptCount": 5,
+    "authoringGuideChars": 498,
+    "usageGuideChars": 2095
+  },
+  "corpusAccess": "none — this script imports no Firestore client and never reads training_examples",
+  "mode": "create-only (no currentCode on any case)",
+  "usage": {
+    "input_tokens": 2789,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 4282,
+    "output_tokens_details": {
+      "thinking_tokens": 1245
+    },
+    "service_tier": "standard",
+    "inference_geo": "global",
+    "speed": "standard"
+  },
+  "cases": [
+    {
+      "id": "single-section-column-stickies",
+      "targets": "figjam_board — titled section, COLUMN of sticky notes",
+      "maxOverlapWithExamplePrompts": 0.286
+    },
+    {
+      "id": "two-sections-row-comparison",
+      "targets": "figjam_board — sections in a ROW, column of stickies in each",
+      "maxOverlapWithExamplePrompts": 0.2
+    },
+    {
+      "id": "grid-of-stickies",
+      "targets": "figjam_board — GRID layout of sticky notes",
+      "maxOverlapWithExamplePrompts": 0.286
+    },
+    {
+      "id": "process-flow-predefined-process",
+      "targets": "figjam_board — FLOW layout, predefined process shapes, ordered connectors",
+      "maxOverlapWithExamplePrompts": 0.1
+    },
+    {
+      "id": "decision-diamond-labelled-branches",
+      "targets": "figjam_board — diamond decision, labelled branch connectors",
+      "maxOverlapWithExamplePrompts": 0.091
+    },
+    {
+      "id": "dashed-return-connector",
+      "targets": "figjam_board — dashed return-path connector",
+      "maxOverlapWithExamplePrompts": 0.182
+    },
+    {
+      "id": "self-loop-connector",
+      "targets": "figjam_board — self-loop connector on a single mark",
+      "maxOverlapWithExamplePrompts": 0.2
+    },
+    {
+      "id": "parallel-connectors-two-marks",
+      "targets": "figjam_board — parallel connectors between the same pair of marks",
+      "maxOverlapWithExamplePrompts": 0.091
+    },
+    {
+      "id": "thick-connector-emphasis",
+      "targets": "figjam_board — thick connector with label",
+      "maxOverlapWithExamplePrompts": 0.2
+    },
+    {
+      "id": "system-diagram-database-shape",
+      "targets": "figjam_board — database shape, labelled arrow connectors",
+      "maxOverlapWithExamplePrompts": 0
+    },
+    {
+      "id": "free-text-heading-with-stickies",
+      "targets": "figjam_board — free text element plus stickies",
+      "maxOverlapWithExamplePrompts": 0.286
+    },
+    {
+      "id": "invisible-group-row",
+      "targets": "figjam_board — invisible groups arranging shapes",
+      "maxOverlapWithExamplePrompts": 0.2
+    },
+    {
+      "id": "multi-page-tabs",
+      "targets": "figjam_board — multiple pages shown as tabs",
+      "maxOverlapWithExamplePrompts": 0.286
+    },
+    {
+      "id": "save-to-figjam-link",
+      "targets": "figjam_board — save-to-figjam target file",
+      "maxOverlapWithExamplePrompts": 0.714
+    },
+    {
+      "id": "document-and-parallelogram-shapes",
+      "targets": "figjam_board — parallelogram input and document shapes",
+      "maxOverlapWithExamplePrompts": 0.143
+    },
+    {
+      "id": "ellipse-terminators-flow",
+      "targets": "figjam_board — ellipse start/end terminators in a FLOW",
+      "maxOverlapWithExamplePrompts": 0
+    },
+    {
+      "id": "ordered-steps-sequence",
+      "targets": "figjam_board — ordering of stages with before",
+      "maxOverlapWithExamplePrompts": 0.2
+    },
+    {
+      "id": "section-of-shapes",
+      "targets": "figjam_board — section holding shapes rather than stickies",
+      "maxOverlapWithExamplePrompts": 0.286
+    },
+    {
+      "id": "coloured-stickies-by-category",
+      "targets": "figjam_board — sticky fill colours across sections",
+      "maxOverlapWithExamplePrompts": 0.2
+    },
+    {
+      "id": "branching-merge-flow",
+      "targets": "figjam_board — branching paths that merge back together",
+      "maxOverlapWithExamplePrompts": 0.091
+    }
+  ]
+}
