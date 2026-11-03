@@ -68,6 +68,7 @@ import {
   logResource,
   logSessionStarted,
   logToolCall,
+  searchTermsOf,
   type EventOutcome,
   type SessionMeta,
 } from "./events.js";
@@ -184,7 +185,7 @@ const PRIVACY_HTML = `<!DOCTYPE html>
   <li>Location is recorded only as a <strong>coarse country</strong> (and, where available, region) derived at our CDN edge. <strong>We do not record your IP address.</strong></li>
   <li>We record the <strong>client kind</strong> (the name your MCP client reports, e.g. &ldquo;claude-ai&rdquo;), which identifies software, not you.</li>
   <li>When your client lists our tools or opens one of our built-in documentation resources, we record that it did so. The only address recorded is one of our own <code>graffiticode://</code> resources; anything else your client requests is not written to our analytics.</li>
-        <li>When you search our language catalog, we record the <strong>length</strong> of your search term and how many languages matched — never the search text itself. A domain filter is recorded only when it matches one we publish; anything else is recorded as <code>(invalid)</code>.</li>
+        <li>When you search our language catalog, we record the <strong>length</strong> of your search term and how many languages matched — never the search text itself. We also record which words from a fixed list of our own catalog terms it contained — language ids, published domains, and item types such as &ldquo;quiz&rdquo; or &ldquo;chart&rdquo; — and how many other words it had; those other words are never recorded. A domain filter is recorded only when it matches one we publish; anything else is recorded as <code>(invalid)</code>.</li>
   <li>We record the <strong>lifecycle status</strong> a call returned (<code>ready</code>, <code>generating</code>, <code>failed</code>) so we can tell a delivered item from one still being generated. It describes the state of your item, not its contents, and anything outside that published set is recorded as <code>(invalid)</code>.</li>
 </ul>
 <p>One caveat, stated plainly: when a request fails we record a truncated backend error message so we can debug it. Error text is not intended to carry your content, but we cannot categorically rule out that a backend message quotes part of an input.</p>
@@ -672,6 +673,12 @@ function createMcpServer(authProvider: AuthProvider, sessionMeta: SessionMeta = 
       name === "list_languages" && typeof toolArgs.search === "string"
         ? toolArgs.search.length
         : undefined;
+    // Which of OUR catalog words the search used, and a count of the rest — the
+    // text itself still never leaves this scope (see searchTermsOf).
+    const searchTerms =
+      name === "list_languages" && typeof toolArgs.search === "string"
+        ? searchTermsOf(toolArgs.search)
+        : undefined;
     const domain =
       name === "list_languages" && typeof toolArgs.domain === "string"
         ? toolArgs.domain
@@ -796,6 +803,7 @@ function createMcpServer(authProvider: AuthProvider, sessionMeta: SessionMeta = 
         status: typeof result.status === "string" ? result.status : undefined,
         descLen,
         searchLen,
+        searchTerms,
         domain,
         authMs,
         upstreamMs: upstream?.ms,
@@ -842,6 +850,7 @@ function createMcpServer(authProvider: AuthProvider, sessionMeta: SessionMeta = 
           item: argItemId,
           descLen,
           searchLen,
+          searchTerms,
           domain,
           authMs,
           upstreamMs: upstream?.ms,
