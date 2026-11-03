@@ -448,10 +448,13 @@ export const MODEL_PRIORITY: Record<string, PriorityConfig> = {
   // 2 trials) sonnet was 100% first-pass with 0% ASCII-stripped, luna 75% and 13%. The
   // production slowness that pushed sonnet out was mostly repair turns from a routing bug,
   // fixed in graffiticode#253/#256: NEDA then took sonnet one 84 s turn. luna stays as fallback.
-  // re-eval 2026-11-03 (6 models x ~22 cases incl. non-English x 2 trials; owner rule: one turn to 100% beats two, then speed, then price): luna 100% first-pass 4.2s, accents kept on every non-English case now that L0187's
-  // instructions ask for them (graffiticode#257); on the NEDA long brief luna took 21-22s, sonnet
-  // 110-150s, both one turn. Supersedes the sonnet-first change of the same day.
-  "0187": ["openai+fast", "anthropic+balanced"],
+  // NEDA long-brief eval 2026-11-03 (6 models x 3 trials, a 3,000-char English brief for a
+  // Portuguese board): sol the only fast model right first time 3/3 with clean Portuguese (no
+  // English terms left, accents kept), 34-39s, near-square layouts with 0-1 crossings; opus and
+  // sonnet also 3/3 but 62-70s and 80-109s; luna 0/3 first-pass, English terms in 2/3 ("gate",
+  // "guardrails"), 3-4 crossings a board; haiku a single 16,000px column. Short cases: sol 100%
+  // first-pass, p50 4.8s. Owner rule: one turn to a correct result beats two, then speed.
+  "0187": ["openai+quality", "anthropic+quality"],
 
   // NOT ENTERED from this sweep: 0013 — every variant "stubbed" every run, writing
   // `snap item "<id>" {}..`; whether the empty options are the right answer or every model drops
