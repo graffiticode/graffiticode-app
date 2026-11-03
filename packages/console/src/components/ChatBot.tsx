@@ -139,46 +139,16 @@ const generateBotResponse = async ({message, user, language, chatHistory = [], c
     };
   } catch (error) {
     console.error('Error generating code:', error);
-    return fallbackResponse(message);
+    // Say what happened. This used to return a canned snippet, which put made-up code into the
+    // editor (and onto the item) whenever a request failed.
+    return {
+      text: `Code generation failed: ${error?.message || 'unknown error'}. Please try again.`,
+      type: 'error',
+      timestamp: new Date().toISOString()
+    };
   }
 };
 
-/**
- * Fallback response generator used when API calls fail
- */
-const fallbackResponse = (message) => {
-  const timestamp = new Date().toISOString();
-  if (message.toLowerCase().includes('hello') || message.toLowerCase().includes('hi')) {
-    return {
-      text: 'Hello! What do you want to make with Graffiticode today?',
-      type: 'text',
-      timestamp
-    };
-  } else if (message.toLowerCase().includes('help')) {
-    return {
-      text: 'I can help you make things with Graffiticode. What specific functionality would you like me to implement?',
-      type: 'text',
-      timestamp
-    };
-  } else if (message.toLowerCase().includes('example')) {
-    return {
-      text: `let double = <x: add x x>..
-let result = map (double) [1 2 3]..`,
-      type: 'code',
-      language: 'graffiticode',
-      timestamp
-    };
-  } else {
-    return {
-      text: `let message = "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"..
-let greeting = <name: concat "Hello, " name>..
-greeting "user"..`,
-      type: 'code',
-      language: 'graffiticode',
-      timestamp
-    };
-  }
-};
 
 /**
  * ChatBot component that provides a chat interface

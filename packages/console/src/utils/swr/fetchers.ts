@@ -690,34 +690,6 @@ export const generateCode = async ({ user, prompt, language, options, currentSrc
     return {};
   }
   const token = await user.getToken();
-  const client = new GraphQLClient("/api", {
-    headers: {
-      authorization: token,
-    }
-  });
-  const query = gql`
-    mutation GenerateCode($prompt: String!, $language: String!, $options: CodeGenerationOptions, $currentSrc: String, $currentData: String, $conversationSummary: ConversationSummaryInput, $itemId: String) {
-      generateCode(prompt: $prompt, language: $language, options: $options, currentSrc: $currentSrc, currentData: $currentData, conversationSummary: $conversationSummary, itemId: $itemId) {
-        src
-        taskId
-        description
-        language
-        model
-        provider
-        tier
-        usage {
-          input_tokens
-          output_tokens
-        }
-        errors {
-          message
-          from
-          to
-        }
-        upstreamLangs
-      }
-    }
-  `;
 
   // The compiled record the editor already fetched for its Data tab, serialized
   // for transport (the schema has no JSON scalar). Sent only on an EDIT: on a
@@ -735,26 +707,37 @@ export const generateCode = async ({ user, prompt, language, options, currentSrc
     }
   }
 
-  // Prepare the variables
-  const variables = {
-    prompt,
-    language,
-    options,
-    currentSrc,
-    currentData: currentDataJson,
-    conversationSummary,
-    itemId,
-  };
-
+  // /api/generate rather than the GraphQL mutation: a long generation outlasts Cloudflare's
+  // 100 s limit, and that endpoint keeps the connection alive until the result is ready (see
+  // src/lib/keepalive-json.ts). Same inputs and the same result shape as generateCode.
+  let response: Response;
   try {
-    const result = await client.request(query, variables);
-    console.log(
-      "fetchers/generateCode()",
-      "result=" + JSON.stringify(result, null, 2),
-    );
-    return result.generateCode;
+    response = await fetch("/api/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", authorization: token },
+      body: JSON.stringify({
+        prompt,
+        language,
+        options,
+        currentSrc,
+        currentData: currentDataJson,
+        conversationSummary,
+        itemId,
+      }),
+    });
   } catch (error) {
     console.error("Error in generateCode fetcher:", error);
     throw new Error(`Failed to generate code: ${error.message}`);
   }
+  const text = await response.text();
+  let result;
+  try {
+    result = JSON.parse(text);
+  } catch {
+    throw new Error(`Failed to generate code: unexpected response (${response.status})`);
+  }
+  if (!response.ok) {
+    throw new Error(`Failed to generate code: ${result?.message || result?.error || response.status}`);
+  }
+  return result;
 };
