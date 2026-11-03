@@ -184,6 +184,7 @@ interface RunResult {
    */
   noOutput: boolean;
   drift?: boolean; // compiled, but the wrong design — see driftedFromPrompt (undefined ⇒ unjudgeable)
+  deaccented?: boolean; // the prompt's accented letters are missing from the program — see deaccented()
   latencyMs: number; inputTokens: number; outputTokens: number; cost: number;
   code?: string;   // retained for the --judge pass; discarded from the console table
   error?: string;
@@ -278,6 +279,27 @@ function driftedFromPrompt(lang: string, prompt: string, code?: string): boolean
   if (!code) return undefined;
   const verdict = verifyExampleForPrompt(lang, { prompt, code });
   return verdict ? !verdict.ok : undefined;
+}
+
+/**
+ * Whether a program written for a prompt in an accented language came back stripped to ASCII.
+ *
+ * The 2026-11-02 L0187 eval missed this because every case was English: Luna then wrote a
+ * Portuguese board with all ~60 accents dropped ("nao e" for "não é", which flips "is not" into
+ * "and not"), and that model already routed production. Tri-state like drift: `undefined` when
+ * the prompt has no accented letters (nothing to judge) or there is no code; `true` when the
+ * prompt has them and none of the program's string literals do.
+ */
+const ACCENTED = /[À-ÖØ-öø-ÿĀ-ſ]/;
+const NOT_PROSE = new Set(["id", "from", "to", "before", "fill", "stroke", "color", "background", "save-to-figjam"]);
+export function deaccented(prompt: string, code?: string): boolean | undefined {
+  if (!code || !ACCENTED.test(prompt)) return undefined;
+  // The visible text only: identifiers and references (`id`, `from`, `to`, `before`) and colour
+  // values are not prose, and an accented id must not hide stripped text.
+  const visible = [...code.matchAll(/([\w-]+)\s+"((?:[^"\\]|\\.)*)"/g)]
+    .filter(([, word]) => !NOT_PROSE.has(word))
+    .map(([, , text]) => text);
+  return !visible.some((t) => ACCENTED.test(t));
 }
 
 function parseArgs(argv: string[]) {
@@ -581,6 +603,7 @@ async function runOne(
       ...acc,
       latencyMs: performance.now() - t0,
       drift: driftedFromPrompt(lang, c.prompt, code),
+      deaccented: deaccented(c.prompt, code),
       code,
       warningsFixable: report.fixable.length,
       warningsUnfixable: report.unfixable.length,
@@ -632,6 +655,9 @@ function summarize(runs: RunResult[]) {
     // "no drift" and "never checked" must not look the same.
     const judgeable = rs.filter((r) => r.drift !== undefined);
     const drifted = judgeable.filter((r) => r.drift).length;
+    // Same tri-state rule: rated over the prompts that have accents to keep.
+    const accentJudged = rs.filter((r) => r.deaccented !== undefined);
+    const stripped = accentJudged.filter((r) => r.deaccented).length;
     const lat = ok.map((r) => r.latencyMs);
     const totalCost = rs.reduce((s, r) => s + r.cost, 0);
     // Convergence: the share of sessions that reached zero FIXABLE warnings, the turns it took
@@ -645,6 +671,7 @@ function summarize(runs: RunResult[]) {
       firstPassRate: first / n, finalRate: final / n, stubRate: stubs / n,
       noOutputRate: noOutput / n, noOutputRuns: noOutput,
       driftRate: judgeable.length ? drifted / judgeable.length : null, driftJudged: judgeable.length,
+      deaccentedRate: accentJudged.length ? stripped / accentJudged.length : null, deaccentedJudged: accentJudged.length,
       convergedRate: converged / n,
       avgTurnsToClean: cleanTurns.length ? cleanTurns.reduce((s, t) => s + t, 0) / cleanTurns.length : null,
       avgTurns: rs.reduce((s, r) => s + (r.turns || 0), 0) / n,
@@ -764,8 +791,8 @@ function printTable(rows: any[]) {
   const ms = (x: number) => (x / 1000).toFixed(1) + "s";
   console.log(
     "\n" +
-    ["lang", "variant", "runs", "err", "1st-pass", "final", "conv", "turns", "warn", "drift", "p50", "p90", "$/run", "$/conv"]
-      .map((h, i) => h.padEnd([6, 26, 5, 4, 9, 7, 6, 6, 6, 7, 7, 7, 8, 8][i])).join(""));
+    ["lang", "variant", "runs", "err", "1st-pass", "final", "conv", "turns", "warn", "drift", "ascii", "p50", "p90", "$/run", "$/conv"]
+      .map((h, i) => h.padEnd([6, 26, 5, 4, 9, 7, 6, 6, 6, 7, 7, 7, 7, 8, 8][i])).join(""));
   for (const r of rows) {
     console.log([
       r.lang.padEnd(6), r.variantId.padEnd(26), String(r.runs).padEnd(5), String(r.errors).padEnd(4),
@@ -777,6 +804,8 @@ function printTable(rows: any[]) {
       r.avgWarningsFixable.toFixed(1).padEnd(6),
       // "—" = nothing judgeable (no embedding hook, or no target in the prompt).
       (r.driftRate === null ? "—" : pct(r.driftRate)).padEnd(7),
+      // Share of accented-language prompts whose program came back stripped to ASCII.
+      (r.deaccentedRate === null ? "—" : pct(r.deaccentedRate)).padEnd(7),
       ms(r.latencyP50).padEnd(7), ms(r.latencyP90).padEnd(7),
       ("$" + r.avgCost.toFixed(4)).padEnd(8),
       (r.costPerConverged === Infinity ? "—" : "$" + r.costPerConverged.toFixed(4)).padEnd(8),

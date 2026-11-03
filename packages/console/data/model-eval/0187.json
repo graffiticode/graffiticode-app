@@ -1,7 +1,7 @@
 [
   {
     "id": "single-section-column-stickies",
-    "prompt": "Make a FigJam board with one titled section called \"Apiary chores \u2014 March\" holding a column of sticky notes: Check hive weights, Scrape burr comb, Replace mouse guards, Order new frames, Clean the smoker."
+    "prompt": "Make a FigJam board with one titled section called \"Apiary chores — March\" holding a column of sticky notes: Check hive weights, Scrape burr comb, Replace mouse guards, Order new frames, Clean the smoker."
   },
   {
     "id": "two-sections-row-comparison",
@@ -33,7 +33,7 @@
   },
   {
     "id": "thick-connector-emphasis",
-    "prompt": "Create a board with three squares \u2014 Quarry, Rail yard and Port terminal \u2014 connected Quarry to Rail yard to Port terminal, and make the Rail yard to Port terminal connector thick and labelled \"Main aggregate line\"."
+    "prompt": "Create a board with three squares — Quarry, Rail yard and Port terminal — connected Quarry to Rail yard to Port terminal, and make the Rail yard to Port terminal connector thick and labelled \"Main aggregate line\"."
   },
   {
     "id": "system-diagram-database-shape",
@@ -41,7 +41,7 @@
   },
   {
     "id": "free-text-heading-with-stickies",
-    "prompt": "A FigJam board with a free text heading reading \"Trail maintenance ideas \u2014 Ridgeway section\" and beneath it a row of sticky notes: Rebuild the stile at gate 4, Cut back bramble near the spring, Add a waymarker at the fork, Re-gravel the boggy stretch."
+    "prompt": "A FigJam board with a free text heading reading \"Trail maintenance ideas — Ridgeway section\" and beneath it a row of sticky notes: Rebuild the stile at gate 4, Cut back bramble near the spring, Add a waymarker at the fork, Re-gravel the boggy stretch."
   },
   {
     "id": "invisible-group-row",
@@ -74,5 +74,21 @@
   {
     "id": "branching-merge-flow",
     "prompt": "Make a decision flow for a bicycle puncture: square \"Remove the wheel\", diamond \"Tyre holds air?\", a branch labelled Yes to \"Refit the wheel\" and a branch labelled No to \"Patch or replace the tube\", then a connector from \"Patch or replace the tube\" to \"Refit the wheel\"."
+  },
+  {
+    "id": "pt-ao-strategy-sections",
+    "prompt": "Cria um quadro FigJam em português de Angola sobre o piloto de gestão de filas numa unidade de saúde no Sumbe: uma secção \"Missão\" (IA responsável que protege direitos), uma secção \"Âmbito do piloto\" (registo de marcações, estado da fila, lembretes só com consentimento) e uma secção \"Riscos e mitigação\" (exposição de dados de saúde → encriptação; exclusão de quem não tem telemóvel → manter opção em papel). Liga a missão ao piloto com a etiqueta \"orienta\"."
+  },
+  {
+    "id": "es-retro",
+    "prompt": "Haz un tablero FigJam de retrospectiva en español con tres secciones: \"Qué salió bien\" (Lanzamos a tiempo, Buena comunicación), \"Qué mejorar\" (Demasiadas reuniones, Pruebas inestables) y \"Acciones\" (Revisión semanal de métricas, Más tiempo para diseño)."
+  },
+  {
+    "id": "fr-workshop-agenda",
+    "prompt": "Crée un tableau FigJam en français pour l’ordre du jour d’un atelier : une étape « Accueil et café », puis « Présentation des priorités », puis « Idées des équipes », puis « Décisions et prochaines étapes », reliées dans l’ordre avec des flèches."
+  },
+  {
+    "id": "de-approval-flow",
+    "prompt": "Erstelle ein FigJam-Board auf Deutsch für einen Freigabeprozess: „Antrag einreichen“, dann eine Raute „Budget geprüft?“, bei Ja „Bestellung auslösen“, bei Nein „Rückfrage an Antragsteller“, die gestrichelt zurück zu „Antrag einreichen“ führt."
   }
 ]
