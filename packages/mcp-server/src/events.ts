@@ -123,6 +123,10 @@ interface ToolEvent extends BaseEvent {
    * discovery signal worth acting on.
    */
   search_len?: number;
+  /** See `searchTermsOf`: catalog vocabulary the search contained, never its text. */
+  search_terms?: string[];
+  /** Content words in the search that weren't in that vocabulary — a count only. */
+  search_unknown?: number;
   domain?: string;
   results?: number;
   /**
@@ -290,6 +294,56 @@ export function normalizeClientKind(v?: string): string | undefined {
 const KNOWN_DOMAINS = new Set(["assessments", "sheets", "diagrams", "learnosity", "surveys"]);
 
 /**
+ * What a catalog search asked for, in OUR words only.
+ *
+ * `search_len` says a search happened; it can't say what was missing when one
+ * matched nothing (about two a day from Codex in 2026-11). The search text is
+ * the user's phrasing and stays out of the logs, so this records which words of
+ * a fixed vocabulary it contained — language ids, published domains, and the
+ * artifact words the catalog is organised around — plus a COUNT of the content
+ * words that weren't on the list. A zero-result search with no recognised terms
+ * is a request for something we don't offer by name; one full of them is a
+ * ranking miss. Neither needs the text.
+ *
+ * Hardcoded for the same reason as KNOWN_DOMAINS: no network on the logging path.
+ * A word added here is a word that may now appear in logs, so it must be generic
+ * product vocabulary, never something a user could be identified by.
+ */
+const SEARCH_VOCAB = new Set([
+  ...KNOWN_DOMAINS,
+  "assessment", "quiz", "test", "question", "item", "mcq", "choice", "cloze", "essay",
+  "flashcard", "card", "deck", "vocabulary",
+  "spreadsheet", "sheet", "table", "cell", "formula", "budget",
+  "chart", "graph", "plot", "bar", "line", "pie",
+  "survey", "poll", "rating", "likert", "nps", "questionnaire",
+  "concept", "web", "map", "diagram", "flowchart", "flow", "board", "figjam", "sticky", "mindmap",
+  "data", "fetch", "json", "csv", "api", "url",
+  "learnosity", "math", "ela", "reading", "passage", "svg", "image", "form", "rubric",
+]);
+// Words that carry no request on their own. Ignored rather than counted as unknown.
+const SEARCH_STOPWORDS = new Set([
+  "a", "an", "the", "and", "or", "for", "of", "to", "in", "on", "with", "my", "me", "i", "we",
+  "make", "create", "build", "generate", "new", "some", "that", "this", "from", "into", "about",
+]);
+
+export function searchTermsOf(search?: string): { terms: string[]; unknown: number } | undefined {
+  if (typeof search !== "string" || !search.trim()) return undefined;
+  const terms = new Set<string>();
+  let unknown = 0;
+  for (const word of search.toLowerCase().split(/[^a-z0-9]+/)) {
+    // One-letter fragments are possessives and initials ("doe's" -> "doe", "s"), not words.
+    if (word.length < 2 || SEARCH_STOPWORDS.has(word)) continue;
+    if (/^l?\d{4}$/.test(word)) { terms.add(normalizeLang(word.replace(/^l/, ""))!); continue; }
+    // The word as written first (domains are plural: "diagrams"), then its singulars.
+    const found = [word, word.replace(/s$/, ""), word.replace(/es$/, ""), word.replace(/zes$/, "")]
+      .find(w => SEARCH_VOCAB.has(w));
+    if (found) terms.add(found);
+    else unknown++;
+  }
+  return { terms: [...terms].sort().slice(0, 12), unknown };
+}
+
+/**
  * A well-formed item handle, or the `(invalid)` sentinel. Never the input.
  *
  * `item_id` is free text off the tool arguments, and the same clients that put
@@ -432,6 +486,7 @@ export function logToolCall(params: {
   err?: string;
   progress?: boolean;
   searchLen?: number;
+  searchTerms?: { terms: string[]; unknown: number };
   domain?: string;
   results?: number;
   authMs?: number;
@@ -467,6 +522,10 @@ export function logToolCall(params: {
   if (params.err) event.err = params.err.slice(0, ERR_MAX_CHARS);
   if (params.progress !== undefined) event.progress = params.progress;
   if (params.searchLen !== undefined) event.search_len = params.searchLen;
+  if (params.searchTerms) {
+    event.search_terms = params.searchTerms.terms;
+    event.search_unknown = params.searchTerms.unknown;
+  }
   const domain = normalizeDomain(params.domain);
   if (domain !== undefined) event.domain = domain;
   if (params.results !== undefined) event.results = params.results;
