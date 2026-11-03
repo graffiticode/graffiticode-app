@@ -20,5 +20,6 @@
   {"id": "sessions-delete-gdpr", "prompt": "A parent has asked us to erase their child's Learnosity attempt, session 5e2b9d14-3c71-4a08-b6f2-91d0e7c4a3f5, under GDPR. What request do we send?"},
   {"id": "response-scores-rescore", "prompt": "After a key correction, how do we set response r-2210 in Learnosity session 0a7f3c19-6d2e-4b85-9c41-e83f5b02d7a6 for user student_0420 to a score of 2 out of 2?"},
   {"id": "edit-all-pages-physics", "prompt": "Actually I need all of them, not just one page — and only the activities tagged Subject: Physics.", "currentCode": "data-job\n  paging SINGLE-PAGE\n  activities-get [\n    status [\"published\"]\n    organisation-id 512\n    limit 20\n    {}\n  ]\n  {}.."},
-  {"id": "edit-completed-since-metadata", "prompt": "Only the sessions completed after 1 September 2026, and include our stored session metadata field school_code.", "currentCode": "data-job\n  paging EXHAUSTIVE\n  responses-get [\n    activity-id [\"algebra-checkpoint-4\"]\n    status [\"Completed\"]\n    {}\n  ]\n  {}..\n"}
+  {"id": "edit-completed-since-metadata", "prompt": "Only the sessions completed after 1 September 2026, and include our stored session metadata field school_code.", "currentCode": "data-job\n  paging EXHAUSTIVE\n  responses-get [\n    activity-id [\"algebra-checkpoint-4\"]\n    status [\"Completed\"]\n    {}\n  ]\n  {}..\n"},
+  {"id": "fr-pull-items", "prompt": "Depuis notre banque d’items Learnosity 2207, récupère tous les items publiés étiquetés Matière : Mathématiques et affiche leur référence et leur titre."}
 ]

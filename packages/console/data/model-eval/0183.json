@@ -84,5 +84,7 @@
     "id": "edit-study-to-assessment",
     "prompt": "Turn this into an activity: make Hydrogen and Oxygen blanks the students fill in, keep Covalent bond shown, and add the instruction \"Drag each element into place.\"",
     "currentCode": "concept-web [\n  hub text \"Water molecule\" {}\n  nodes [\n    node text \"Hydrogen\" {}\n    node text \"Oxygen\" {}\n    node text \"Covalent bond\" {}\n  ] {}\n] title \"What makes water\" {}.."
-  }
+  },
+  {"id": "fr-ecosystem", "prompt": "Carte conceptuelle avec « Écosystème » au centre et, autour : Producteurs, Consommateurs, Décomposeurs, Énergie solaire."},
+  {"id": "pt-water-cycle", "prompt": "Mapa de conceitos com «Ciclo da água» no centro e, à volta: Evaporação, Condensação, Precipitação, Infiltração."}
 ]

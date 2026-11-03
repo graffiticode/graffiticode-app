@@ -82,5 +82,7 @@
     "id": "edit-switch-source",
     "prompt": "Use https://l0185.graffiticode.org/data/users.json instead — it has no age, so show every user — with their address city in place of city.",
     "currentCode": "pick [\"name\" \"city\"]\nwhere [\"age\" ABOVE 30]\nfetch \"https://l0185.graffiticode.org/data/people.json\"\n{}.."
-  }
+  },
+  {"id": "es-mean-by-species", "prompt": "De https://l0185.graffiticode.org/data/iris.csv, calcula la longitud media del pétalo por especie y muéstrala en una tabla con encabezados en español."},
+  {"id": "pt-count-species", "prompt": "De https://l0185.graffiticode.org/data/iris.csv, conta quantas flores há de cada espécie e ordena da maior para a menor contagem, com cabeçalhos em português."}
 ]

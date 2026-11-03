@@ -282,24 +282,35 @@ function driftedFromPrompt(lang: string, prompt: string, code?: string): boolean
 }
 
 /**
- * Whether a program written for a prompt in an accented language came back stripped to ASCII.
+ * Whether a program lost the accents the user wrote: the 2026-11-02 L0187 eval (English-only)
+ * missed luna stripping a production Portuguese board ("nao e" for "não é").
  *
- * The 2026-11-02 L0187 eval missed this because every case was English: Luna then wrote a
- * Portuguese board with all ~60 accents dropped ("nao e" for "não é", which flips "is not" into
- * "and not"), and that model already routed production. Tri-state like drift: `undefined` when
- * the prompt has no accented letters (nothing to judge) or there is no code; `true` when the
- * prompt has them and none of the program's string literals do.
+ * Compares the accented WORDS of the prompt with the program's prose: a word is kept when it
+ * appears with its accents, lost when it appears only folded ("decisões" → "decisoes").
+ * Tri-state like drift: `undefined` when none of those words appear (an English prompt, or a
+ * program that carries no prose, as L0177's configuration or a survey whose content is data),
+ * `true` when more were lost than kept. Prose is every string literal except identifiers,
+ * references and colours, so list items and record values (`type: "Matière"`) count.
  */
 const ACCENTED = /[À-ÖØ-öø-ÿĀ-ſ]/;
-const NOT_PROSE = new Set(["id", "from", "to", "before", "fill", "stroke", "color", "background", "save-to-figjam"]);
+const NOT_PROSE = new Set(["id", "from", "to", "before", "fill", "stroke", "color", "background", "save-to-figjam", "session-id"]);
+const fold = (t: string) => t.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 export function deaccented(prompt: string, code?: string): boolean | undefined {
-  if (!code || !ACCENTED.test(prompt)) return undefined;
-  // The visible text only: identifiers and references (`id`, `from`, `to`, `before`) and colour
-  // values are not prose, and an accented id must not hide stripped text.
-  const visible = [...code.matchAll(/([\w-]+)\s+"((?:[^"\\]|\\.)*)"/g)]
-    .filter(([, word]) => !NOT_PROSE.has(word))
-    .map(([, , text]) => text);
-  return !visible.some((t) => ACCENTED.test(t));
+  if (!code) return undefined;
+  const accentedWords = [...new Set((prompt.match(/\p{L}{3,}/gu) ?? []).filter((w) => ACCENTED.test(w)).map((w) => w.toLowerCase()))];
+  if (!accentedWords.length) return undefined;
+  const prose = [...code.matchAll(/(?:([\w-]+)\s+)?"((?:[^"\\]|\\.)*)"/g)]
+    .filter(([, word]) => !word || !NOT_PROSE.has(word))
+    .map(([, , text]) => text)
+    .join(" ");
+  const words = new Set((prose.match(/\p{L}+/gu) ?? []).map((w) => w.toLowerCase()));
+  const folded = new Set([...words].map(fold));
+  let kept = 0, lost = 0;
+  for (const w of accentedWords) {
+    if (words.has(w)) kept++;
+    else if (folded.has(fold(w))) lost++;
+  }
+  return kept + lost === 0 ? undefined : lost > kept;
 }
 
 function parseArgs(argv: string[]) {

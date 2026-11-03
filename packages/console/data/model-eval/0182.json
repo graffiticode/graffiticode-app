@@ -95,5 +95,7 @@
     "id": "change-existing-answer",
     "prompt": "Swap my first two choices, and drop the idea of my own.",
     "currentCode": "survey [\n  id \"team-retro\"\n  session-id get-val-public \"itemId\"\n  response [\n    choices [\"cut the build time in half\" \"write smaller pull requests\" \"keep a written decision log\"]\n    write-in \"run a blameless review after every incident\"\n  ]\n].."
-  }
+  },
+  {"id": "pt-satisfaction", "prompt": "Cria um inquérito de satisfação em português com uma escala de 1 a 5 para atendimento, rapidez e limpeza, e uma pergunta de recomendação de 0 a 10."},
+  {"id": "es-ranked", "prompt": "Encuesta en español para ordenar por prioridad: más espacios verdes, mejor transporte público, más bibliotecas, calles más seguras."}
 ]

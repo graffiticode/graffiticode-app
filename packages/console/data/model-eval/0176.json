@@ -26,5 +26,7 @@
   {
     "id": "choicematrix-partial-credit",
     "prompt": "Create a Learnosity choice matrix item asking students to classify four statements about photosynthesis as True, False, or Cannot Be Determined. The statements are: \"Photosynthesis produces oxygen\" (True), \"Photosynthesis occurs only at night\" (False), \"All plants photosynthesize at the same rate\" (Cannot Be Determined), and \"Chlorophyll absorbs light energy\" (True). Award partial credit so each correctly classified row earns points independently."
-  }
+  },
+  {"id": "pt-mcq", "prompt": "Cria um item Learnosity de escolha múltipla em português: Qual é a capital de Angola? Opções: Luanda, Benguela, Huambo, Lubango; resposta correta: Luanda."},
+  {"id": "es-short-text", "prompt": "Crea un ítem Learnosity de respuesta corta en español: ¿Cuántos lados tiene un hexágono? Respuesta aceptada: seis."}
 ]
