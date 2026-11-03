@@ -26,5 +26,7 @@
     "id": "edit-dark-and-fix-card",
     "prompt": "Switch this deck to dark mode, and the back of the \"tachycardia\" card is wrong — it should say \"a resting heart rate above 100 beats per minute\".",
     "currentCode": "cards [\n  [\"bradycardia\" \"a resting heart rate below 60 beats per minute\"]\n  [\"tachycardia\" \"a resting heart rate below 50 beats per minute\"]\n  [\"arrhythmia\" \"an irregular heartbeat\"]\n] title \"Cardiology Terms\" {}.."
-  }
+  },
+  {"id": "es-kitchen", "prompt": "Tarjetas de estudio de vocabulario de cocina en español con la traducción al inglés: cuchara/spoon, tenedor/fork, cuchillo/knife, sartén/frying pan, cazuela/pot."},
+  {"id": "de-capitals", "prompt": "Lernkarten auf Deutsch zu Hauptstädten: Frankreich – Paris, Spanien – Madrid, Österreich – Wien, Schweiz – Bern, Dänemark – Kopenhagen."}
 ]

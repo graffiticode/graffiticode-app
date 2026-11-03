@@ -74,5 +74,7 @@
   {
     "id": "mixed-sections-connectors-colours",
     "prompt": "Make a troubleshooting board with a section \"Symptoms\" holding three blue stickies \u2014 \"Printer offline\", \"Jobs stuck in queue\", \"Error 0x6100\" \u2014 and a section \"Checks\" to its right holding a diamond \"Cable seated?\" and a process \"Restart spooler\", with a dashed arrow from \"Jobs stuck in queue\" to \"Restart spooler\" labelled \"try first\"."
-  }
+  },
+  {"id": "pt-lessons", "prompt": "Quadro FigJam com uma secção «Lições aprendidas» com notas amarelas: Comunicação diária, Testes automáticos, Revisões de código."},
+  {"id": "fr-kanban", "prompt": "Tableau FigJam avec trois sections : « À faire », « En cours », « Terminé », et deux notes dans chacune."}
 ]

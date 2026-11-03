@@ -21,5 +21,7 @@
   { "id": "stacked-percent-labels", "prompt": "Stacked bars of energy mix by country with values on the bars: France nuclear 65, renewables 25, fossil 10; Germany nuclear 0, renewables 50, fossil 50; Poland nuclear 0, renewables 25, fossil 75." },
   { "id": "url-comments-per-post", "prompt": "Column chart of how many comments each of the first ten posts has, from https://l0185.graffiticode.org/data/comments.json." },
   { "id": "url-magnitude-histogram", "prompt": "Histogram of earthquake magnitudes from https://l0185.graffiticode.org/data/earthquakes.json, using the features list." },
-  { "id": "url-orders-by-customer", "prompt": "Bar chart of order totals per customer name, joining https://l0185.graffiticode.org/data/orders.json with the customers in https://l0185.graffiticode.org/data/customers.json." }
+  { "id": "url-orders-by-customer", "prompt": "Bar chart of order totals per customer name, joining https://l0185.graffiticode.org/data/orders.json with the customers in https://l0185.graffiticode.org/data/customers.json." },
+  {"id": "es-bar", "prompt": "Gráfico de barras de préstamos de la biblioteca por género este trimestre: misterio 412, fantasía 389, biografía 156, poesía 98."},
+  {"id": "de-line", "prompt": "Liniendiagramm der monatlichen Niederschläge in München in Millimetern: Januar 48, Februar 41, März 63, April 71, Mai 105."}
 ]

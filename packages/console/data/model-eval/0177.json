@@ -122,5 +122,6 @@
       "expectHoles": [],
       "note": "Starts complete and warning-free. Switching to item-list makes `reference` unnecessary and makes the `widget` and `settings` members invalid for the view — a browser has no widgets to edit. Carrying them over earns member-dropped warnings, which is the defect this case exists to catch."
     }
-  }
+  },
+  {"id": "es-editor-locale", "prompt": "Integra el editor de ítems de Learnosity en nuestra plataforma docente; la interfaz del editor debe mostrarse en español y los autores son profesores de matemáticas."}
 ]
