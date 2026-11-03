@@ -1,6 +1,13 @@
 // Ordered model-family priority, per language — and, optionally, the TIER each family
 // serves that language at.
 //
+// RE-EVALUATE WEEKLY (owner decision, 2026-11-03). Models, dialects and corpora all move, and
+// an entry is only as good as its last measurement. Each week run scripts/model-eval.ts on
+// every primary language with the six models (opus, sonnet, haiku, sol, terra, luna), the
+// non-English cases included, and update entries by the owner's rule: one turn to a correct,
+// accent-preserving result beats two turns regardless of price; then speed; price only breaks
+// ties. Differences of one run are noise. Cite the run in the entry's comment.
+//
 // This is a STATIC HINT produced by offline evaluation (`scripts/model-eval.ts`),
 // not a runtime decision. The first family in a language's list whose provider is
 // available serves the request; on an *availability* failure (missing credentials,
@@ -252,10 +259,11 @@ export const MODEL_PRIORITY: Record<string, PriorityConfig> = {
   // working artifact in hand — but NOTHING here measures it: every case in every eval set is a
   // fresh create, so the harness has never scored a second turn. Change it when there is a run
   // behind it, not because the reasoning sounds right.
+  // re-eval 2026-11-03 (6 models x ~22 cases incl. non-English x 2 trials; owner rule: one turn to 100% beats two, then speed, then price): terra 100% first-pass 13.4s, sol 100% 17.5s, opus 100% 31.8s; sonnet 71% 50s.
   "0175": {
     order: ["openai", "anthropic"],
-    create: "quality",
-    update: "quality",
+    create: "balanced",
+    update: "balanced",
     repair: "balanced",
   },
 
@@ -366,7 +374,8 @@ export const MODEL_PRIORITY: Record<string, PriorityConfig> = {
   // variant measurably beat another: luna − haiku +11% converged, 95% CI [+1.5%, +21.2%]. No variant
   // converges reliably; 22 of the residual warnings are unclassified in eval-warning-taxonomy.ts
   // and counted as fixable, so the absolute rates are likely understated — the ordering is not.
-  "0178": ["openai+fast", "anthropic+balanced"],
+  // re-eval 2026-11-03 (6 models x ~22 cases incl. non-English x 2 trials; owner rule: one turn to 100% beats two, then speed, then price): sonnet 100% first-pass 3.2s, sol 100% 3.8s, luna 100% 3.9s.
+  "0178": ["anthropic+balanced", "openai+quality"],
 
   // 0179 (22 cases): haiku 100% $0.0023 4.2s · luna 100% $0.0028 5.7s · sonnet 100% $0.0065
   // 5.2s · terra 97% $0.0047 — terra returned NO code on 2 of 66 runs (output spent, nothing
@@ -374,14 +383,16 @@ export const MODEL_PRIORITY: Record<string, PriorityConfig> = {
   // (a sheet has many valid layouts), so agreement cannot flag a wrong design here; haiku is solo
   // on 2 and the most self-consistent (89%). This supersedes "no entry" below: that sweep found the
   // fast models within noise, and on a cost question within noise is the case for the cheaper one.
-  "0179": ["anthropic+fast", "openai+fast"],
+  // re-eval 2026-11-03 (6 models x ~22 cases incl. non-English x 2 trials; owner rule: one turn to 100% beats two, then speed, then price): sonnet 100% first-pass 5.2s; haiku 96%; best openai terra 96% 3.6s.
+  "0179": ["anthropic+balanced", "openai+balanced"],
 
   // 0180 (25 cases): terra 100% $0.0024 2.9s, 100% first-pass, solo 0 · luna 100% $0.0019 4.3s ·
   // sonnet 100% $0.0053 · haiku 100% $0.0019 but 79% first-pass and SOLO ON 8 OF 25 — e.g.
   // `classify-conductors`, where it wrote a choice question and the other three the classification
   // the prompt asked for. It compiles, so convergence cannot see it, and 0180 has no drift hook.
   // haiku is avoided in both slots; terra over luna for first-pass and latency at +$0.0005.
-  "0180": ["openai+balanced", "anthropic+balanced"],
+  // re-eval 2026-11-03 (6 models x ~22 cases incl. non-English x 2 trials; owner rule: one turn to 100% beats two, then speed, then price): sol the only 100% first-pass 3.8s; terra 96%, opus 98%.
+  "0180": ["openai+quality", "anthropic+quality"],
 
   // 0181 (20 cases): haiku 100% $0.0011 2.5s · luna 100% $0.0013 · terra 100% $0.0020 · sonnet
   // 100% $0.0033. haiku cheapest, fastest, 100% self-consistent and in step with sonnet (72%
@@ -396,17 +407,21 @@ export const MODEL_PRIORITY: Record<string, PriorityConfig> = {
   // 0183 (21 cases): haiku 100% $0.0014 3.3s · terra 100% $0.0025 · luna 98% $0.0017, 1 stub ·
   // sonnet 100% $0.0042. haiku cheapest and 97% self-consistent; terra is the fallback that never
   // missed.
-  "0183": ["anthropic+fast", "openai+balanced"],
+  // re-eval 2026-11-03 (6 models x ~22 cases incl. non-English x 2 trials; owner rule: one turn to 100% beats two, then speed, then price): terra 100% first-pass 2.6s; haiku 96%; opus 100% 4.9s.
+  "0183": ["openai+balanced", "anthropic+quality"],
 
   // 0184 (23 cases): terra 100% $0.0026 3.0s · luna 97% $0.0018, 1 zero-output · haiku 96%
   // $0.0016, 83% first-pass · sonnet 100% $0.0048. Both fast variants fail to converge on a few
   // runs; terra is the cheapest that does not, and the fastest. Fallback away from haiku.
-  "0184": ["openai+balanced", "anthropic+balanced"],
+  // re-eval 2026-11-03 (6 models x ~22 cases incl. non-English x 2 trials; owner rule: one turn to 100% beats two, then speed, then price): sonnet 100% first-pass 3.8s, sol 100% 4.1s; terra 96%, luna 82%.
+  "0184": ["anthropic+balanced", "openai+quality"],
 
   // 0185 (20 cases): haiku 100% $0.0017 2.8s · luna 100% $0.0020 4.2s · terra 98% $0.0022 ·
   // sonnet 100% $0.0064, p90 14.4s. Narrow: luna has the better first-pass (85% vs 77%) and is solo
   // once against haiku's 4, but haiku is 15% cheaper and faster. Low traffic; revisit if it grows.
-  "0185": ["anthropic+fast", "openai+fast"],
+  // re-eval 2026-11-03 (6 models x ~22 cases incl. non-English x 2 trials; owner rule: one turn to 100% beats two, then speed, then price): haiku only 66% first-pass; terra 91% 2.3s, opus 93% 5.1s (one run apart: terra for
+  // speed); terra kept every accent, sonnet and luna stripped some table headers.
+  "0185": ["openai+balanced", "anthropic+quality"],
 
   // 0186 (19 cases, eval 2026-11-01, same setup; set authored by eval-cases-from-mcp.ts, hold-out
   // clean, proximity top1 mean .43): haiku 100% $0.0016 3.6s p90 5.4s · luna 100% $0.0025 4.7s ·
@@ -417,7 +432,8 @@ export const MODEL_PRIORITY: Record<string, PriorityConfig> = {
   // first-pass and cheaper than terra, which is solo twice adding unasked fields (page tabs,
   // connector sides). In production 0186 was the costliest language once the others moved
   // ($0.26/item, 2026-10-30→11-01), and its sonnet calls failed over to terra on 4 of 11.
-  "0186": ["anthropic+fast", "openai+fast"],
+  // re-eval 2026-11-03 (6 models x ~22 cases incl. non-English x 2 trials; owner rule: one turn to 100% beats two, then speed, then price): terra 100% first-pass 3.2s; haiku 95%; opus 100% 6.9s.
+  "0186": ["openai+balanced", "anthropic+quality"],
 
   // 0187 (19 cases, eval 2026-11-02, same setup; set by eval-cases-from-mcp.ts, hold-out clean,
   // proximity top1 mean .39): luna 100% $0.0019 4.7s, solo 0, agrees 53% (ties sonnet) · haiku 100%
@@ -432,7 +448,10 @@ export const MODEL_PRIORITY: Record<string, PriorityConfig> = {
   // 2 trials) sonnet was 100% first-pass with 0% ASCII-stripped, luna 75% and 13%. The
   // production slowness that pushed sonnet out was mostly repair turns from a routing bug,
   // fixed in graffiticode#253/#256: NEDA then took sonnet one 84 s turn. luna stays as fallback.
-  "0187": ["anthropic", "openai+fast"],
+  // re-eval 2026-11-03 (6 models x ~22 cases incl. non-English x 2 trials; owner rule: one turn to 100% beats two, then speed, then price): luna 100% first-pass 4.2s, accents kept on every non-English case now that L0187's
+  // instructions ask for them (graffiticode#257); on the NEDA long brief luna took 21-22s, sonnet
+  // 110-150s, both one turn. Supersedes the sonnet-first change of the same day.
+  "0187": ["openai+fast", "anthropic+balanced"],
 
   // NOT ENTERED from this sweep: 0013 — every variant "stubbed" every run, writing
   // `snap item "<id>" {}..`; whether the empty options are the right answer or every model drops
