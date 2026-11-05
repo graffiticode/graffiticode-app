@@ -174,9 +174,11 @@ their next item lands back in a trial workspace. What fixes that differs by host
 `claude-code`/`editor` take an `Authorization` header, so they're pointed at the key
 the claim page mints; `codex-cli` (`codex-mcp-client`) is told to run
 `codex mcp login`, which runs the email/wallet OAuth consent (verified end to end
-2026-11-05); `claude-app`/`openai` connector UIs have no header field, so
-until `OAUTH_RECONNECT_ENABLED` is on they are told plainly that new items keep
-starting out anonymous rather than sent at a sign-in that isn't offered yet.
+2026-11-05); `claude-app` is told to disconnect and reconnect the connector and
+sign in (its Connect button runs the same consent, verified 2026-11-05); `openai`
+connector UIs have no header field and the ChatGPT app has no OAuth yet, so until
+`OAUTH_RECONNECT_ENABLED` is on they are told plainly that new items keep starting
+out anonymous rather than sent at a sign-in that isn't offered yet.
 
 The JWT contract (defined in `src/claim-token.ts` and verified by the console at `console/src/lib/claim-token.ts`):
 

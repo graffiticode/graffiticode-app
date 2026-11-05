@@ -231,6 +231,12 @@ test("the reconnect hint tells header-capable hosts about the key and never prom
     assert.match(reconnectHint(host), /sign-in page issues the key/, `${host} should say where the key comes from`);
   }
   assert.match(reconnectHint("claude-code"), /claude mcp add --transport http/);
+  // claude.ai / Claude desktop are told to reconnect and sign in (verified 2026-11-05).
+  assert.match(reconnectHint("claude-app"), /Settings → Connectors/);
+  assert.match(reconnectHint("claude-app"), /sign in with the same account/);
+  // ChatGPT has no sign-in until OpenAI enables OAuth, so with the flag off (as in
+  // tests) it must not be told to reconnect.
+  assert.doesNotMatch(reconnectHint("openai"), /reconnect|Settings → Connectors/);
   // The Codex CLI is told to sign in, not to paste a key.
   assert.match(reconnectHint("codex-cli"), /codex mcp login/);
   assert.doesNotMatch(reconnectHint("codex-cli"), /Authorization|api-key/);

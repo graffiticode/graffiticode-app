@@ -163,10 +163,27 @@ export default function ConnectAgentInstructions({
         </>
       )}
 
-      {(host === "claude-app" || host === "openai") && (
-        // No header field in either connector UI, so there is nothing to paste. The
-        // OAuth consent page now takes email and wallet sign-in; change this copy when
-        // OAUTH_RECONNECT_ENABLED goes on in the MCP server. Until then, say it plainly.
+      {host === "claude-app" && (
+        // The connector's Connect button runs our OAuth consent (email or wallet) and
+        // its calls then arrive signed in — verified end to end 2026-11-05. Reconnecting
+        // is what replaces the anonymous connection the user has now.
+        <>
+          <p className="text-sm text-gray-600 mb-2">In Claude (web or desktop):</p>
+          <ol className="list-decimal pl-5 text-sm text-gray-600 space-y-1">
+            <li>Open <strong>Settings → Connectors</strong>.</li>
+            <li>Disconnect <strong>Graffiticode</strong>, then connect it again.</li>
+            <li>Sign in with this account in the window that opens, and click <strong>Allow</strong>.</li>
+          </ol>
+          <p className="text-xs text-gray-500 mt-2">
+            New chats will then save items to this account automatically.
+          </p>
+        </>
+      )}
+
+      {host === "openai" && (
+        // No header field in ChatGPT's connector UI, and the ChatGPT app has no OAuth
+        // until OpenAI enables it (OAUTH_RECONNECT_ENABLED in the MCP server). Until
+        // then, say it plainly.
         <div className="border border-gray-300 px-3 py-2 text-sm text-gray-600">
           <p className="mb-2">
             {HOST_LABELS[host]} connectors don&rsquo;t take an API key yet, so new items there will
