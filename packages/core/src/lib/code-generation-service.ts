@@ -69,9 +69,8 @@ import {
   RenderContext,
 } from "./prompt-renderer.js";
 import { checkBurstLimit } from "./free-plan-throttle.js";
-import { recordSpend } from "./free-plan-quota.js";
+import { recordSpend, assertFreePlanPromptLength } from "./free-plan-quota.js";
 import { estimateUsdCost } from "./model-pricing.js";
-import { FreePlanError, buildSignupUrl } from "./free-plan-context.js";
 import { recordTokenUsage, Stage } from "./token-usage-service.js";
 
 // Sentinel itemId injected during code-generation verification. Side-effecting
@@ -80,12 +79,6 @@ import { recordTokenUsage, Stage } from "./token-usage-service.js";
 // credential gates that guard them, since verification runs without the user's
 // account credentials. Mirrored by VERIFY_ITEM_ID in the L0158 compiler.
 export const VERIFY_ITEM_ID = "verify-itemid";
-
-const MIN_FREE_PLAN_PROMPT = 20;
-// Caps the prompt the MCP server sends — a windowed dialog (last ~6 user turns +
-// the new request), with the current source and system instructions excluded.
-// It is NOT a cap on a single description: an iterating session accumulates here.
-const MAX_FREE_PLAN_PROMPT = 10000;
 
 // Global cache for language assets with TTL
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
@@ -1378,28 +1371,8 @@ export async function generateCode({
   const isFreePlan = !!auth?.freePlan;
 
   if (isFreePlan) {
-    const trimmed = (prompt || "").trim();
-    if (trimmed.length < MIN_FREE_PLAN_PROMPT) {
-      throw new FreePlanError("free_plan_description_too_short", 400, {
-        error: "free_plan_description_too_short",
-        message: `Please describe what you want in at least ${MIN_FREE_PLAN_PROMPT} characters.`,
-      });
-    }
-    if (trimmed.length > MAX_FREE_PLAN_PROMPT) {
-      const signupUrl = buildSignupUrl("prompt_too_long");
-      // Self-contained message: only the string propagates back through the MCP
-      // tool result, so the recovery paths and URL must live in the text itself.
-      throw new FreePlanError("free_plan_description_too_long", 400, {
-        error: "free_plan_description_too_long",
-        message:
-          `This request plus the recent conversation is ${trimmed.length} characters, over the ` +
-          `${MAX_FREE_PLAN_PROMPT}-character free-plan limit. To continue: send a shorter request, ` +
-          `or create a new item to reset the conversation, or sign in to remove the limit — ${signupUrl}`,
-        limit: MAX_FREE_PLAN_PROMPT,
-        length: trimmed.length,
-        signup_url: signupUrl,
-      });
-    }
+    // Normally already checked when the job was reserved (startGeneration).
+    assertFreePlanPromptLength(prompt);
     // Runaway-loop guard only. The trial's actual budget is denominated in
     // items and enforced at item creation (assertItemCreateAllowed) and at
     // revision (assertRevisionsRemaining) — both in resolvers.ts, both anchored

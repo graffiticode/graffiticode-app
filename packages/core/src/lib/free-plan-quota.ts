@@ -193,6 +193,50 @@ export function buildRevisionLimitError(limit: number): FreePlanError {
   });
 }
 
+export const MIN_FREE_PLAN_PROMPT = 20;
+// Caps the prompt the MCP server sends — a windowed dialog (last ~6 user turns +
+// the new request), with the current source and system instructions excluded.
+// It is NOT a cap on a single description: an iterating session accumulates here.
+export const MAX_FREE_PLAN_PROMPT = 10000;
+
+// The too-long refusal is a wall: signing in removes it. It used to throw
+// without a wall_hit, so the digest reported it as a generation failure (an MCP
+// render_item with outcome generation_failed) and the wall count missed it.
+export function buildPromptTooLongError(length: number): FreePlanError {
+  emitEvent("wall_hit", { wall: "prompt_too_long", auth: "freePlan" });
+  const signupUrl = buildSignupUrl("prompt_too_long");
+  return new FreePlanError("free_plan_description_too_long", 400, {
+    error: "free_plan_description_too_long",
+    message:
+      `This request plus the recent conversation is ${length} characters, over the ` +
+      `${MAX_FREE_PLAN_PROMPT}-character free-plan limit. To continue: send a shorter request, ` +
+      `or create a new item to reset the conversation, or sign in to remove the limit — ${signupUrl}`,
+    limit: MAX_FREE_PLAN_PROMPT,
+    length,
+    signup_url: signupUrl,
+  });
+}
+
+/**
+ * The free-plan prompt-length checks. Run where a generation is reserved
+ * (startGeneration), so the caller's create_item/update_item gets the refusal
+ * directly instead of a "generating" that fails on the next poll, and again in
+ * generateCode for any path that reaches it without a reservation.
+ *
+ * Too short is an input rejection, not a wall — signing in does not lift it —
+ * so it emits nothing.
+ */
+export function assertFreePlanPromptLength(prompt: string | null | undefined): void {
+  const trimmed = (prompt || "").trim();
+  if (trimmed.length < MIN_FREE_PLAN_PROMPT) {
+    throw new FreePlanError("free_plan_description_too_short", 400, {
+      error: "free_plan_description_too_short",
+      message: `Please describe what you want in at least ${MIN_FREE_PLAN_PROMPT} characters.`,
+    });
+  }
+  if (trimmed.length > MAX_FREE_PLAN_PROMPT) throw buildPromptTooLongError(trimmed.length);
+}
+
 const ALERT_THRESHOLDS = [50, 80] as const;
 
 /**
