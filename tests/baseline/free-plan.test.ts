@@ -47,14 +47,15 @@ test("an expired free-plan item is reported as expired (wrapped), not as missing
   assert.deepEqual(ok(await h.gql(`query { items(lang:"0175"){ id } }`, {}, A)).items, []);
 });
 
-test("free-plan items are listed only once they have a program", async () => {
-  // A generation whose prompt is under the free plan's minimum fails, leaving
-  // a shell with no taskId: readable by id, absent from the listing.
-  const g = ok(await generate(h, A, { prompt: "too short", modification: "too short" })).startCodeGeneration;
-  const item = ok(await getItem(h, A, g.itemId)).item;
-  assert.equal(item.generationStatus, "failed");
-  assert.equal(item.taskId, null);
-  assert.match(item.generationError, /at least 20 characters/);
+test("a free-plan prompt outside the length limits is refused before any item exists", async () => {
+  // Checked when the job is reserved (startGeneration), so the caller gets the
+  // refusal on this call instead of a "generating" item that fails on its next
+  // poll, and no empty shell is left behind.
+  const short = errorOf(await generate(h, A, { prompt: "too short", modification: "too short" }));
+  assert.match(short.message, /at least 20 characters/);
+  const long = "x".repeat(10001);
+  const tooLong = errorOf(await generate(h, A, { prompt: long, modification: long }));
+  assert.match(tooLong.message, /10000-character free-plan limit/);
   assert.deepEqual(ok(await h.gql(`query { items(lang:"0175"){ id } }`, {}, A)).items, []);
 });
 
