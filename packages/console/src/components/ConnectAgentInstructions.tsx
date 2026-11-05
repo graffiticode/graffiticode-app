@@ -147,9 +147,9 @@ export default function ConnectAgentInstructions({
       )}
 
       {(host === "claude-app" || host === "openai") && (
-        // No header field in either connector UI, and /oauth/consent is Google-only
-        // today, so there is genuinely nothing this user can paste. Say that plainly
-        // rather than inventing a step — and give them the option that does work.
+        // No header field in either connector UI, so there is nothing to paste. The
+        // OAuth consent page now takes email and wallet sign-in; change this copy when
+        // OAUTH_RECONNECT_ENABLED goes on in the MCP server. Until then, say it plainly.
         <div className="border border-gray-300 px-3 py-2 text-sm text-gray-600">
           <p className="mb-2">
             {HOST_LABELS[host]} connectors don&rsquo;t take an API key yet, so new items there will

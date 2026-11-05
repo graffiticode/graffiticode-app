@@ -770,10 +770,10 @@ export function classifyClientHost(clientName?: string): ClientHost {
 }
 
 // Whether the connector UIs that have no header field (claude.ai, ChatGPT) can yet
-// bind a connection to an account. Until `/oauth/consent` accepts the email and
-// wallet sign-ins those users actually have — it is Google-only today — telling them
-// to "reconnect and sign in" would send them at a button they cannot use, so they get
-// the neutral line instead. Flip this with the consent-page work; nothing else changes.
+// bind a connection to an account. `/oauth/consent` now takes the email and wallet
+// sign-ins those users actually have (it used to be Google-only); turn this on once
+// that flow is verified end to end in each host. ChatGPT additionally needs OpenAI to
+// set the app's authentication to optional OAuth. Until then they get the neutral line.
 const OAUTH_RECONNECT_ENABLED = process.env.OAUTH_RECONNECT_ENABLED === "true";
 
 /**

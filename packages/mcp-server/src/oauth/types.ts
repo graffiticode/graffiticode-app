@@ -55,7 +55,14 @@ export interface AuthorizationCode {
   scope: string;
   code_challenge: string;
   code_challenge_method: string;
-  google_id_token: string;
+  /** Legacy consent page: a Google ID token, exchanged at the auth service. */
+  google_id_token?: string;
+  /**
+   * Current consent page: a one-time console grant (core/oauth-grants), redeemed
+   * at token exchange together with the internal state it was minted for.
+   */
+  grant?: string;
+  grant_state?: string;
   resource: string;
   expires_at: number;
   used: boolean;
