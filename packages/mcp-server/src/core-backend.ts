@@ -159,8 +159,13 @@ async function run(op: string, ctx: Ctx, v: Record<string, any>): Promise<Record
 }
 
 // The errors graphqlRequest raises for the same failure over HTTP.
-function asGraphqlError(err: any): Error {
-  const limit = err?.extensions ? parseFreePlanError(err.extensions, err.message) : null;
+export function asGraphqlError(err: any): Error {
+  // Core wraps a refused create as "Failed to create item: …" and keeps the
+  // FreePlanError as `cause` (core/generation.ts, items.ts). Read the cause, or a
+  // free-plan refusal on create reaches the agent as a bare "GraphQL error: …"
+  // instead of the Graffiticode-named text an update gets.
+  const source = !err?.extensions && err?.cause?.extensions ? err.cause : err;
+  const limit = source?.extensions ? parseFreePlanError(source.extensions, source.message) : null;
   return limit ?? new Error(`GraphQL error: ${err?.message ?? err}`);
 }
 
