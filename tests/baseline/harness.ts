@@ -362,6 +362,12 @@ export async function start(): Promise<Harness> {
     async resetFirestore() {
       const host = process.env.FIRESTORE_EMULATOR_HOST;
       await realFetch(`http://${host}/emulator/v1/projects/${PROJECT}/databases/(default)/documents`, { method: "DELETE" });
+      // The trial's item budget comes from the trial account's own subscription,
+      // and its daily pace is ceil(remaining / days left in the month). Without a
+      // seeded plan it falls back to Bronze's 25, which paces to 1 item/day for
+      // most of a 30-day month, so any test creating two free-plan items fails
+      // depending on the calendar date. Seed a large plan, as production does.
+      await admin.firestore().doc(`users/${TRIAL_UID}`).set({ subscription: { plan: "teams", status: "active" } });
       calls.length = 0;
       llmRequests.length = 0;
       jobPayloads.length = 0;
