@@ -5,6 +5,7 @@
 import type { IncomingMessage, ServerResponse } from "http";
 import { oauthStore } from "./firestore-store.js";
 import { verifyPKCE, generateRandomString } from "./pkce.js";
+import { redeemOAuthGrant, OAuthGrantError } from "@graffiticode-app/core/oauth-grants";
 import type {
   OAuthClient,
   ClientRegistrationRequest,
@@ -384,18 +385,17 @@ export async function handleAuthorize(
 }
 
 /**
- * GET /oauth/callback
- * Callback from consent page with Google ID token.
+ * /oauth/callback — where the console consent page returns the browser.
  *
- * SECURITY BLOCKER (OpenAI-submission item 2c-vi — NOT yet resolved): the consent
- * page redirects the browser here with `google_id_token` in the QUERY STRING, so a
- * live Google ID token can land in browser history, CDN/proxy access logs, and
- * Referer headers. Fixing this requires a COORDINATED change in the console/auth
- * consent service (it builds this redirect): replace the query-string token with a
- * short-lived, single-use result code redeemed server-to-server (preferred) or a
- * form POST — bound to the pending OAuth state/client, expiring fast, consumed once.
- * Until that lands, OAuth is NOT review-ready; ship v1 noauth-only (see the
- * go/no-go gate) rather than advertise a partially-hardened OAuth surface.
+ * The page POSTs a form (never a query string, which lands in CDN and Cloud Run
+ * access logs, history and Referer) carrying either:
+ *   - `grant`: a one-time code from the console's /api/oauth/grant, minted after
+ *     an email or wallet sign-in. It is not a credential by itself: it is only
+ *     redeemable server-to-server (core/oauth-grants), once, for the state it was
+ *     minted for, within 10 minutes. This is the current page.
+ *   - `google_id_token`: the legacy Google-only page. Kept so a console still
+ *     serving that page keeps working during rollout; remove once it is gone.
+ * or `error` (+ `error_description`) when the person declined.
  */
 export async function handleCallback(
   req: IncomingMessage,
@@ -450,8 +450,9 @@ export async function handleCallback(
     return;
   }
 
-  if (!googleIdToken) {
-    sendError(res, 400, { error: "invalid_request", error_description: "Missing google_id_token" });
+  const grant = params.get("grant");
+  if (!grant && !googleIdToken) {
+    sendError(res, 400, { error: "invalid_request", error_description: "Missing grant" });
     return;
   }
 
@@ -474,7 +475,7 @@ export async function handleCallback(
     scope: pending.scope,
     code_challenge: pending.code_challenge,
     code_challenge_method: pending.code_challenge_method,
-    google_id_token: googleIdToken,
+    ...(grant ? { grant, grant_state: state } : { google_id_token: googleIdToken! }),
     resource: pending.resource,
     expires_at: Date.now() + 10 * 60 * 1000, // 10 minutes
     used: false,
@@ -549,14 +550,73 @@ async function exchangeGoogleTokenForFirebaseToken(googleIdToken: string): Promi
     throw new Error(authData.error?.message || "Failed to get Firebase custom token");
   }
 
-  // Step 2: Exchange Firebase custom token for ID token + refresh token
+  const session = await signInWithCustomToken(authData.data.firebaseCustomToken);
+
+  // The providerId is the Firebase UID from the custom token auth
+  // This is the same UID stored in the oauth-links collection
+  const providerId = session.uid || authData.data.uid || "";
+
+  // Extract email from Google ID token (JWT payload)
+  let email = "";
+  try {
+    const payload = JSON.parse(Buffer.from(googleIdToken.split(".")[1], "base64").toString());
+    email = payload.email || "";
+  } catch {
+    // Ignore - email is optional
+  }
+
+  return {
+    firebaseIdToken: session.firebaseIdToken,
+    firebaseRefreshToken: session.firebaseRefreshToken,
+    providerId,
+    email,
+    expiresAt: session.expiresAt,
+  };
+}
+
+/**
+ * Redeem a console consent grant for a Firebase session of the account that
+ * consented. The grant is single-use and bound to the authorization's state.
+ */
+async function exchangeConsentGrant(grant: string, state: string): Promise<{
+  firebaseIdToken: string;
+  firebaseRefreshToken: string;
+  providerId: string;
+  email: string;
+  expiresAt: number;
+}> {
+  let redeemed;
+  try {
+    redeemed = await redeemOAuthGrant({ code: grant, state });
+  } catch (err) {
+    if (err instanceof OAuthGrantError) {
+      throw new GrantRefused("The sign-in expired or was already used. Connect again.");
+    }
+    throw err;
+  }
+  const session = await signInWithCustomToken(redeemed.firebaseCustomToken);
+  if (session.uid && session.uid !== redeemed.uid) {
+    throw new Error("Consent grant resolved to a different account");
+  }
+  // No email: the console sign-in may be wallet-only, and the token store
+  // treats email as optional.
+  return { ...session, providerId: redeemed.uid, email: "" };
+}
+
+/** Exchange a Firebase custom token for a Firebase ID token + refresh token. */
+async function signInWithCustomToken(firebaseCustomToken: string): Promise<{
+  firebaseIdToken: string;
+  firebaseRefreshToken: string;
+  uid: string;
+  expiresAt: number;
+}> {
   const firebaseResponse = await fetch(
     `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${FIREBASE_API_KEY}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        token: authData.data.firebaseCustomToken,
+        token: firebaseCustomToken,
         returnSecureToken: true,
       }),
     }
@@ -582,28 +642,12 @@ async function exchangeGoogleTokenForFirebaseToken(googleIdToken: string): Promi
     throw new Error("No refresh token returned from Firebase");
   }
 
-  // Firebase ID tokens expire in 1 hour, we use 55 minutes with buffer
-  const expiresAt = Date.now() + TOKEN_EXPIRES_IN * 1000;
-
-  // The providerId is the Firebase UID from the custom token auth
-  // This is the same UID stored in the oauth-links collection
-  const providerId = firebaseData.localId || authData.data.uid || "";
-
-  // Extract email from Google ID token (JWT payload)
-  let email = "";
-  try {
-    const payload = JSON.parse(Buffer.from(googleIdToken.split(".")[1], "base64").toString());
-    email = payload.email || "";
-  } catch {
-    // Ignore - email is optional
-  }
-
   return {
     firebaseIdToken: firebaseData.idToken,
     firebaseRefreshToken: firebaseData.refreshToken,
-    providerId,
-    email,
-    expiresAt,
+    uid: firebaseData.localId || "",
+    // Firebase ID tokens expire in 1 hour, we use 55 minutes with buffer
+    expiresAt: Date.now() + TOKEN_EXPIRES_IN * 1000,
   };
 }
 
@@ -759,10 +803,10 @@ async function handleAuthorizationCodeGrant(
   await oauthStore.markAuthCodeUsed(code);
 
   try {
-    // Exchange Google ID token for Firebase ID token + refresh token
-    const { firebaseIdToken, firebaseRefreshToken, providerId, email, expiresAt } = await exchangeGoogleTokenForFirebaseToken(
-      authCode.google_id_token
-    );
+    // Redeem the consent for a Firebase ID token + refresh token.
+    const { firebaseIdToken, firebaseRefreshToken, providerId, email, expiresAt } = authCode.grant
+      ? await exchangeConsentGrant(authCode.grant, authCode.grant_state ?? "")
+      : await exchangeGoogleTokenForFirebaseToken(authCode.google_id_token ?? "");
 
     // Get client name for token metadata
     const client = await oauthStore.getClient(authCode.client_id);

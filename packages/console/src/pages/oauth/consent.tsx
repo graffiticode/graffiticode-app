@@ -1,25 +1,36 @@
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
+import { useEffect, useState } from 'react';
 import Head from 'next/head';
-import { initializeApp, getApps } from 'firebase/app';
-import {
-  getAuth,
-  connectAuthEmulator,
-  GoogleAuthProvider,
-  signInWithPopup,
-  signOut,
-} from 'firebase/auth';
-import { apiFirebaseConfig } from '../../lib/firebase';
+import { useRouter } from 'next/router';
+import { useAuth } from 'reactfire';
+import { signOut } from 'firebase/auth';
+import useGraffiticodeAuth, { useEmailSignIn } from '@graffiticode/auth-react';
+import AuthMethodDialog from '../../components/AuthMethodDialog';
+import WalletSelectionDialog from '../../components/WalletSelectionDialog';
+import { getPageTitle } from '../../lib/utils';
 
-const isDevelopment = process.env.NODE_ENV === 'development';
+// The OAuth consent step for agents connecting to Graffiticode (Codex, Claude,
+// ChatGPT…). The MCP server's /oauth/authorize sends the browser here with
+// callback_url (its /oauth/callback), its internal state, and the client's name.
+//
+// Sign-in is the console's own — email or Ethereum wallet, the same dialog
+// /claim uses — so any Graffiticode account can connect. (This page used to be
+// Google-only, and Google is only an account-linking option here, so most
+// accounts could not get through it.)
+//
+// "Allow" asks /api/oauth/grant for a one-time code and POSTs only that code to
+// the MCP server, which redeems it server-to-server when the agent exchanges its
+// authorization code. No credential passes through the browser or a URL.
 
-// Allowlisted callback URL patterns
+interface Wallet {
+  name: string;
+  provider: any;
+}
+
+// Allowlisted callback URL patterns: the MCP server's own origins (and local dev).
 const ALLOWED_CALLBACK_PATTERNS = [
   /^https:\/\/[^/]*\.graffiticode\.org(\/|$)/,
   /^https:\/\/graffiticode\.org(\/|$)/,
   /^https:\/\/[^/]*\.run\.app(\/|$)/,
-  /^https:\/\/claude\.ai(\/|$)/,
-  /^https:\/\/claude\.com(\/|$)/,
   /^http:\/\/localhost(:\d+)?(\/|$)/,
   /^http:\/\/127\.0\.0\.1(:\d+)?(\/|$)/,
 ];
@@ -27,248 +38,262 @@ const ALLOWED_CALLBACK_PATTERNS = [
 function isValidCallbackUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
-    if (!['http:', 'https:'].includes(parsed.protocol)) {
-      return false;
-    }
-    return ALLOWED_CALLBACK_PATTERNS.some(pattern => pattern.test(url));
+    if (!['http:', 'https:'].includes(parsed.protocol)) return false;
+    return ALLOWED_CALLBACK_PATTERNS.some((pattern) => pattern.test(url));
   } catch {
     return false;
   }
 }
 
-// Firebase config with authDomain pointing to Firebase Hosting
-// (required for OAuth to work - needs /__/auth/handler)
-const oauthFirebaseConfig = {
-  ...apiFirebaseConfig,
-  authDomain: "graffiticode.firebaseapp.com",
-};
+// Stashed because signing in remounts the page and can empty router.query
+// (the same reason /claim stashes its token).
+const CONSENT_KEY = 'graffiticode:oauth-consent';
+type ConsentParams = { callbackUrl: string; state: string; appName: string };
 
-// Create a separate Firebase app instance for OAuth
-let oauthAuthInstance: ReturnType<typeof getAuth> | null = null;
+const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
-const getOAuthAuth = () => {
-  if (oauthAuthInstance) return oauthAuthInstance;
-
-  const appName = 'oauth-consent-helper';
-  const existingApp = getApps().find(app => app.name === appName);
-  const app = existingApp || initializeApp(oauthFirebaseConfig, appName);
-  oauthAuthInstance = getAuth(app);
-
-  if (isDevelopment) {
-    try {
-      connectAuthEmulator(oauthAuthInstance, 'http://localhost:9099', { disableWarnings: true });
-    } catch {
-      // Already connected
-    }
+function readStash(): ConsentParams | null {
+  try {
+    const raw = sessionStorage.getItem(CONSENT_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    return parsed?.callbackUrl && parsed?.state ? parsed : null;
+  } catch {
+    return null;
   }
+}
 
-  return oauthAuthInstance;
-};
-
-const cleanupOAuthSession = async (oauthAuth: ReturnType<typeof getAuth>) => {
-  if (!isDevelopment) {
-    await signOut(oauthAuth);
+// POST the fields to the MCP server: a form body stays out of URLs, access logs,
+// history and Referer. The server answers 303 to the agent's redirect_uri.
+function postToCallback(callbackUrl: string, fields: Record<string, string>) {
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = callbackUrl;
+  form.style.display = 'none';
+  for (const [name, value] of Object.entries(fields)) {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = name;
+    input.value = value;
+    form.appendChild(input);
   }
-};
+  document.body.appendChild(form);
+  form.submit();
+}
 
 export default function OAuthConsent() {
   const router = useRouter();
-  const { callback_url, state, app_name } = router.query;
+  const auth = useAuth();
+  const { user, loading, signInWithEthereum } = useGraffiticodeAuth();
+  // An agent can be someone's first contact with Graffiticode, so an unmatched
+  // email creates an account here, as on /claim.
+  const {
+    sendCode,
+    verifyAndSignIn,
+    sending: emailSending,
+    verifying: codeVerifying,
+    emailError,
+    codeError,
+  } = useEmailSignIn({ allowSignup: true });
 
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [params, setParams] = useState<ConsentParams | null>(null);
+  const [paramsChecked, setParamsChecked] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [showWalletDialog, setShowWalletDialog] = useState(false);
+  const [granting, setGranting] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const callbackUrl = Array.isArray(callback_url) ? callback_url[0] : callback_url;
-  const stateParam = Array.isArray(state) ? state[0] : state;
-  const appName = Array.isArray(app_name) ? app_name[0] : app_name || 'an application';
-
-  // Validate parameters once router is ready
   useEffect(() => {
     if (!router.isReady) return;
-
-    if (!callbackUrl) {
-      setValidationError('Missing required parameter: callback_url');
-      return;
-    }
-
-    if (!stateParam) {
-      setValidationError('Missing required parameter: state');
-      return;
-    }
-
-    if (!isValidCallbackUrl(callbackUrl)) {
-      setValidationError('Invalid callback URL');
-      return;
-    }
-
-    setValidationError(null);
-  }, [router.isReady, callbackUrl, stateParam]);
-
-  const handleSignIn = async () => {
-    if (!callbackUrl || !stateParam) return;
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      const oauthAuth = getOAuthAuth();
-      const provider = new GoogleAuthProvider();
-
-      // Use popup with Firebase Hosting authDomain
-      const result = await signInWithPopup(oauthAuth, provider);
-      const idToken = await result.user.getIdToken();
-
-      // Clean up helper auth session
-      await cleanupOAuthSession(oauthAuth);
-
-      // Show success state before redirect (page may stay open after protocol handler)
-      setLoading(false);
-      setSuccess(true);
-
-      // Hand the Google ID token back by POSTing a form, NOT by putting it in the
-      // URL. A query string is recorded in the CDN and Cloud Run access logs (a real
-      // user's id_token was found sitting in plaintext in Cloud Logging), kept in
-      // browser history, and can leak via Referer. A form body is in none of those.
-      // The MCP server accepts POST at /oauth/callback and answers 303, so the
-      // browser follows on to the client's redirect_uri with a GET.
-      const form = document.createElement('form');
-      form.method = 'POST';
-      form.action = callbackUrl;
-      form.style.display = 'none';
-      for (const [name, value] of [
-        ['google_id_token', idToken],
-        ['state', stateParam],
-      ]) {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = name;
-        input.value = value;
-        form.appendChild(input);
-      }
-      document.body.appendChild(form);
-      form.submit();
-    } catch (err: any) {
-      console.error('OAuth consent error:', err);
-      if (err.code === 'auth/popup-closed-by-user') {
-        setError('Sign-in was cancelled');
-      } else if (err.code === 'auth/popup-blocked') {
-        setError('Popup was blocked. Please allow popups for this site and try again.');
+    const callbackUrl = first(router.query.callback_url);
+    const state = first(router.query.state);
+    let next: ConsentParams | null = null;
+    if (callbackUrl || state) {
+      if (!callbackUrl || !state) {
+        setValidationError('This sign-in link is incomplete. Start connecting from your agent again.');
+      } else if (!isValidCallbackUrl(callbackUrl)) {
+        setValidationError('This sign-in link is not valid.');
       } else {
-        setError(err.message || 'Failed to sign in with Google');
+        next = { callbackUrl, state, appName: first(router.query.app_name) || 'An application' };
+        try {
+          sessionStorage.setItem(CONSENT_KEY, JSON.stringify(next));
+        } catch {
+          // Without storage a sign-in remount loses the request; nothing to do here.
+        }
       }
-      setLoading(false);
+    } else {
+      next = readStash();
+      if (!next) setValidationError('This sign-in link is missing its details. Start connecting from your agent again.');
+    }
+    setParams(next);
+    setParamsChecked(true);
+  }, [router.isReady, router.query.callback_url, router.query.state, router.query.app_name]);
+
+  const clearStash = () => {
+    try {
+      sessionStorage.removeItem(CONSENT_KEY);
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleAllow = async () => {
+    if (!user || !params || granting) return;
+    setGranting(true);
+    setError(null);
+    try {
+      const idToken = await user.getToken();
+      const res = await fetch('/api/oauth/grant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: idToken },
+        body: JSON.stringify({ state: params.state }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (res.status === 401 && body?.error === 'sign_in_required') {
+        // The browser's sign-in session has lapsed or belongs to another account.
+        // Signing in again refreshes it.
+        await signOut(auth).catch(() => {});
+        setError('Please sign in again to connect this account.');
+        return;
+      }
+      if (!res.ok || typeof body?.code !== 'string') {
+        throw new Error('Could not connect your account. Please try again.');
+      }
+      clearStash();
+      setDone(true);
+      postToCallback(params.callbackUrl, { grant: body.code, state: params.state });
+    } catch (err: any) {
+      setError(err?.message || 'Could not connect your account. Please try again.');
+    } finally {
+      setGranting(false);
     }
   };
 
   const handleCancel = () => {
-    if (!callbackUrl || !stateParam) return;
-
-    // Redirect back with error
-    const redirectUrl = new URL(callbackUrl);
-    redirectUrl.searchParams.set('error', 'access_denied');
-    redirectUrl.searchParams.set('error_description', 'User cancelled the sign-in');
-    redirectUrl.searchParams.set('state', stateParam);
-
-    window.location.href = redirectUrl.toString();
+    if (!params) return;
+    clearStash();
+    postToCallback(params.callbackUrl, {
+      error: 'access_denied',
+      error_description: 'The user declined to connect',
+      state: params.state,
+    });
   };
+
+  const handleSwitchAccount = async () => {
+    setError(null);
+    await signOut(auth).catch((err) => console.error(err));
+  };
+
+  const handleWalletSelect = async (wallet: Wallet) => {
+    try {
+      await signInWithEthereum(wallet);
+      setShowWalletDialog(false);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  if (!router.isReady || loading || !paramsChecked) {
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-100px)]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+      </div>
+    );
+  }
+
+  const shell = (body: React.ReactNode) => (
+    <>
+      <Head><title>{getPageTitle('Connect')}</title></Head>
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-100px)] px-4 py-8">
+        <div className="w-full max-w-sm flex flex-col items-center text-center">{body}</div>
+      </div>
+    </>
+  );
+
+  if (validationError || !params) {
+    return shell(
+      <>
+        <h1 className="text-xl font-semibold text-gray-900 mb-2">Can&rsquo;t connect</h1>
+        <p className="text-sm text-gray-600">{validationError}</p>
+      </>,
+    );
+  }
+
+  if (done) {
+    return shell(
+      <>
+        <h1 className="text-xl font-semibold text-gray-900 mb-2">Connected</h1>
+        <p className="text-sm text-gray-600">You can close this window and return to {params.appName}.</p>
+      </>,
+    );
+  }
+
+  if (user) {
+    const account = user.email || user.uid;
+    return shell(
+      <>
+        <h1 className="text-xl font-semibold text-gray-900 mb-2">Connect {params.appName}</h1>
+        <p className="text-sm text-gray-600 mb-1">
+          {params.appName} wants to create and edit items in this Graffiticode account:
+        </p>
+        <p className="text-sm font-medium text-gray-900 mb-5 break-all">{account}</p>
+        {error && <p className="text-sm text-red-700 mb-4">{error}</p>}
+        <button
+          type="button"
+          disabled={granting}
+          className="w-full rounded-none border border-gray-900 bg-gray-900 px-4 py-2 text-sm text-white hover:bg-gray-800 disabled:opacity-50 mb-3"
+          onClick={handleAllow}
+        >
+          {granting ? 'Connecting…' : 'Allow'}
+        </button>
+        <button
+          type="button"
+          disabled={granting}
+          className="w-full rounded-none border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 mb-3"
+          onClick={handleSwitchAccount}
+        >
+          Use a different account
+        </button>
+        <button
+          type="button"
+          disabled={granting}
+          className="text-sm text-gray-500 underline disabled:opacity-50"
+          onClick={handleCancel}
+        >
+          Cancel
+        </button>
+      </>,
+    );
+  }
 
   return (
     <>
-      <Head>
-        <title>Sign in - Graffiticode</title>
-      </Head>
-      <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-        <div className="sm:mx-auto sm:w-full sm:max-w-md">
-          <h2 className="text-center text-3xl font-bold tracking-tight text-gray-900">
-            Graffiticode
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Sign in to connect to {appName}
-          </p>
-        </div>
-
-        <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-          <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-            {validationError ? (
-              <div className="text-center">
-                <div className="rounded-md bg-red-50 p-4">
-                  <p className="text-sm text-red-700">{validationError}</p>
-                </div>
-              </div>
-            ) : success ? (
-              <div className="text-center">
-                <div className="rounded-md bg-green-50 p-4">
-                  <div className="flex justify-center mb-2">
-                    <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                    </svg>
-                  </div>
-                  <p className="text-sm text-green-700 font-medium">Sign-in successful!</p>
-                  <p className="text-xs text-green-600 mt-1">You can close this window.</p>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="text-center mb-6">
-                  <p className="text-sm text-gray-500">
-                    <span className="font-medium text-gray-900">{appName}</span> wants to access your Graffiticode account
-                  </p>
-                </div>
-
-                {error && (
-                  <div className="rounded-md bg-red-50 p-4 mb-4">
-                    <p className="text-sm text-red-700">{error}</p>
-                  </div>
-                )}
-
-                <div className="space-y-4">
-                  <button
-                    onClick={handleSignIn}
-                    disabled={loading}
-                    className="w-full flex justify-center items-center py-2 px-4 border border-transparent rounded-none shadow-sm text-sm font-medium text-white bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {loading ? (
-                      <>
-                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Signing in...
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-                          <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                          <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                          <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                          <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                        </svg>
-                        Sign in with Google
-                      </>
-                    )}
-                  </button>
-
-                  <button
-                    onClick={handleCancel}
-                    disabled={loading}
-                    className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Cancel
-                  </button>
-                </div>
-
-                <div className="mt-6">
-                  <p className="text-xs text-center text-gray-500">
-                    By signing in, you agree to share your Graffiticode account information with {appName}.
-                  </p>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
+      <Head><title>{getPageTitle('Connect')}</title></Head>
+      {error && (
+        <p className="pt-8 text-center text-sm text-red-700">{error}</p>
+      )}
+      {/* One Headless UI Dialog open at a time — see claim.tsx. */}
+      <AuthMethodDialog
+        isOpen={!showWalletDialog}
+        // Dismissing sign-in declines the connection, but never while a code is
+        // in flight: Privy raises its own overlay while creating a wallet.
+        onClose={() => {
+          if (codeVerifying || emailSending) return;
+          handleCancel();
+        }}
+        onSelectEthereum={() => setShowWalletDialog(true)}
+        onSubmitEmail={sendCode}
+        onSubmitCode={verifyAndSignIn}
+        emailSending={emailSending}
+        emailError={emailError}
+        codeVerifying={codeVerifying}
+        codeError={codeError}
+      />
+      <WalletSelectionDialog
+        isOpen={showWalletDialog}
+        onClose={() => setShowWalletDialog(false)}
+        onSelectWallet={handleWalletSelect}
+      />
     </>
   );
 }
