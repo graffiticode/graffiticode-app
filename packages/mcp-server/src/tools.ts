@@ -775,11 +775,11 @@ export function classifyClientHost(clientName?: string): ClientHost {
   return "unknown";
 }
 
-// Whether the connector UIs that have no header field (claude.ai, ChatGPT) can yet
-// bind a connection to an account. `/oauth/consent` now takes the email and wallet
-// sign-ins those users actually have (it used to be Google-only); turn this on once
-// that flow is verified end to end in each host. ChatGPT additionally needs OpenAI to
-// set the app's authentication to optional OAuth. Until then they get the neutral line.
+// Whether ChatGPT and other OpenAI connector users are told to reconnect and sign in.
+// Off until OpenAI sets the Graffiticode app's authentication to optional OAuth —
+// until then there is no sign-in for them to reach. claude.ai / Claude desktop no
+// longer depend on this: their Connect button runs the email/wallet consent and their
+// calls then arrive signed in (verified end to end 2026-11-05).
 const OAUTH_RECONNECT_ENABLED = process.env.OAUTH_RECONNECT_ENABLED === "true";
 
 /**
@@ -807,6 +807,10 @@ export function reconnectHint(host: ClientHost): string {
         "(use the name codex mcp list shows), sign in with the same account, then restart Codex."
       );
     case "claude-app":
+      return (
+        "After signing in, connect this account: in Claude, open Settings → Connectors, " +
+        "disconnect Graffiticode and connect it again, then sign in with the same account."
+      );
     case "openai":
       return OAUTH_RECONNECT_ENABLED
         ? "After signing in, reconnect the Graffiticode connector and sign in there too, " +

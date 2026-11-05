@@ -269,7 +269,7 @@ npm start          # Streamable HTTP server on PORT (default 3001)
 | `GRAFFITICODE_SKILLS_REF` | `main` | Git ref for skill discovery |
 | `GRAFFITICODE_SKILLS_TTL_MS` | `60000` | Skill catalog cache TTL |
 | `FREE_PLAN_NAMESPACE_SALT` | — | HS256 secret for trial-claim JWTs. Must match the console's value. If unset, trial responses still work but omit claim links. |
-| `OAUTH_RECONNECT_ENABLED` | `false` | Whether claude.ai/ChatGPT users are told to reconnect their connector and sign in. Off until the email/wallet `/oauth/consent` flow is verified end to end in those hosts (ChatGPT also needs OpenAI to enable optional OAuth), because their connector UIs take no API key and pointing them at an unusable button is worse than saying nothing. Affects trial copy only — never auth itself. |
+| `OAUTH_RECONNECT_ENABLED` | `false` | Whether ChatGPT/OpenAI connector users are told to reconnect their connector and sign in. Off until OpenAI enables optional OAuth on the Graffiticode app, because pointing them at a sign-in they can't reach is worse than saying nothing. claude.ai/Claude desktop users are always told (verified end to end 2026-11-05). Affects trial copy only — never auth itself. |
 | `OPENAI_APPS_CHALLENGE_TOKEN` | — | Token served verbatim at `/.well-known/openai-apps-challenge` for OpenAI app-directory domain verification. Set only during submission; the route 404s while unset. |
 | `INTERNAL_API_KEY` | — | Sent as `X-Internal-API-Key` to the auth service |
 
