@@ -48,7 +48,7 @@ export default function Home() {
       <h1 className="text-2xl font-medium text-gray-700">Welcome to Graffiticode</h1>
       <p className="text-sm text-gray-500 text-justify w-1/2">
         Graffiticode is a platform for deploying smart tools for agents and humans.
-        Visit our <a href="https://forum.graffiticode.org/c/support" className="text-blue-600 hover:underline">Support</a> forum to learn more.
+        Visit our <Link href="/support" className="text-blue-600 hover:underline">Support</Link> page to learn more.
         If you are feeling adventurous go straight to <Link href="/tools" className="text-blue-600 hover:underline">Tools</Link> to see what you can make with Graffiticode.
         {!user && (
           <>
