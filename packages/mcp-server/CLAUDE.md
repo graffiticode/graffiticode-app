@@ -161,7 +161,7 @@ Free-plan `create_item` and `update_item` responses include three extra fields s
 - `claim_message` — two lines: the URL, then a reconnect hint chosen for `<host>`
 
 `src` attributes the click (chat link vs render-host footer). `agent` is the coarse
-host bucket from `classifyClientHost` (`claude-code` | `claude-app` | `openai` |
+host bucket from `classifyClientHost` (`claude-code` | `claude-app` | `codex-cli` | `openai` |
 `editor` | `unknown`) — never the raw `clientInfo.name` — so the claim page opens on
 the right connect instructions instead of asking someone who just signed in to
 identify their own agent. **This repo owns that taxonomy**; adding a bucket means
@@ -172,7 +172,9 @@ the item source surface (`console|mcp|front`).
 The reconnect hint exists because a claimed user is still connected *anonymously* —
 their next item lands back in a trial workspace. What fixes that differs by host:
 `claude-code`/`editor` take an `Authorization` header, so they're pointed at the key
-the claim page mints; `claude-app`/`openai` connector UIs have no header field, so
+the claim page mints; `codex-cli` (`codex-mcp-client`) is told to run
+`codex mcp login`, which runs the email/wallet OAuth consent (verified end to end
+2026-11-05); `claude-app`/`openai` connector UIs have no header field, so
 until `OAUTH_RECONNECT_ENABLED` is on they are told plainly that new items keep
 starting out anonymous rather than sent at a sign-in that isn't offered yet.
 

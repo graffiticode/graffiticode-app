@@ -211,7 +211,10 @@ test("client host classification separates the four ways a connection binds to a
   assert.equal(classifyClientHost("claude-code"), "claude-code");
   assert.equal(classifyClientHost("claude-ai"), "claude-app");
   assert.equal(classifyClientHost("claude-desktop"), "claude-app");
-  for (const openai of ["ChatGPT", "openai-apps", "codex-mcp-client"]) {
+  // The Codex CLI signs in with `codex mcp login`, so it is its own bucket even
+  // though its name also matches the OpenAI pattern.
+  assert.equal(classifyClientHost("codex-mcp-client"), "codex-cli");
+  for (const openai of ["ChatGPT", "openai-apps", "openai-mcp"]) {
     assert.equal(classifyClientHost(openai), "openai", `${openai} should classify as openai`);
   }
   assert.equal(classifyClientHost("cursor"), "editor");
@@ -228,13 +231,16 @@ test("the reconnect hint tells header-capable hosts about the key and never prom
     assert.match(reconnectHint(host), /sign-in page issues the key/, `${host} should say where the key comes from`);
   }
   assert.match(reconnectHint("claude-code"), /claude mcp add --transport http/);
+  // The Codex CLI is told to sign in, not to paste a key.
+  assert.match(reconnectHint("codex-cli"), /codex mcp login/);
+  assert.doesNotMatch(reconnectHint("codex-cli"), /Authorization|api-key/);
   // claude.ai/ChatGPT have no header field, so they must never be told to paste one.
   for (const host of ["claude-app", "openai"] as const) {
     assert.doesNotMatch(reconnectHint(host), /Authorization|api-key/, `${host} has no header field`);
   }
   // Every bucket returns something; an empty hint would append a bare space to the
   // claim message.
-  for (const host of ["claude-code", "claude-app", "openai", "editor", "unknown"] as const) {
+  for (const host of ["claude-code", "claude-app", "codex-cli", "openai", "editor", "unknown"] as const) {
     assert.ok(reconnectHint(host).trim().length > 0, `${host} hint must be non-empty`);
   }
 });
