@@ -10,6 +10,7 @@ import { resolveAuth } from "./auth.js";
 import { adoptWorkspaceFromSibling } from "./claims.js";
 import { reserveGeneration } from "./generation-jobs.js";
 import { assertItemCreateAllowed } from "./access.js";
+import { assertFreePlanPromptLength } from "./lib/free-plan-quota.js";
 
 // startCodeGeneration: reserve a v2 job (with the item shell, for a create) and
 // wake the console's worker. Serves create_item and update_item.
@@ -106,6 +107,9 @@ export async function startGeneration(ctx: any, args: any, trusted: { externalWr
   try {
     // The create gate, as createItem runs it; a revision has no gate here.
     if (!itemId) await assertItemCreateAllowed(auth, lang);
+    // The prompt-length checks generateCode applies, run here too so a refusal
+    // reaches the caller now rather than as a failed job on its next poll.
+    if (auth.freePlan) assertFreePlanPromptLength(prompt);
     const reserved = await reserveGeneration({
       auth, itemId, lang, name, client, prompt, modification, currentSrc, currentData,
       ...(baseTaskId !== undefined ? { baseTaskId } : {}),

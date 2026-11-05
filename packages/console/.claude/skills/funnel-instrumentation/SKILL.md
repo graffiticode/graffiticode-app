@@ -13,7 +13,7 @@ One structured JSON line per lifecycle event to stdout → Cloud Logging via `em
 
 ## Wall taxonomy
 
-A **`wall_hit`** is a request refused by a limit — the headline signal for "demand we turned away", rendered in the digest as `⛔ N walls — <breakdown by kind>`. Eight kinds:
+A **`wall_hit`** is a request refused by a limit — the headline signal for "demand we turned away", rendered in the digest as `⛔ N walls — <breakdown by kind>`. Nine kinds:
 
 | `wall` | Raised by | Meaning |
 |---|---|---|
@@ -22,13 +22,14 @@ A **`wall_hit`** is a request refused by a limit — the headline signal for "de
 | `revision_limit` | `buildRevisionLimitError` | Item hit its revision cap |
 | `language_scope` | `buildScopeError` | Language outside trial scope (carries `lang`) |
 | `item_expired` | `buildItemExpiredError` | Free-plan item aged past its 48h TTL |
+| `prompt_too_long` | `buildPromptTooLongError` (via `assertFreePlanPromptLength`) | Free-plan request plus recent conversation over 10,000 chars. Checked in `startGeneration`, so `create_item`/`update_item` refuse it directly instead of failing the job |
 | `plan_item_limit` | `checkItemCreateAllowed` → `assertItemCreateAllowed` | Hard-capped plan spent its included items |
 | `overage_cap` | same | Customer's own overage spend cap reached |
 | `non_english_request` | GUARDRAIL 0 in `generate-for-request.ts` | Prompt not written in English. This `wall_hit` fires only when `NON_ENGLISH_GATE=enforce`; the same-named `non_english_request` *event* fires in shadow mode too (below) |
 
 `non_english_request` is the one wall with a **separate reporting event**, and the reason generalizes: `wall_hit` carries no `app`, so `isMcpOrigin` drops it from all three surfaces (see below). It also fires only in enforce mode, which would report zero during the shadow window that exists to measure it. So the demand signal is the headline event **`non_english_request`** — emitted in both modes, carrying `blocked`, `script`/`plang`, and an `app` stamp — and the `wall_hit` exists only to keep the refusal taxonomy complete. Any future wall that needs to show up in a report has the same two problems to solve.
 
-**Emission point differs by path, deliberately.** The five free-plan walls are emitted **inside the `FreePlanError` builders** in `free-plan-quota.ts`, because every builder is called directly inside a `throw` — the one choke point that can't drift as call sites move. The cost is that a builder has no auth context, so those walls are counted **by kind but not attributed to a session**; the digest only reports counts, so that's sufficient. The two paid walls are emitted at the gate in `resolvers.ts` instead, where `auth` *is* in scope, so they carry `session` and `lang`. When adding a free-plan limit, emit from the builder, not the call site — and note `assertItemCreateAllowed` skips its own emit on the free-plan branch precisely because `buildMonthlyQuotaError` already fired.
+**Emission point differs by path, deliberately.** The six free-plan walls are emitted **inside the `FreePlanError` builders** in `free-plan-quota.ts`, because every builder is called directly inside a `throw` — the one choke point that can't drift as call sites move. The cost is that a builder has no auth context, so those walls are counted **by kind but not attributed to a session**; the digest only reports counts, so that's sufficient. The two paid walls are emitted at the gate in `resolvers.ts` instead, where `auth` *is* in scope, so they carry `session` and `lang`. When adding a free-plan limit, emit from the builder, not the call site — and note `assertItemCreateAllowed` skips its own emit on the free-plan branch precisely because `buildMonthlyQuotaError` already fired.
 
 ## Aggregation — three surfaces, ONE path
 
