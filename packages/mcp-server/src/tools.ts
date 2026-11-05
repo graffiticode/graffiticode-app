@@ -751,19 +751,25 @@ export function isOpenAIClient(clientName?: string): boolean {
  *                 `host=claude-code v=2.1.219` distinct from `claude-ai`).
  *   claude-app  — claude.ai / Claude Desktop: connector UI, NO header field, so
  *                 OAuth is its only account-binding path.
- *   openai      — ChatGPT / Codex: same constraint as claude-app.
+ *   codex-cli   — the Codex command line (`codex-mcp-client`, verified by its user
+ *                 agent `codex-mcp-client/0.166.0`). It runs our OAuth flow on demand
+ *                 with `codex mcp login`, verified end to end 2026-11-05, so it is
+ *                 told to do that. Matched BEFORE openai, which its name also matches.
+ *   openai      — ChatGPT and other OpenAI connectors (`openai-mcp`, …): same
+ *                 constraint as claude-app, and the ChatGPT app has no OAuth yet.
  *   editor      — Cursor / VS Code / Windsurf / Zed: MCP config file, takes a header.
  *   unknown     — unnamed or unrecognized. Send them to the page and let them pick.
  *
  * This bucket, not the raw client name, is what travels to the console on the claim
  * URL: one taxonomy, defined here, rendered there.
  */
-export type ClientHost = "claude-code" | "claude-app" | "openai" | "editor" | "unknown";
+export type ClientHost = "claude-code" | "claude-app" | "codex-cli" | "openai" | "editor" | "unknown";
 
 export function classifyClientHost(clientName?: string): ClientHost {
   if (!clientName) return "unknown";
   if (/claude-?code/i.test(clientName)) return "claude-code";
   if (isWidgetHost(clientName)) return "claude-app";
+  if (/codex-mcp-client/i.test(clientName)) return "codex-cli";
   if (isOpenAIClient(clientName)) return "openai";
   if (/cursor|vs-?code|visual[-\s]?studio|windsurf|zed/i.test(clientName)) return "editor";
   return "unknown";
@@ -794,6 +800,11 @@ export function reconnectHint(host: ClientHost): string {
       return (
         "After signing in, add an Authorization: Bearer <api-key> header to the " +
         "graffiticode entry in your MCP config — the sign-in page issues the key."
+      );
+    case "codex-cli":
+      return (
+        "After signing in, connect this account: run codex mcp login graffiticode " +
+        "(use the name codex mcp list shows), sign in with the same account, then restart Codex."
       );
     case "claude-app":
     case "openai":

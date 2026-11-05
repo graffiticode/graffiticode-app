@@ -16,15 +16,16 @@ import CopyButton from "./CopyButton";
  * adding a bucket means adding it there first. An unrecognized value is treated as
  * "unknown", which renders the generic instructions plus the host picker.
  */
-export type ClientHost = "claude-code" | "claude-app" | "openai" | "editor" | "unknown";
+export type ClientHost = "claude-code" | "claude-app" | "codex-cli" | "openai" | "editor" | "unknown";
 
-const HOSTS: ClientHost[] = ["claude-code", "editor", "claude-app", "openai", "unknown"];
+const HOSTS: ClientHost[] = ["claude-code", "codex-cli", "editor", "claude-app", "openai", "unknown"];
 
 export const HOST_LABELS: Record<ClientHost, string> = {
   "claude-code": "Claude Code",
   editor: "Cursor / VS Code",
   "claude-app": "Claude desktop or web",
-  openai: "ChatGPT / Codex",
+  "codex-cli": "Codex (command line)",
+  openai: "ChatGPT / Codex app",
   unknown: "Another agent",
 };
 
@@ -146,6 +147,22 @@ export default function ConnectAgentInstructions({
         </>
       )}
 
+      {host === "codex-cli" && (
+        // Codex runs our OAuth sign-in itself, so there is no key to make: the
+        // consent page it opens signs in to this account. The entry may be named
+        // something other than graffiticode, hence the pointer to `codex mcp list`.
+        <>
+          <p className="text-sm text-gray-600 mb-2">
+            Run this in your terminal, then sign in with this account in the browser window it opens:
+          </p>
+          <Snippet text="codex mcp login graffiticode" />
+          <p className="text-xs text-gray-500 mt-2">
+            If Graffiticode has a different name in <code>codex mcp list</code>, use that name. Restart
+            Codex afterwards so it connects as you.
+          </p>
+        </>
+      )}
+
       {(host === "claude-app" || host === "openai") && (
         // No header field in either connector UI, so there is nothing to paste. The
         // OAuth consent page now takes email and wallet sign-in; change this copy when
@@ -156,8 +173,8 @@ export default function ConnectAgentInstructions({
             keep starting out anonymous — save each one with the link your assistant prints.
           </p>
           <p>
-            To have items save automatically today, connect from Claude Code, Cursor, or VS Code with
-            an API key from{" "}
+            To have items save automatically today, connect from the Codex command line
+            (<code>codex mcp login</code>), or from Claude Code, Cursor, or VS Code with an API key from{" "}
             <Link className="underline" href="/settings">
               Settings
             </Link>

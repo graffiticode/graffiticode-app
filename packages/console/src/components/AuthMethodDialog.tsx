@@ -20,7 +20,8 @@ interface AuthMethodDialogProps {
   emailError?: string | null;
   codeVerifying?: boolean;
   codeError?: string | null;
-  variant?: 'default' | 'claim';
+  // 'connect': the OAuth consent page, which signs in to an existing account only.
+  variant?: 'default' | 'claim' | 'connect';
 }
 
 type Step = 'method' | 'email' | 'code';
@@ -53,11 +54,14 @@ export default function AuthMethodDialog({
   }, [isOpen]);
 
   const isClaim = variant === 'claim';
-  const title = isClaim ? 'Save your items' : 'Sign in to Graffiticode';
+  const isConnect = variant === 'connect';
+  const title = isClaim ? 'Save your items' : isConnect ? 'Sign in to connect your agent' : 'Sign in to Graffiticode';
   const leadCopy = isClaim
     ? 'Sign in to keep these items permanently.'
-    : 'New here? Create a free account by signing in. No blockchain fees. No credit card required.';
-  const ethereumLabel = isClaim ? 'Sign in with Ethereum Wallet' : 'Continue with Ethereum Wallet';
+    : isConnect
+      ? 'Use the email or wallet you signed up with, or used to save your items.'
+      : 'New here? Create a free account by signing in. No blockchain fees. No credit card required.';
+  const ethereumLabel = isClaim || isConnect ? 'Sign in with Ethereum Wallet' : 'Continue with Ethereum Wallet';
   const emailCaption = isClaim ? '(creates a new Graffiticode account)' : null;
 
   const handleEmailSubmit = async (e: React.FormEvent) => {

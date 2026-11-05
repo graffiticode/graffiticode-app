@@ -17,6 +17,11 @@ import { getPageTitle } from '../../lib/utils';
 // Google-only, and Google is only an account-linking option here, so most
 // accounts could not get through it.)
 //
+// Sign-in ONLY: an email or wallet that matches no account is told so, never
+// given a new one. Someone connecting an agent nearly always means an account
+// they already have (often the one they just saved items into), and a silently
+// created empty account would connect the agent to the wrong place.
+//
 // "Allow" asks /api/oauth/grant for a one-time code and POSTs only that code to
 // the MCP server, which redeems it server-to-server when the agent exchanges its
 // authorization code. No credential passes through the browser or a URL.
@@ -83,17 +88,19 @@ function postToCallback(callbackUrl: string, fields: Record<string, string>) {
 export default function OAuthConsent() {
   const router = useRouter();
   const auth = useAuth();
-  const { user, loading, signInWithEthereum } = useGraffiticodeAuth();
-  // An agent can be someone's first contact with Graffiticode, so an unmatched
-  // email creates an account here, as on /claim.
+  const { user, loading, beginEthereumSignIn } = useGraffiticodeAuth();
+  // allowSignup off: an unmatched email comes back 'needs-confirm' instead of
+  // creating an account (see the note at the top of the file).
   const {
     sendCode,
     verifyAndSignIn,
+    cancelSignup,
+    reset: resetEmailFlow,
     sending: emailSending,
     verifying: codeVerifying,
     emailError,
     codeError,
-  } = useEmailSignIn({ allowSignup: true });
+  } = useEmailSignIn({ allowSignup: false });
 
   const [params, setParams] = useState<ConsentParams | null>(null);
   const [paramsChecked, setParamsChecked] = useState(false);
@@ -102,6 +109,8 @@ export default function OAuthConsent() {
   const [granting, setGranting] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Set when the email or wallet someone signed in with has no account.
+  const [noAccount, setNoAccount] = useState<'email' | 'wallet' | null>(null);
 
   useEffect(() => {
     if (!router.isReady) return;
@@ -184,13 +193,30 @@ export default function OAuthConsent() {
     await signOut(auth).catch((err) => console.error(err));
   };
 
+  const handleSubmitCode = async (code: string) => {
+    const result = await verifyAndSignIn(code);
+    if (result === 'needs-confirm') {
+      await cancelSignup().catch(() => {});
+      setNoAccount('email');
+    }
+    return result;
+  };
+
   const handleWalletSelect = async (wallet: Wallet) => {
     try {
-      await signInWithEthereum(wallet);
+      // begin, never confirm: a wallet with no account comes back pending and is
+      // left that way.
+      const pending = await beginEthereumSignIn(wallet);
       setShowWalletDialog(false);
+      if (pending?.needsSignupConfirm) setNoAccount('wallet');
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const tryAnotherWay = () => {
+    resetEmailFlow();
+    setNoAccount(null);
   };
 
   if (!router.isReady || loading || !paramsChecked) {
@@ -266,6 +292,31 @@ export default function OAuthConsent() {
     );
   }
 
+  if (noAccount) {
+    return shell(
+      <>
+        <h1 className="text-xl font-semibold text-gray-900 mb-2">No account found</h1>
+        <p className="text-sm text-gray-600 mb-2">
+          No Graffiticode account uses that {noAccount === 'email' ? 'email' : 'wallet'}. Sign in with the
+          email or wallet you signed up with, or used when you saved your items.
+        </p>
+        <p className="text-sm text-gray-600 mb-5">
+          New to Graffiticode? Create an account at console.graffiticode.org, then connect again.
+        </p>
+        <button
+          type="button"
+          className="w-full rounded-none border border-gray-900 bg-gray-900 px-4 py-2 text-sm text-white hover:bg-gray-800 mb-3"
+          onClick={tryAnotherWay}
+        >
+          Try another email or wallet
+        </button>
+        <button type="button" className="text-sm text-gray-500 underline" onClick={handleCancel}>
+          Cancel
+        </button>
+      </>,
+    );
+  }
+
   return (
     <>
       <Head><title>{getPageTitle('Connect')}</title></Head>
@@ -283,11 +334,12 @@ export default function OAuthConsent() {
         }}
         onSelectEthereum={() => setShowWalletDialog(true)}
         onSubmitEmail={sendCode}
-        onSubmitCode={verifyAndSignIn}
+        onSubmitCode={handleSubmitCode}
         emailSending={emailSending}
         emailError={emailError}
         codeVerifying={codeVerifying}
         codeError={codeError}
+        variant="connect"
       />
       <WalletSelectionDialog
         isOpen={showWalletDialog}

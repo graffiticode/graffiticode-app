@@ -37,10 +37,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: 'invalid_request' });
   }
 
+  // Which check failed is logged (never the uid, cookie or token) so a pattern of
+  // "sign in again" answers can be told apart: no cookie at all, a cookie the
+  // auth service no longer honours, or one for a different account.
   const refreshToken = readSsoCookie(req.headers.cookie);
   const firebaseCustomToken = refreshToken ? await bootstrapFirebaseToken(refreshToken) : null;
-  if (!firebaseCustomToken || customTokenUid(firebaseCustomToken) !== uid) {
-    return res.status(401).json({ error: 'sign_in_required' });
+  const refusal = !refreshToken
+    ? 'no_session_cookie'
+    : !firebaseCustomToken
+      ? 'session_cookie_rejected'
+      : customTokenUid(firebaseCustomToken) !== uid
+        ? 'session_account_mismatch'
+        : null;
+  if (refusal) {
+    console.warn(`[oauth] grant refused reason=${refusal}`);
+    return res.status(401).json({ error: 'sign_in_required', reason: refusal });
   }
 
   try {
