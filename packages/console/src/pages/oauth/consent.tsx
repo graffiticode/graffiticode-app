@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useAuth } from 'reactfire';
@@ -7,6 +7,7 @@ import useGraffiticodeAuth, { useEmailSignIn } from '@graffiticode/auth-react';
 import AuthMethodDialog from '../../components/AuthMethodDialog';
 import WalletSelectionDialog from '../../components/WalletSelectionDialog';
 import { getPageTitle } from '../../lib/utils';
+import { claimedRecently } from '../../lib/recent-claim';
 
 // The OAuth consent step for agents connecting to Graffiticode (Codex, Claude,
 // ChatGPT…). The MCP server's /oauth/authorize sends the browser here with
@@ -17,10 +18,13 @@ import { getPageTitle } from '../../lib/utils';
 // Google-only, and Google is only an account-linking option here, so most
 // accounts could not get through it.)
 //
-// Sign-in ONLY: an email or wallet that matches no account is told so, never
-// given a new one. Someone connecting an agent nearly always means an account
-// they already have (often the one they just saved items into), and a silently
-// created empty account would connect the agent to the wrong place.
+// New accounts: an email or wallet that matches no account is offered one, behind
+// an explicit "Create a new account?" step that names it, so a typo can't silently
+// connect the agent to an empty account. The exception is a browser that claimed
+// trial items in the last week (lib/recent-claim): that person is reconnecting to
+// the account they just saved into, so an unknown email there is told so instead.
+// Without this, someone whose agent asks them to connect before they have an
+// account (Claude's connector does, on first use) could only cancel.
 //
 // "Allow" asks /api/oauth/grant for a one-time code and POSTs only that code to
 // the MCP server, which redeems it server-to-server when the agent exchanges its
@@ -88,18 +92,20 @@ function postToCallback(callbackUrl: string, fields: Record<string, string>) {
 export default function OAuthConsent() {
   const router = useRouter();
   const auth = useAuth();
-  const { user, loading, beginEthereumSignIn } = useGraffiticodeAuth();
+  const { user, loading, beginEthereumSignIn, confirmEthereumSignIn } = useGraffiticodeAuth();
   // allowSignup off: an unmatched email comes back 'needs-confirm' instead of
   // creating an account (see the note at the top of the file).
   const {
     sendCode,
     verifyAndSignIn,
+    confirmAndCreateAccount,
     cancelSignup,
     reset: resetEmailFlow,
     sending: emailSending,
     verifying: codeVerifying,
     emailError,
     codeError,
+    pendingEmail,
   } = useEmailSignIn({ allowSignup: false });
 
   const [params, setParams] = useState<ConsentParams | null>(null);
@@ -111,6 +117,19 @@ export default function OAuthConsent() {
   const [error, setError] = useState<string | null>(null);
   // Set when the email or wallet someone signed in with has no account.
   const [noAccount, setNoAccount] = useState<'email' | 'wallet' | null>(null);
+  // Set when that email or wallet may become a new account and is waiting on "Create".
+  const [newAccount, setNewAccount] = useState<
+    | { kind: 'email'; email: string }
+    | { kind: 'wallet'; address: string; accountAddress: string }
+    | null
+  >(null);
+  const [creating, setCreating] = useState(false);
+  // Read once on mount (storage is browser-only).
+  const [allowNewAccount, setAllowNewAccount] = useState(false);
+  useEffect(() => setAllowNewAccount(!claimedRecently()), []);
+  // The callback consumes the state on the first POST, so a second one (a double
+  // click while the browser is still navigating) lands the person on a 400 page.
+  const submitted = useRef(false);
 
   useEffect(() => {
     if (!router.isReady) return;
@@ -147,7 +166,7 @@ export default function OAuthConsent() {
   };
 
   const handleAllow = async () => {
-    if (!user || !params || granting) return;
+    if (!user || !params || granting || submitted.current) return;
     setGranting(true);
     setError(null);
     try {
@@ -170,6 +189,7 @@ export default function OAuthConsent() {
       }
       clearStash();
       setDone(true);
+      submitted.current = true;
       postToCallback(params.callbackUrl, { grant: body.code, state: params.state });
     } catch (err: any) {
       setError(err?.message || 'Could not connect your account. Please try again.');
@@ -179,7 +199,8 @@ export default function OAuthConsent() {
   };
 
   const handleCancel = () => {
-    if (!params) return;
+    if (!params || submitted.current) return;
+    submitted.current = true;
     clearStash();
     postToCallback(params.callbackUrl, {
       error: 'access_denied',
@@ -196,27 +217,63 @@ export default function OAuthConsent() {
   const handleSubmitCode = async (code: string) => {
     const result = await verifyAndSignIn(code);
     if (result === 'needs-confirm') {
-      await cancelSignup().catch(() => {});
-      setNoAccount('email');
+      if (allowNewAccount) {
+        setNewAccount({ kind: 'email', email: pendingEmail || '' });
+      } else {
+        await cancelSignup().catch(() => {});
+        setNoAccount('email');
+      }
     }
     return result;
   };
 
   const handleWalletSelect = async (wallet: Wallet) => {
     try {
-      // begin, never confirm: a wallet with no account comes back pending and is
-      // left that way.
+      // A wallet with no account comes back pending; it is confirmed only from the
+      // "Create a new account?" step, and never after a recent claim.
       const pending = await beginEthereumSignIn(wallet);
       setShowWalletDialog(false);
-      if (pending?.needsSignupConfirm) setNoAccount('wallet');
+      if (pending?.needsSignupConfirm) {
+        if (allowNewAccount) {
+          setNewAccount({ kind: 'wallet', address: pending.address, accountAddress: pending.accountAddress });
+        } else {
+          setNoAccount('wallet');
+        }
+      }
     } catch (err) {
       console.error(err);
     }
   };
 
   const tryAnotherWay = () => {
+    if (newAccount?.kind === 'email') cancelSignup().catch(() => {});
     resetEmailFlow();
     setNoAccount(null);
+    setNewAccount(null);
+    setError(null);
+  };
+
+  const handleCreateAccount = async () => {
+    if (!newAccount || creating) return;
+    setCreating(true);
+    setError(null);
+    try {
+      if (newAccount.kind === 'email') {
+        await confirmAndCreateAccount();
+      } else {
+        await confirmEthereumSignIn({
+          address: newAccount.address,
+          accountAddress: newAccount.accountAddress,
+          needsSignupConfirm: true,
+        });
+      }
+      // Signed in now: the Allow screen takes over.
+      setNewAccount(null);
+    } catch (err: any) {
+      setError(err?.message || 'Could not create your account. Please try again.');
+    } finally {
+      setCreating(false);
+    }
   };
 
   if (!router.isReady || loading || !paramsChecked) {
@@ -292,16 +349,48 @@ export default function OAuthConsent() {
     );
   }
 
+  if (newAccount) {
+    const who = newAccount.kind === 'email' ? newAccount.email : newAccount.address;
+    return shell(
+      <>
+        <h1 className="text-xl font-semibold text-gray-900 mb-2">Create a new account?</h1>
+        <p className="text-sm text-gray-600 mb-1">No Graffiticode account uses this {newAccount.kind}:</p>
+        <p className="text-sm font-medium text-gray-900 mb-3 break-all">{who}</p>
+        <p className="text-sm text-gray-600 mb-5">
+          Create a free account with it and connect {params.appName}? If you already have an account,
+          sign in with that one instead.
+        </p>
+        {error && <p className="text-sm text-red-700 mb-4">{error}</p>}
+        <button
+          type="button"
+          disabled={creating}
+          className="w-full rounded-none border border-gray-900 bg-gray-900 px-4 py-2 text-sm text-white hover:bg-gray-800 disabled:opacity-50 mb-3"
+          onClick={handleCreateAccount}
+        >
+          {creating ? 'Creating account…' : 'Create account'}
+        </button>
+        <button
+          type="button"
+          disabled={creating}
+          className="w-full rounded-none border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 mb-3"
+          onClick={tryAnotherWay}
+        >
+          Use a different email or wallet
+        </button>
+        <button type="button" disabled={creating} className="text-sm text-gray-500 underline disabled:opacity-50" onClick={handleCancel}>
+          Cancel
+        </button>
+      </>,
+    );
+  }
+
   if (noAccount) {
     return shell(
       <>
         <h1 className="text-xl font-semibold text-gray-900 mb-2">No account found</h1>
-        <p className="text-sm text-gray-600 mb-2">
-          No Graffiticode account uses that {noAccount === 'email' ? 'email' : 'wallet'}. Sign in with the
-          email or wallet you signed up with, or used when you saved your items.
-        </p>
         <p className="text-sm text-gray-600 mb-5">
-          New to Graffiticode? Create an account at console.graffiticode.org, then connect again.
+          No Graffiticode account uses that {noAccount === 'email' ? 'email' : 'wallet'}. Sign in with the
+          email or wallet you used when you saved your items.
         </p>
         <button
           type="button"
@@ -340,6 +429,7 @@ export default function OAuthConsent() {
         codeVerifying={codeVerifying}
         codeError={codeError}
         variant="connect"
+        allowNewAccount={allowNewAccount}
       />
       <WalletSelectionDialog
         isOpen={showWalletDialog}

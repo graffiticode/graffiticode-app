@@ -81,12 +81,12 @@ checklist below: the reviewer now sees a widget, and the expected tool-call path
 >
 > Superseded: on 2026-07-16 v1 was decided `noauth`-only.
 
-**Why it was `noauth`-only, and why that's resolved.** The consent page used to return the
+**Why it was `noauth`-only, and why that's resolved.** The consent page used to return a
 Google ID token in the `/oauth/callback` **query string**, which leaks into CDN and Cloud Run
-logs, history and Referer. It now POSTs the token in a form body (`handleCallback` in
-`src/oauth/handlers.ts`, which still logs a loud warning if one ever arrives in a query
-string). On 2026-10-22, 30 days of mcp-service logs had no such warning, and the callbacks were
-POSTs.
+logs, history and Referer. Since 2026-11-05 it signs in by email or wallet and POSTs only a
+one-time grant (`core/oauth-grants.ts`), redeemed server-to-server at token exchange; the
+Google path and GET callbacks were removed on 2026-11-06 (`handleCallback` in
+`src/oauth/handlers.ts` is POST-only).
 
 **Submitting with mixed auth:**
 - **Confirm the existing app's saved Authentication is optional (mixed) OAuth.** An OAuth-only
