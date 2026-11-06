@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { getPageTitle } from '../lib/utils';
+import CopyButton from '../components/CopyButton';
 
 const cardClass = 'block bg-gray-50 p-4 border border-gray-200 rounded-none';
 
@@ -15,7 +16,10 @@ export default function Support() {
         <div className={cardClass}>
           <div className="font-medium">Email</div>
           <div className="text-sm text-gray-600">Write to us and we’ll get back to you.</div>
-          <div className="mt-2 text-sm text-gray-900 select-all">support@graffiticode.org</div>
+          <div className="mt-2 flex items-center gap-2 text-sm text-gray-900">
+            <span className="select-all">support@graffiticode.org</span>
+            <CopyButton value="support@graffiticode.org" title="Copy email address" />
+          </div>
         </div>
         <a
           href="https://forum.graffiticode.org/c/support/57"
