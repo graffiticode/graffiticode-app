@@ -1220,12 +1220,10 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     return;
   }
 
-  // OAuth Callback (from consent page). POST is the real path — the consent page
-  // submits the Google ID token in a form body so it never appears in a URL (query
-  // strings land in CDN/Cloud Run access logs, browser history, and Referer headers).
-  // GET is kept so a consent page deployed before that change still works; it logs a
-  // warning and can be removed once the console rollout has landed.
-  if (url.pathname === "/oauth/callback" && (req.method === "POST" || req.method === "GET")) {
+  // OAuth Callback (from consent page). POST only: the grant travels in a form body so
+  // it never appears in a URL (query strings land in CDN/Cloud Run access logs, browser
+  // history, and Referer headers).
+  if (url.pathname === "/oauth/callback" && req.method === "POST") {
     await handleCallback(req, res);
     return;
   }

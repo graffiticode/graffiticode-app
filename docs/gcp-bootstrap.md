@@ -174,6 +174,12 @@ for s in INTERNAL_JOB_SECRET FREE_PLAN_API_KEY FREE_PLAN_NAMESPACE_SALT ACT_AS_G
 gcloud firestore fields ttls update expiresAt --collection-group=idempotency-keys \
   --enable-ttl --project=$P
 
+# OAuth consent grants (oauth-grants/{sha256(code)}, core/oauth-grants.ts) live
+# 10 minutes; redemption deletes them, so the TTL only sweeps grants nobody
+# redeemed. The field is expireAt (a Timestamp) — expiresAt there is millis.
+gcloud firestore fields ttls update expireAt --collection-group=oauth-grants \
+  --enable-ttl --project=$P
+
 # gc-deploy needs the service to exist, on its runtime SA: a placeholder first,
 # then `npm run deploy -- openapi` (verify/openapi.mjs checks core readiness,
 # the protocol floor and the served public URL before promotion).

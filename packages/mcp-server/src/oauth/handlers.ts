@@ -21,7 +21,6 @@ import type {
 // Environment configuration
 const MCP_SERVER_URL = process.env.MCP_SERVER_URL || "https://mcp.graffiticode.org";
 const CONSOLE_URL = process.env.CONSOLE_URL || "https://console.graffiticode.org";
-const AUTH_URL = process.env.GRAFFITICODE_AUTH_URL || "https://auth.graffiticode.org";
 const FIREBASE_API_KEY = "AIzaSyAoVuUNi8ElnS7cn6wc3D8XExML-URLw0I";
 
 // Token expiration (55 minutes to match Firebase token lifetime with buffer)
@@ -387,40 +386,20 @@ export async function handleAuthorize(
 /**
  * /oauth/callback — where the console consent page returns the browser.
  *
- * The page POSTs a form (never a query string, which lands in CDN and Cloud Run
- * access logs, history and Referer) carrying either:
- *   - `grant`: a one-time code from the console's /api/oauth/grant, minted after
- *     an email or wallet sign-in. It is not a credential by itself: it is only
- *     redeemable server-to-server (core/oauth-grants), once, for the state it was
- *     minted for, within 10 minutes. This is the current page.
- *   - `google_id_token`: the legacy Google-only page. Kept so a console still
- *     serving that page keeps working during rollout; remove once it is gone.
- * or `error` (+ `error_description`) when the person declined.
+ * POST only: the page submits a form, never a query string, which lands in CDN
+ * and Cloud Run access logs, history and Referer (a real user's Google ID token
+ * once sat in plaintext in Cloud Logging that way). The form carries either
+ * `grant`, a one-time code from the console's /api/oauth/grant minted after an
+ * email or wallet sign-in, or `error` (+ `error_description`) when the person
+ * declined. A grant is not a credential by itself: it is redeemable only
+ * server-to-server (core/oauth-grants), once, for the state it was minted for,
+ * within 10 minutes.
  */
 export async function handleCallback(
   req: IncomingMessage,
   res: ServerResponse
 ): Promise<void> {
-  const url = new URL(req.url || "/", `http://${req.headers.host}`);
-
-  // The consent page POSTs the Google ID token in a form body. It must never travel
-  // in a query string: URLs are recorded by the CDN and by Cloud Run request logs
-  // (verified — a real user's id_token sat in plaintext in Cloud Logging), kept in
-  // browser history, and forwarded in Referer headers. The body is in none of those.
-  //
-  // GET is still accepted so a consent page deployed before this change keeps
-  // working, but it logs a warning and should stop being reachable once the console
-  // rollout is complete. The cancel path stays GET: it carries only error + state.
-  const isPost = req.method === "POST";
-  const params = isPost ? await parseFormBody(req) : url.searchParams;
-
-  const googleIdToken = params.get("google_id_token");
-  if (!isPost && googleIdToken) {
-    console.warn(
-      "[oauth] google_id_token arrived in the callback QUERY STRING (pre-POST consent page). " +
-        "It is now in this request's access log. Deploy the console consent page that POSTs it."
-    );
-  }
+  const params = await parseFormBody(req);
   const state = params.get("state");
   const error = params.get("error");
   const errorDescription = params.get("error_description");
@@ -438,7 +417,7 @@ export async function handleCallback(
         redirectUrl.searchParams.set("error_description", errorDescription);
       }
       redirectUrl.searchParams.set("state", clientState);
-      redirect(res, redirectUrl.toString(), isPost ? 303 : 302);
+      redirect(res, redirectUrl.toString(), 303);
       return;
     }
     sendError(res, 400, { error, error_description: errorDescription || undefined });
@@ -451,7 +430,7 @@ export async function handleCallback(
   }
 
   const grant = params.get("grant");
-  if (!grant && !googleIdToken) {
+  if (!grant) {
     sendError(res, 400, { error: "invalid_request", error_description: "Missing grant" });
     return;
   }
@@ -475,7 +454,8 @@ export async function handleCallback(
     scope: pending.scope,
     code_challenge: pending.code_challenge,
     code_challenge_method: pending.code_challenge_method,
-    ...(grant ? { grant, grant_state: state } : { google_id_token: googleIdToken! }),
+    grant,
+    grant_state: state,
     resource: pending.resource,
     expires_at: Date.now() + 10 * 60 * 1000, // 10 minutes
     used: false,
@@ -488,90 +468,19 @@ export async function handleCallback(
   redirectUrl.searchParams.set("code", code);
   redirectUrl.searchParams.set("state", clientState);
 
-  redirect(res, redirectUrl.toString(), isPost ? 303 : 302);
+  redirect(res, redirectUrl.toString(), 303);
 }
 
 /**
- * Exchange Google ID token for Firebase ID token and refresh token
- */
-/**
- * The auth service refused the sign-in itself — most often "No Graffiticode account for this
- * email" — as opposed to failing. Answered as OAuth `invalid_grant` (400) with the service's
- * own message, which a client can show the person; a 500 says only that the server broke.
+ * The sign-in itself was refused (an expired or already-used consent grant), as opposed to
+ * the server failing. Answered as OAuth `invalid_grant` (400) with a message a client can show
+ * the person; a 500 says only that the server broke.
  */
 export class GrantRefused extends Error {}
-
-/** The refusal message the auth service sent, from its JSON envelope or as plain text. */
-export function refusalMessage(text: string): string {
-  try {
-    const body = JSON.parse(text) as { error?: { message?: string } | string; message?: string };
-    const msg = typeof body.error === "string" ? body.error : body.error?.message ?? body.message;
-    if (msg) return String(msg).slice(0, 300);
-  } catch {
-    /* not JSON */
-  }
-  return text.slice(0, 300) || "Sign-in was refused.";
-}
 
 /** Logs never carry an email address (CLAUDE.md privacy contract), even inside a message. */
 export function redactEmails(text: string): string {
   return text.replace(/[^\s@<>"',;()]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/g, "<email>");
-}
-
-async function exchangeGoogleTokenForFirebaseToken(googleIdToken: string): Promise<{
-  firebaseIdToken: string;
-  firebaseRefreshToken: string;
-  providerId: string;
-  email: string;
-  expiresAt: number;
-}> {
-  // Step 1: Exchange Google ID token for Firebase custom token
-  const authResponse = await fetch(`${AUTH_URL}/authenticate/google`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ idToken: googleIdToken }),
-  });
-
-  if (!authResponse.ok) {
-    const error = await authResponse.text();
-    if (authResponse.status === 401 || authResponse.status === 403) {
-      throw new GrantRefused(refusalMessage(error));
-    }
-    throw new Error(`Failed to authenticate with Google: ${error}`);
-  }
-
-  const authData = (await authResponse.json()) as {
-    status: string;
-    error?: { message: string } | null;
-    data?: { firebaseCustomToken?: string; uid?: string } | null;
-  };
-
-  if (authData.status !== "success" || !authData.data?.firebaseCustomToken) {
-    throw new Error(authData.error?.message || "Failed to get Firebase custom token");
-  }
-
-  const session = await signInWithCustomToken(authData.data.firebaseCustomToken);
-
-  // The providerId is the Firebase UID from the custom token auth
-  // This is the same UID stored in the oauth-links collection
-  const providerId = session.uid || authData.data.uid || "";
-
-  // Extract email from Google ID token (JWT payload)
-  let email = "";
-  try {
-    const payload = JSON.parse(Buffer.from(googleIdToken.split(".")[1], "base64").toString());
-    email = payload.email || "";
-  } catch {
-    // Ignore - email is optional
-  }
-
-  return {
-    firebaseIdToken: session.firebaseIdToken,
-    firebaseRefreshToken: session.firebaseRefreshToken,
-    providerId,
-    email,
-    expiresAt: session.expiresAt,
-  };
 }
 
 /**
@@ -804,9 +713,8 @@ async function handleAuthorizationCodeGrant(
 
   try {
     // Redeem the consent for a Firebase ID token + refresh token.
-    const { firebaseIdToken, firebaseRefreshToken, providerId, email, expiresAt } = authCode.grant
-      ? await exchangeConsentGrant(authCode.grant, authCode.grant_state ?? "")
-      : await exchangeGoogleTokenForFirebaseToken(authCode.google_id_token ?? "");
+    const { firebaseIdToken, firebaseRefreshToken, providerId, email, expiresAt } =
+      await exchangeConsentGrant(authCode.grant ?? "", authCode.grant_state ?? "");
 
     // Get client name for token metadata
     const client = await oauthStore.getClient(authCode.client_id);

@@ -22,6 +22,8 @@ interface AuthMethodDialogProps {
   codeError?: string | null;
   // 'connect': the OAuth consent page, which signs in to an existing account only.
   variant?: 'default' | 'claim' | 'connect';
+  // connect only: whether an unknown email or wallet may become a new account.
+  allowNewAccount?: boolean;
 }
 
 type Step = 'method' | 'email' | 'code';
@@ -38,6 +40,7 @@ export default function AuthMethodDialog({
   codeVerifying = false,
   codeError = null,
   variant = 'default',
+  allowNewAccount = false,
 }: AuthMethodDialogProps) {
   const [step, setStep] = useState<Step>('method');
   const [email, setEmail] = useState('');
@@ -59,7 +62,9 @@ export default function AuthMethodDialog({
   const leadCopy = isClaim
     ? 'Sign in to keep these items permanently.'
     : isConnect
-      ? 'Use the email or wallet you signed up with, or used to save your items.'
+      ? allowNewAccount
+        ? 'Sign in with email or a wallet. New here? You can create a free account.'
+        : 'Use the email or wallet you signed up with, or used to save your items.'
       : 'New here? Create a free account by signing in. No blockchain fees. No credit card required.';
   const ethereumLabel = isClaim || isConnect ? 'Sign in with Ethereum Wallet' : 'Continue with Ethereum Wallet';
   const emailCaption = isClaim ? '(creates a new Graffiticode account)' : null;

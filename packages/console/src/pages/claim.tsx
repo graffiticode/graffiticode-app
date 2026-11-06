@@ -6,6 +6,7 @@ import { signOut } from 'firebase/auth';
 import useGraffiticodeAuth from '@graffiticode/auth-react';
 import { useEmailSignIn } from '@graffiticode/auth-react';
 import AuthMethodDialog from '../components/AuthMethodDialog';
+import { markClaimed } from '../lib/recent-claim';
 import WalletSelectionDialog from '../components/WalletSelectionDialog';
 import ConnectAgentInstructions, {
   hostTakesApiKey,
@@ -200,6 +201,8 @@ export default function Claim() {
       const target = items[0].lang
         ? `/items/${items[0].id}?lang=${items[0].lang}`
         : `/items/${items[0].id}`;
+      // The consent page reads this to keep reconnecting the agent sign-in only.
+      markClaimed();
       setClaimed({ count: items.length, target });
     } catch (err: any) {
       // Leave the token in place so "Try again" can retry.
