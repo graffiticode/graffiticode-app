@@ -212,6 +212,15 @@ test("a failed command is a failure that isn't checkable", async () => {
   assert.equal(item.lastWrite.checkable, false);
 });
 
+test("a command refused at admission records its reason, explained as a refused save was", async () => {
+  h.setCommand(() => ({ status: 200, body: { status: "success", data: { commandId: "cmd-r", outcome: "failed", result: "none", statusUrl: "/command/cmd-r", reason: "not-granted" }, error: null } }));
+  const item = await createItem(h, alice, { lang: "0176" });
+  assert.equal(item.lastWrite.status, "failed");
+  assert.match(item.lastWrite.message, /permission denied \(not-granted\)/);
+  assert.equal(item.lastWrite.checkable, false);
+  assert.deepEqual(compiles(), []);
+});
+
 test("a refused command records the refusal's reason, and nothing compiles", async () => {
   h.setCommand(() => refusedWith(403, "system-connection"));
   const item = await createItem(h, alice, { lang: "0176" });

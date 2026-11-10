@@ -129,10 +129,15 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 // outcome reads as the compile bridge reports it (api commands/bridge.js), so
 // lib/write-errors.ts explains it the same way and the partial and uncertain
 // ones stay checkable (reconcileItemWrite, by this save's key).
-const commandMessage = ({ outcome, statusUrl }: { outcome: string; statusUrl?: string }) =>
+// A command Policy refused at admission carries the refusal's `reason`
+// (not-granted, connection-disabled, ...): it reads as a refused compile did,
+// so the explanation names the cause.
+const commandMessage = ({ outcome, statusUrl, reason }: { outcome: string; statusUrl?: string; reason?: string }) =>
   outcome === "completed"
     ? null
-    : errorMessages([{ message: `Error: the command is ${outcome}${statusUrl ? `, read it at ${statusUrl}` : ""}`, code: "command-not-completed" }]);
+    : reason
+      ? `Error: permission denied (${reason})`
+      : errorMessages([{ message: `Error: the command is ${outcome}${statusUrl ? `, read it at ${statusUrl}` : ""}`, code: "command-not-completed" }]);
 
 // Sends one write through a connection and returns its outcome as a message
 // (null for success). Persists nothing and never throws: a transport failure
