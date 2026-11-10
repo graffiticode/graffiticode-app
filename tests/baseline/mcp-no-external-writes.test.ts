@@ -42,7 +42,8 @@ const withConnection = () => {
   h.setConnections([{ connectionId: "conn-1", backend: "learnosity", status: "active", label: "Item bank", ownerPermissions: null }]);
 };
 const lastGenerationId = () => h.jobPayloads.at(-1).generationId;
-const connectionCompiles = () => h.calls.filter(c => c.path === "/compile" && c.body?.connectionId);
+// A write is a command (POST /command), or a compile through a connection.
+const connectionCompiles = () => h.calls.filter(c => (c.path === "/compile" || c.path === "/command") && c.body?.connectionId);
 
 async function assertNoWrite(generationId: string) {
   const j = await doc(`generation-jobs/${generationId}`);

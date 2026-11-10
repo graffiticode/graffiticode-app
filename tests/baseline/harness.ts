@@ -68,6 +68,11 @@ export type Calls = Array<{ method: string; path: string; body?: any; headers: h
 export type CompileResponder = (req: { id: string; connectionId: string; idempotencyKey: string }) =>
   { status: number; body: unknown };
 
+// POST /command and GET /command/:id (C6, D3). `id` is the command's id for a
+// status read, absent for a POST.
+export type CommandResponder = (req: { method: "POST" | "GET"; id?: string; taskId?: string; connectionId?: string; idempotencyKey?: string }) =>
+  { status: number; body: unknown };
+
 export type ReconcileResponder = (req: { connectionId: string; idempotencyKey: string }) =>
   { status: number; body: unknown } | Promise<{ status: number; body: unknown }>;
 
@@ -80,6 +85,7 @@ export const CONSOLE_IDENTITY = "idt|console-run@graffiticode-app.iam.gserviceac
 type BackendState = {
   actAs: ActAsResponder;
   compile: CompileResponder;
+  command: CommandResponder;
   reconcile: ReconcileResponder;
   connections: any[];
   tasks: Map<string, any>;
@@ -150,6 +156,15 @@ function fakeBackend(calls: Calls, state: BackendState) {
       const id = url.searchParams.get("id");
       return sendJson(res, 200, { status: "success", data: { compiled: true, id } });
     }
+    if (req.method === "POST" && url.pathname === "/command") {
+      const r = state.command({ method: "POST", taskId: body?.id, connectionId: body?.connectionId, idempotencyKey: body?.idempotencyKey });
+      return sendJson(res, r.status, r.body);
+    }
+    const command = url.pathname.match(/^\/command\/([^/]+)$/);
+    if (req.method === "GET" && command) {
+      const r = state.command({ method: "GET", id: decodeURIComponent(command[1]) });
+      return sendJson(res, r.status, r.body);
+    }
     if (req.method === "POST" && url.pathname === "/compile") {
       const r = state.compile({ id: body?.id, connectionId: body?.connectionId, idempotencyKey: body?.idempotencyKey });
       return sendJson(res, r.status, r.body);
@@ -188,6 +203,7 @@ export type Harness = {
   jobPayloads: any[];
   setLlm(fn: LlmResponder, delayMs?: number): void;
   setCompile(fn: CompileResponder): void;
+  setCommand(fn: CommandResponder): void;
   setActAs(fn: ActAsResponder): void;
   setReconcile(fn: ReconcileResponder): void;
   setConnections(connections: any[]): void;
@@ -216,6 +232,8 @@ export async function start(): Promise<Harness> {
   const jobPayloads: any[] = [];
   const defaultLlm = (() => "```\n" + DEFAULT_PROGRAM + "\n```") as LlmResponder;
   const defaultCompile = (() => ({ status: 200, body: { status: "success", data: { id: "x" } } })) as CompileResponder;
+  // A language whose saves aren't commands: every write compiles, as before C6.
+  const defaultCommand = (() => ({ status: 409, body: { status: "error", error: { code: 409, message: "command refused", reason: "commands-not-enabled" }, data: null } })) as CommandResponder;
   const defaultReconcile = (() => ({ status: 200, body: { status: "success", data: { operations: [] } } })) as ReconcileResponder;
   // The real route checks the caller and the grant (backend auth/routes/internal.js);
   // the fake checks the caller and answers with a token the fake verifier accepts.
@@ -225,6 +243,7 @@ export async function start(): Promise<Harness> {
   const state: BackendState & { llm: LlmResponder; llmDelayMs: number } = {
     actAs: defaultActAs,
     compile: defaultCompile,
+    command: defaultCommand,
     reconcile: defaultReconcile,
     connections: [],
     tasks: new Map<string, any>(),
@@ -345,6 +364,7 @@ export async function start(): Promise<Harness> {
     calls, external, llmRequests, jobs, jobPayloads,
     setLlm(fn, delayMs = 0) { state.llm = fn; state.llmDelayMs = delayMs; },
     setCompile(fn) { state.compile = fn; },
+    setCommand(fn) { state.command = fn; },
     setActAs(fn) { state.actAs = fn; },
     setReconcile(fn) { state.reconcile = fn; },
     setConnections(connections) { state.connections = connections; },
@@ -372,7 +392,7 @@ export async function start(): Promise<Harness> {
       llmRequests.length = 0;
       jobPayloads.length = 0;
       state.llm = defaultLlm; state.llmDelayMs = 0;
-      state.compile = defaultCompile; state.reconcile = defaultReconcile; state.actAs = defaultActAs;
+      state.compile = defaultCompile; state.command = defaultCommand; state.reconcile = defaultReconcile; state.actAs = defaultActAs;
       state.connections = [];
       delete process.env.POLICY_URL;
     },

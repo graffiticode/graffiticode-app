@@ -1,6 +1,6 @@
 // Moved from pages/api/resolvers.ts (Phase 1: untangle inside the console).
 import { randomUUID } from "crypto";
-import { compileThroughConnection, recompileTask } from "./lib/task-api.js";
+import { compileThroughConnection, getCommand, postCommand, recompileTask } from "./lib/task-api.js";
 import { createPublication, deletePublication, PublicationError } from "./lib/publications.js";
 import { isConnectableLang, programSavesToItemBank } from "./lib/connectable.js";
 import { resolveCurrentConnection, currentConnectionId, saveWriteKey } from "./lib/current-connection.js";
@@ -113,10 +113,37 @@ export async function performWrite({ auth, itemId, taskId, connectionId, idempot
   return recordLastWrite({ auth, itemId, taskId, connectionId, message, idempotencyKey });
 }
 
+// Refusals of POST /command that mean "this isn't a command": a chain with no
+// write (a preview), a language whose saves aren't commands, or an api without
+// a legacy handler for a key the legacy path holds. Each is compiled through
+// the connection instead, as before C6.
+const NOT_A_COMMAND = new Set(["no-effects", "commands-not-enabled", "legacy-protocol"]);
+
+// How long a save waits for a command another request is running (a duplicate
+// of an in-flight save), between reads of its status: about 30 s in all.
+export const COMMAND_POLL_MS = [500, 1000, 2000, 4000, 8000, 8000, 8000];
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// A command's outcome as a write message: null when it completed. Any other
+// outcome reads as the compile bridge reports it (api commands/bridge.js), so
+// lib/write-errors.ts explains it the same way and the partial and uncertain
+// ones stay checkable (reconcileItemWrite, by this save's key).
+const commandMessage = ({ outcome, statusUrl }: { outcome: string; statusUrl?: string }) =>
+  outcome === "completed"
+    ? null
+    : errorMessages([{ message: `Error: the command is ${outcome}${statusUrl ? `, read it at ${statusUrl}` : ""}`, code: "command-not-completed" }]);
+
 // Sends one write through a connection and returns its outcome as a message
 // (null for success). Persists nothing and never throws: a transport failure
 // is an outcome too. The generation outbox (effects.ts) records the result in
 // a transaction fenced on its own lease; performWrite records it directly.
+//
+// A write is a command (C6, D3): POST /command with the save's key. A chain
+// the api says isn't a command (a preview, a language without commands) and a
+// key the legacy path already holds (a save from before commands, which stays
+// legacy) compile through the connection as before; the legacy key's compile
+// replays its recorded receipts and writes nothing again.
 export async function sendWrite({ token, taskId, connectionId, idempotencyKey }: {
   token: string;
   taskId: string;
@@ -124,18 +151,46 @@ export async function sendWrite({ token, taskId, connectionId, idempotencyKey }:
   idempotencyKey: string;
 }): Promise<string | null> {
   try {
-    const resp = await compileThroughConnection({ authToken: token, id: taskId, connectionId, idempotencyKey });
-    const errors = [
-      ...(Array.isArray(resp?.data?.errors) ? resp.data.errors : []),
-      ...(Array.isArray(resp?.errors) ? resp.errors : []),
-    ];
-    if (resp?.status !== "success" && errors.length === 0) {
-      errors.push(resp?.error ?? `compile ${resp?.status ?? "failed"}`);
+    const resp = await postCommand({ authToken: token, id: taskId, connectionId, idempotencyKey });
+    const reason = resp?.error?.reason;
+    const legacy = resp?.status === "success" && resp.data?.protocol === "legacy";
+    if (legacy || NOT_A_COMMAND.has(reason)) {
+      return await sendCompile({ token, taskId, connectionId, idempotencyKey });
     }
-    return errors.length ? errorMessages(errors) : null;
+    if (resp?.status !== "success") {
+      if (reason) return `Error: permission denied (${reason})`;
+      return errorMessages([resp?.error ?? "command failed"]);
+    }
+    let answer = resp.data;
+    for (const wait of COMMAND_POLL_MS) {
+      if (answer?.outcome !== "pending") break;
+      await sleep(wait);
+      const read = await getCommand({ authToken: token, statusUrl: answer.statusUrl });
+      if (read?.status !== "success") break;
+      answer = read.data;
+    }
+    return commandMessage(answer ?? { outcome: "uncertain" });
   } catch (err) {
     return `Write failed: ${err?.message ?? err}`;
   }
+}
+
+// The write as a compile through the connection (today's envelope).
+async function sendCompile({ token, taskId, connectionId, idempotencyKey }: {
+  token: string;
+  taskId: string;
+  connectionId: string;
+  idempotencyKey: string;
+}): Promise<string | null> {
+  const resp = await compileThroughConnection({ authToken: token, id: taskId, connectionId, idempotencyKey });
+  const errors = [
+    ...(Array.isArray(resp?.data?.errors) ? resp.data.errors : []),
+    ...(Array.isArray(resp?.errors) ? resp.errors : []),
+  ];
+  if (resp?.status !== "success" && errors.length === 0) {
+    errors.push(resp?.error ?? `compile ${resp?.status ?? "failed"}`);
+  }
+  return errors.length ? errorMessages(errors) : null;
 }
 
 export function buildLastWrite({ taskId, connectionId, message, status, idempotencyKey, at = Date.now() }: {

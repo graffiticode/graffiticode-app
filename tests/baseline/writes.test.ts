@@ -168,3 +168,103 @@ test("a non-connectable language never writes through a connection", async () =>
   assert.equal(item.lastWrite, null);
   assert.equal(ok(await getItem(h, alice, item.id)).item.lastWrite, null);
 });
+
+// --- writes as commands (C6, D3): POST /command, and the compile fallbacks --
+
+const commands = () => h.calls.filter(c => c.method === "POST" && c.path === "/command").map(c => c.body);
+const commandAnswer = (outcome: string, commandId = "cmd-1") =>
+  ({ status: 200, body: { status: "success", data: { commandId, outcome, result: outcome === "completed" ? "available" : "none", statusUrl: `/command/${commandId}` }, error: null } });
+const refusedWith = (status: number, reason: string) =>
+  ({ status, body: { status: "error", error: { code: status, message: "command refused", reason }, data: null } });
+
+test("a save is a command with the save's key, and nothing compiles", async () => {
+  h.setCommand(({ method }) => method === "POST" ? commandAnswer("completed") : refusedWith(404, "not-found"));
+  const item = await createItem(h, alice, { lang: "0176" });
+  assert.deepEqual(commands(), [{ id: item.taskId, data: {}, connectionId: "conn-1", idempotencyKey: saveKey(item.id, item.taskId) }]);
+  assert.deepEqual(compiles(), []);
+  assert.equal(item.lastWrite.status, "ok");
+  assert.equal((await storedLastWrite(item.id)).idempotencyKey, saveKey(item.id, item.taskId));
+});
+
+test("a partial or uncertain command is a checkable failure, checked by its key", async () => {
+  for (const outcome of ["partial", "uncertain"]) {
+    h.setCommand(() => commandAnswer(outcome));
+    const item = await createItem(h, alice, { lang: "0176" });
+    assert.equal(item.lastWrite.status, "failed");
+    assert.match(item.lastWrite.message, new RegExp(`the command is ${outcome}, read it at /command/cmd-1`));
+    assert.equal(item.lastWrite.checkable, true);
+    h.setReconcile(({ idempotencyKey }) => {
+      assert.equal(idempotencyKey, saveKey(item.id, item.taskId));
+      return { status: 200, body: { status: "success", data: { operations: [{ verdict: "applied", final: true }] } } };
+    });
+    const w = ok(await h.gql(CHECK, { id: item.id }, alice)).reconcileItemWrite.lastWrite;
+    assert.equal(w.status, "ok");
+    assert.equal(w.confirmed, true);
+  }
+  assert.deepEqual(compiles(), []);
+});
+
+test("a failed command is a failure that isn't checkable", async () => {
+  h.setCommand(() => commandAnswer("failed"));
+  const item = await createItem(h, alice, { lang: "0176" });
+  assert.equal(item.lastWrite.status, "failed");
+  assert.match(item.lastWrite.message, /the command is failed/);
+  assert.equal(item.lastWrite.checkable, false);
+});
+
+test("a refused command records the refusal's reason, and nothing compiles", async () => {
+  h.setCommand(() => refusedWith(403, "system-connection"));
+  const item = await createItem(h, alice, { lang: "0176" });
+  assert.equal(item.lastWrite.status, "failed");
+  assert.match(item.lastWrite.message, /permission denied \(system-connection\)/);
+  assert.deepEqual(compiles(), []);
+});
+
+test("a chain the api says isn't a command compiles through the connection with the same key", async () => {
+  for (const reason of ["no-effects", "commands-not-enabled"]) {
+    await h.resetFirestore();
+    h.enablePolicy();
+    h.setConnections([{ connectionId: "conn-1", backend: "learnosity", status: "active", label: "Item bank", ownerPermissions: null }]);
+    h.setCommand(() => refusedWith(409, reason));
+    const item = await createItem(h, alice, { lang: "0176" });
+    assert.equal(commands().length, 1);
+    assert.deepEqual(compiles(), [{ id: item.taskId, data: {}, connectionId: "conn-1", idempotencyKey: saveKey(item.id, item.taskId) }]);
+    assert.equal(item.lastWrite.status, "ok");
+  }
+});
+
+test("a key the legacy path holds compiles with that key, and reports the compile's outcome", async () => {
+  h.setCommand(() => ({ status: 200, body: { status: "success", data: { protocol: "legacy", invocationId: "inv-1", outcome: "failed", result: "unavailable" }, error: null } }));
+  h.setCompile(uncertain);
+  const item = await createItem(h, alice, { lang: "0176" });
+  const [compiled] = compiles();
+  assert.equal(compiled.idempotencyKey, commands()[0].idempotencyKey);
+  assert.match(item.lastWrite.message, /the save is uncertain/, "the compile's own message, not the command answer's");
+});
+
+test("a pending command is read at its status URL until it settles", async () => {
+  let reads = 0;
+  h.setCommand(({ method, id }) => {
+    if (method === "POST") return commandAnswer("pending", "cmd-p");
+    assert.equal(id, "cmd-p");
+    reads += 1;
+    return commandAnswer(reads < 2 ? "pending" : "completed", "cmd-p");
+  });
+  const item = await createItem(h, alice, { lang: "0176" });
+  assert.equal(reads, 2);
+  assert.equal(item.lastWrite.status, "ok");
+  assert.deepEqual(compiles(), []);
+});
+
+test("as commands, retry replays the save's key and recompile uses a fresh one", async () => {
+  h.setCommand(() => commandAnswer("uncertain"));
+  const item = await createItem(h, alice, { lang: "0176" });
+  ok(await h.gql(`mutation($id:String!){ retryItemWrite(id:$id){ id } }`, { id: item.id }, alice));
+  const [first, retry] = commands();
+  assert.equal(retry.idempotencyKey, first.idempotencyKey);
+  h.setCommand(() => commandAnswer("completed", "cmd-2"));
+  const r = ok(await h.gql(`mutation($id:String!){ recompileItem(id:$id){ lastWrite { status } } }`, { id: item.id }, alice)).recompileItem;
+  assert.match(commands().at(-1).idempotencyKey, /^recompile:[0-9a-f-]{36}$/);
+  assert.equal(r.lastWrite.status, "ok");
+  assert.deepEqual(compiles(), []);
+});
