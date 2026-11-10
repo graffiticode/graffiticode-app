@@ -115,6 +115,33 @@ export async function compileThroughConnection(
   return await post("/compile", { id, data: {}, connectionId, idempotencyKey }) as any;
 }
 
+// Runs a program's writes as a command (C6, D3; api POST /command): the api
+// allocates or finds the command for this key and runs it before answering
+// `{ commandId, outcome, result, statusUrl }`, or, for a key the legacy path
+// holds, `{ protocol: "legacy", outcome, … }`. The same key never writes
+// twice. A chain with no write is refused (`no-effects`, or
+// `commands-not-enabled` for a language whose saves aren't commands), and the
+// caller compiles it through the connection instead. Error statuses come back
+// as the api's JSON body rather than a throw.
+export async function postCommand(
+  { authToken, id, connectionId, idempotencyKey }:
+  { authToken: string; id: string; connectionId: string; idempotencyKey: string },
+) {
+  const post = bent(getBaseUrlForApi(), "POST", "json", 200, 400, 401, 403, 404, 409, 422, 500, 502, 503, {
+    authorization: authToken,
+  });
+  return await post("/command", { id, data: {}, connectionId, idempotencyKey }) as any;
+}
+
+// A command's current outcome (api GET /command/:id, the statusUrl
+// postCommand answered with), for its own user.
+export async function getCommand({ authToken, statusUrl }: { authToken: string; statusUrl: string }) {
+  const get = bent(getBaseUrlForApi(), "GET", "json", 200, 401, 404, 500, 502, 503, {
+    authorization: authToken,
+  });
+  return await get(statusUrl) as any;
+}
+
 // Compiles a task afresh instead of answering from the compile cache, and
 // stores the new result (api GET /data?refresh=1, which requires a signed-in
 // caller). The token travels in a header, never the URL, so it stays out of
