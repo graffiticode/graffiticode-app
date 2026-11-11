@@ -412,7 +412,7 @@ export interface Digest {
   reach: {
     byClient: Record<
       string,
-      { connects: number; sessions: number; listed: number; read: number; used: number }
+      { connects: number; sessions: number; listed: number; read: number; used: number; items: number }
     >;
     /** Self-identifying automation, collapsed to one line. */
     crawlers: { sessions: number; byName: Record<string, number> };
@@ -423,6 +423,26 @@ export interface Digest {
     /** Whether mcp_listed exists in this window at all. */
     instrumented: boolean;
   };
+  /**
+   * Where agent connects came from, by ISO country (`geo_country`, "unknown"
+   * when no event in the session carried one). Same population as
+   * `reach.byClient` — crawlers excluded — so `connects` sums to its sessions
+   * and `used` to its used column. `toolCalls` counts every non-probe call,
+   * including sessions that connected in an earlier window, so it sums to
+   * `context.toolCalls` instead.
+   *
+   * Hosted clients (claude.ai, ChatGPT/openai-mcp) dial out from their
+   * provider's cloud, so for them this is the datacenter's country, not the
+   * user's; only locally-run hosts (claude-code, codex-mcp-client) locate a
+   * person.
+   *
+   * `items` (here and on reach.byClient rows) counts item_created in this
+   * window, credited through the item's session to the client and country its
+   * tool calls named, so it sums to `items.ok`. A session that named no client
+   * lands under "unknown"; its connect may have been in an earlier window, so
+   * a row can carry items with zero connects.
+   */
+  byCountry: Record<string, { connects: number; used: number; toolCalls: number; items: number }>;
 }
 
 // The client-classification vocabulary lives in ./funnel-clients (a leaf module
@@ -515,6 +535,7 @@ export function aggregate(
       agentIdle: 0,
       instrumented: false,
     },
+    byCountry: {},
   };
 
   // Session-level joins: what became of each connect, and a checkout that never
@@ -574,7 +595,26 @@ export function aggregate(
   // arrived in a different order — and `gcloud logging read` defaults to
   // descending, so offline analysis would disagree with the live path.
   const probeKeys = new Set<string>();
+  // reach key / session -> the first country any of its events reported. A
+  // pre-pass for the same ordering reason as probeKeys: not every event in a
+  // session carries geo_country, and the one that does may be read last.
+  const keyGeo = new Map<string, string>();
+  // session -> the first client kind any of its events named. item_created
+  // carries none, so this is how an item reaches its Reach row.
+  const sessionKind = new Map<string, string>();
   for (const e of events) {
+    const named = langSafeKind(e.client_kind);
+    if (named && typeof e.session === "string" && e.session && !sessionKind.has(e.session)) {
+      sessionKind.set(e.session, named);
+    }
+    const geo = geoOf(e);
+    if (geo) {
+      const k = reachKey(e);
+      if (k && !keyGeo.has(k)) keyGeo.set(k, geo);
+      if (typeof e.session === "string" && e.session && !keyGeo.has(e.session)) {
+        keyGeo.set(e.session, geo);
+      }
+    }
     if (!isProbeKind(langSafeKind(e.client_kind))) continue;
     const k = reachKey(e);
     if (k) probeKeys.add(k);
@@ -586,6 +626,18 @@ export function aggregate(
    * Dropping it at fetchEvents instead would have emptied the crawler rows —
    * the evidence and the noise are the same events, told apart only here.
    */
+  const countryOf = (e: LogEvent): string => {
+    const own = geoOf(e);
+    if (own) return own;
+    const k = reachKey(e);
+    const viaKey = k ? keyGeo.get(k) : undefined;
+    if (viaKey) return viaKey;
+    return (typeof e.session === "string" && keyGeo.get(e.session)) || "unknown";
+  };
+  const countryRow = (geo: string) =>
+    (d.byCountry[geo] ??= { connects: 0, used: 0, toolCalls: 0, items: 0 });
+  const clientRow = (kind: string) =>
+    (d.reach.byClient[kind] ??= { connects: 0, sessions: 0, listed: 0, read: 0, used: 0, items: 0 });
   const isProbe = (e: LogEvent): boolean => {
     const kind = langSafeKind(e.client_kind);
     if (kind) return isProbeKind(kind);
@@ -629,6 +681,7 @@ export function aggregate(
         mark(usedKeys, e);
         if (isProbe(e)) break;
         d.context.toolCalls++;
+        countryRow(countryOf(e)).toolCalls++;
         if (session) {
           const kind = langSafeKind(e.client_kind);
           if (kind && !active.has(session)) {
@@ -663,6 +716,8 @@ export function aggregate(
       case "item_created":
         if (isProbe(e)) break;
         d.items.ok++;
+        countryRow(countryOf(e)).items++;
+        clientRow((typeof e.session === "string" && sessionKind.get(e.session)) || "unknown").items++;
         bump(d.items.byApp, typeof e.app === "string" ? e.app : "console");
         bump(d.languages.created, langKey(e.lang));
         if (e.first_for_account) d.items.firstForAccount++;
@@ -791,19 +846,16 @@ export function aggregate(
         d.reach.unnamed++;
         break;
       case "agent": {
-        const row = (d.reach.byClient[r.kind as string] ??= {
-          connects: 0,
-          sessions: 0,
-          listed: 0,
-          read: 0,
-          used: 0,
-        });
+        const row = clientRow(r.kind as string);
         row.connects += r.connects;
         row.sessions++;
         if (listedKeys.has(key)) row.listed++;
         if (readKeys.has(key)) row.read++;
         if (used) row.used++;
         else d.reach.agentIdle++;
+        const geoRow = countryRow(keyGeo.get(key) ?? "unknown");
+        geoRow.connects++;
+        if (used) geoRow.used++;
         break;
       }
     }
