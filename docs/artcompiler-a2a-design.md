@@ -1,12 +1,14 @@
 # Artcompiler A2A services and Learnosity agents
 
 Status: Draft for review  
-Date: November 9, 2026  
+Date: November 11, 2026  
 Basis: [MCP/A2A design brief](./mcp-a2a-design-brief.md)
 
 ## 1. Decision
 
-Artcompiler will expose specialized services that accept responsibility for a bounded outcome. Graffiticode supplies the shared intent translation, language composition, compilation, execution, and capability enforcement machinery. A2A and MCP are interfaces to those services.
+**Artcompiler builds and operates specialized micro-agents. Graffiticode supplies the platform for the controlled execution of their work and inspection of the results.**
+
+Each Artcompiler service accepts responsibility for a bounded outcome. Artcompiler is responsible for the service's domain expertise, generated work, and completion contract. Its micro-agents use Graffiticode's shared intent translation, language composition, generation, compilation, execution, capability enforcement, and result inspection mechanisms. A2A and MCP are interfaces to these Artcompiler services.
 
 For Learnosity, define two services:
 
@@ -23,9 +25,15 @@ The initial release offers only capabilities that can be demonstrated end to end
 
 The general architecture must support additional Artcompiler domains without rebuilding authentication, job tracking, clarification, artifact delivery, or recovery. A new service should primarily supply its supported intents, language constraints, provider operations, and completion validators.
 
-The service earns delegation by supplying maintained capability: appropriate generation, reliable execution, constrained provider access, and evidence of the outcome. A2A itself does not make the underlying work more intelligent or reliable.
+Artcompiler earns delegation by supplying maintained capability: appropriate generation, reliable execution, constrained provider access, and evidence of the outcome. A2A itself does not make the underlying work more intelligent or reliable.
 
-This design does not require one model, language, internal micro-agent, or deployment per public agent. It does not introduce a general autonomous multi-agent scheduler. Cross-service workflows begin as explicit compositions with recorded child jobs and authority boundaries.
+The micro-agents exist to do useful work that is **secure, transparent, and accessible**:
+
+- **Secure:** Artcompiler defines each service's scope; execution is constrained by that scope, the caller's grants, and connection policy, with protected operations enforced by policy and broker.
+- **Transparent:** authorized users can inspect the selected revision or plan, output artifacts, validation results, provenance, and provider evidence where applicable. Uncertainty and incomplete outcomes remain visible.
+- **Accessible:** clients can discover and use supported capabilities through A2A and MCP, obtain clarification when needed, and retrieve usable results through documented contracts.
+
+An Artcompiler micro-agent is defined here by its bounded responsibility and observable results. Internal composition and delegation are implementation choices. This design does not require one model, language, internal micro-agent, or deployment per public agent. It does not introduce a general autonomous multi-agent scheduler. Cross-service workflows begin as explicit compositions with recorded child jobs and authority boundaries.
 
 Learner delivery, human-facing reporting, and unrestricted Learnosity administration are outside the initial service scope. Embedding Learnosity's authoring UI is an authoring integration-planning skill when supported by a current language; it does not require a third public identity.
 
@@ -47,19 +55,19 @@ New work includes service definitions and enforced scope attenuation, a durable 
 
 ### 4.1 Components and ownership
 
-**Service registry.** Stores reviewed, versioned service definitions. Owns stable service and skill identifiers, supported requests, allowed language compositions, maximum provider capabilities, output contracts, and completion criteria. Deployment configuration enables a subset of implemented skills.
+**Artcompiler service registry.** Stores reviewed, versioned service definitions. Owns stable service and skill identifiers, supported requests, allowed language compositions, maximum provider capabilities, output contracts, and completion criteria. Deployment configuration enables a subset of implemented skills.
 
 **Protocol adapters.** Authenticate requests, resolve the selected service, validate protocol payloads, and translate messages, job state, and artifacts. They own transport behavior and client compatibility. They do not contain Learnosity business logic.
 
-**Service runtime.** Resolves caller context, interprets the requested outcome, requests missing information, constructs a bounded plan, reserves work, and evaluates completion. The runtime may use existing generation and routing. Every resulting language and operation remains constrained by service scope.
+**Artcompiler service runtime.** Resolves caller context, interprets the requested outcome, requests missing information, constructs a bounded plan, reserves work, and evaluates completion. The runtime may use existing generation and routing. Every resulting language and operation remains constrained by service scope.
 
-**Graffiticode execution.** Generates and processes language-specific work. Compilation is one stage of a service job. Its successful completion alone does not prove a provider write or a complete export.
+**Graffiticode platform.** Supplies shared intent translation, language composition, generation, compilation, controlled execution, and capability enforcement machinery for Artcompiler's micro-agents. Job records, artifacts, and verification evidence support authorized inspection of the work and results. Compilation is one stage of a service job. Its successful completion alone does not prove a provider write or a complete export; Artcompiler evaluates the resulting evidence against the service's completion contract.
 
 **Policy and broker.** Enforce provider access at the operation boundary and perform credentialed calls. The console remains the place for detailed connection and capability management. Artcompiler stores connection references, not provider secrets in prompts or job artifacts.
 
 **Job and artifact stores.** Persist the service-level conversation, requested deliverable, child generation jobs, execution checkpoints, results, and evidence. Workers and adapters operate against this durable state; an open HTTP stream is never its source of truth.
 
-The request path is: adapter → service runtime → scoped Graffiticode work → policy/broker operations → verification → durable result → adapter. A card or tool catalog is generated from the same service definition used by the runtime.
+The request path is: adapter → Artcompiler service runtime → controlled Graffiticode execution → policy/broker operations → verification → durable, inspectable result → adapter. A card or tool catalog is generated from the same service definition used by the runtime.
 
 ### 4.2 Service definition
 
@@ -146,6 +154,8 @@ Cancellation is cooperative: stop scheduling, check cancellation between bounded
 
 Publish **Artcompiler Learnosity Assessment Authoring** and **Artcompiler Learnosity Data Operations** as distinct cards. Proposed application paths are `/agents/learnosity/authoring` and `/agents/learnosity/data`; their exact host is a deployment decision.
 
+The cards identify the services Artcompiler builds and operates. Graffiticode is their execution and result inspection platform. Each public identity groups a coherent responsibility and its supported skills; internal languages and micro-agents do not automatically receive separate cards. An A2A endpoint is a protocol access point. The [A2A core concepts](https://a2a-protocol.org/latest/topics/key-concepts/) allow a remote agent to be an agent or agentic system, so an endpoint does not determine whether its implementation performs work directly or delegates internally.
+
 Use directly configured card URLs or a catalog to discover both identities on a shared host. The standard root `/.well-known/agent-card.json` returns a single Agent Card; do not put an Artcompiler card array there. If root discovery is required for each identity, use separate hostnames or another supported routing arrangement.
 
 Each card describes responsibility, currently enabled skills, examples, input/output media types, security requirements, and supported interfaces. Pin an A2A release and SDK together; validate cards and payloads against that release. Keep protocol version, service-definition version, and artifact-schema version separate. The current [A2A specification](https://a2a-protocol.org/latest/specification/) defines cards, task interaction, artifacts, discovery, and transport bindings; `latest` is a research link, not a deployment version pin.
@@ -176,7 +186,7 @@ Initially deploy one Learnosity endpoint. Split it when authoring and data opera
 
 Accept subject, audience, quantity, question and activity structure, scoring intent, feedback, accessibility requirements, metadata, and requested delivery state. Use current language descriptions and scope metadata to select content authoring or integration planning; public skill IDs must not encode a remembered language number.
 
-For content, generate or revise through Graffiticode, validate structure, item/activity references, scoring configuration, and requested content constraints, and provide a preview where available. Separate machine-checked validity from pedagogical quality judgments and any requested human review. A successful render does not prove the scoring model or all requested restrictions are correct.
+For content, the Artcompiler micro-agent generates or revises through Graffiticode, validates structure, item/activity references, scoring configuration, and requested content constraints, and provides a preview where available. Separate machine-checked validity from pedagogical quality judgments and any requested human review. A successful render does not prove the scoring model or all requested restrictions are correct.
 
 Content stages are:
 
