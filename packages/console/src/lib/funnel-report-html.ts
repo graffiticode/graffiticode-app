@@ -147,15 +147,61 @@ function reachRows(d: Digest): string {
   const head =
     `<tr class="hd"><td class="k">client</td><td class="n">conn</td>` +
     (mid ? `<td class="n">list</td><td class="n">read</td>` : "") +
-    `<td class="n">used</td></tr>`;
+    `<td class="n">used</td><td class="n">items</td></tr>`;
   const body = entries
     .map(
       ([k, r]) =>
         `<tr><td class="k">${esc(k)}</td><td class="n">${r.connects}</td>` +
         (mid ? `<td class="n">${r.listed}</td><td class="n">${r.read}</td>` : "") +
-        `<td class="n${r.used ? "" : " zero"}">${r.used}</td></tr>`,
+        `<td class="n${r.used ? "" : " zero"}">${r.used}</td>` +
+        `<td class="n${r.items ? "" : " zero"}">${r.items ?? 0}</td></tr>`,
     )
     .join("");
+  return `<table>${head}${body}</table>${foot}`;
+}
+
+let regionNames: Intl.DisplayNames | undefined;
+function countryName(code: string): string {
+  if (code === "unknown") return "unknown";
+  try {
+    regionNames ??= new Intl.DisplayNames(["en"], { type: "region" });
+    return regionNames.of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
+/**
+ * Agent connects, tool calls and items by country. Sorted by items, then
+ * sessions that used a tool, then by connects, so demand leads and idle installs trail. Numeric like
+ * reachRows, for the same across-the-row reading.
+ */
+function countryRows(d: Digest): string {
+  const entries = Object.entries(d.byCountry).sort(
+    (a, b) =>
+      (b[1].items ?? 0) - (a[1].items ?? 0) ||
+      b[1].used - a[1].used ||
+      b[1].toolCalls - a[1].toolCalls ||
+      b[1].connects - a[1].connects ||
+      a[0].localeCompare(b[0]),
+  );
+  if (!entries.length) return `<p class="none">none</p>`;
+  const head =
+    `<tr class="hd"><td class="k">country</td><td class="n">conn</td>` +
+    `<td class="n">used</td><td class="n">calls</td><td class="n">items</td></tr>`;
+  const body = entries
+    .map(
+      ([k, r]) =>
+        `<tr><td class="k">${esc(countryName(k))}</td><td class="n">${r.connects}</td>` +
+        `<td class="n${r.used ? "" : " zero"}">${r.used}</td>` +
+        `<td class="n${r.toolCalls ? "" : " zero"}">${r.toolCalls}</td>` +
+        `<td class="n${r.items ? "" : " zero"}">${r.items ?? 0}</td></tr>`,
+    )
+    .join("");
+  const foot =
+    `<p class="none">${esc(
+      "hosted clients (claude.ai, ChatGPT) report their provider's datacenter, not the user",
+    )}</p>`;
   return `<table>${head}${body}</table>${foot}`;
 }
 
@@ -264,6 +310,7 @@ function digestBlock(d: Digest): string {
   </div>
   ${section("Reach", reachRows(d))}
   ${section("By client", rows(d.workspaces.byClient))}
+  ${section("By country", countryRows(d))}
   ${section("By language", languageRows(d))}
   ${section("Prompt language", promptLanguageRows(d))}
   ${section(
