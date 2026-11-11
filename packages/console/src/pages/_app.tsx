@@ -58,7 +58,8 @@ export default function App({
   const rawDomain = queryDomainStr || storedDomain || getTitle();
   const domain = rawDomain.toLowerCase() === 'graffiticode' ? undefined : rawDomain;
   const domainLanguages = selectLanguages(domain);
-  const defaultLanguage = domainLanguages.length > 0 ? domainLanguages[0] : {id: "0000", name: "L0000"};
+  // The list is newest first; the default stays pinned to the lowest id (L0000 with no domain).
+  const defaultLanguage = domainLanguages.length > 0 ? domainLanguages[domainLanguages.length - 1] : {id: "0000", name: "L0000"};
 
   const [language, setLanguage] = useLocalStorage("graffiticode:language", defaultLanguage);
   const [mark, setMark] = useLocalStorage("graffiticode:items:mark", marks[0]);
@@ -82,7 +83,7 @@ export default function App({
     } else if (domainLanguages.length > 0) {
       const currentInDomain = domainLanguages.some(l => l.name === language.name);
       if (!currentInDomain) {
-        setLanguage(domainLanguages[0]);
+        setLanguage(defaultLanguage);
       }
     }
 

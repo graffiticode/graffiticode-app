@@ -26,7 +26,11 @@ export function findLanguageByNumber(num: string): Language | undefined {
   return findLanguageById(num);
 }
 
-export { selectLangs as selectLanguages };
+// The console lists languages newest first (descending id). Sorted here, not in
+// core's selectLanguages, so the MCP catalog order (listLanguages) is unchanged.
+export function selectLanguages(domain?: string): Language[] {
+  return [...selectLangs(domain)].sort((a, b) => b.id.localeCompare(a.id));
+}
 
 interface LanguageSelectorProps {
   domain?: string;
@@ -36,7 +40,7 @@ interface LanguageSelectorProps {
 
 export default function LanguageSelector({ domain, language, setLanguage }: LanguageSelectorProps) {
   const [query, setQuery] = useState('')
-  const domainLanguages = selectLangs(domain);
+  const domainLanguages = selectLanguages(domain);
   // Normalize the query to ensure it has the leading "L" if it's just numbers
   const normalizedQuery = query && /^\d+$/.test(query) ? `L${query}` : query;
   // Check if query is a valid custom language format (e.g., "L0177" or just "0177")
