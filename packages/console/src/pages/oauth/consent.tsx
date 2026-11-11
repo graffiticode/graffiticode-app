@@ -8,6 +8,7 @@ import AuthMethodDialog from '../../components/AuthMethodDialog';
 import WalletSelectionDialog from '../../components/WalletSelectionDialog';
 import { getPageTitle } from '../../lib/utils';
 import { claimedRecently } from '../../lib/recent-claim';
+import { accountLabel } from '../../lib/account-label';
 
 // The OAuth consent step for agents connecting to Graffiticode (Codex, Claude,
 // ChatGPT…). The MCP server's /oauth/authorize sends the browser here with
@@ -124,6 +125,10 @@ export default function OAuthConsent() {
     | null
   >(null);
   const [creating, setCreating] = useState(false);
+  // The email this account signs in with: typed on this page, or from the user doc
+  // (signInEmail, written at account creation) for a session that was already open.
+  const [typedEmail, setTypedEmail] = useState<string | null>(null);
+  const [docEmail, setDocEmail] = useState<{ uid: string; email: string | null } | null>(null);
   // Read once on mount (storage is browser-only).
   const [allowNewAccount, setAllowNewAccount] = useState(false);
   useEffect(() => setAllowNewAccount(!claimedRecently()), []);
@@ -156,6 +161,29 @@ export default function OAuthConsent() {
     setParams(next);
     setParamsChecked(true);
   }, [router.isReady, router.query.callback_url, router.query.state, router.query.app_name]);
+
+  // Keyed on the uid: the auth hook builds a new user object on every render.
+  const uid = user?.uid;
+  const getToken = user?.getToken;
+  useEffect(() => {
+    if (!uid || !getToken) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await getToken();
+        const res = await fetch(`/api/user/${uid}`, { headers: { Authorization: token } });
+        const doc = res.ok ? await res.json() : null;
+        const email = typeof doc?.signInEmail === 'string' && doc.signInEmail ? doc.signInEmail : null;
+        if (!cancelled) setDocEmail({ uid, email });
+      } catch {
+        // Fall back to what we have; the label is a courtesy, not a gate.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- getToken is new each render; uid is the identity
+  }, [uid]);
 
   const clearStash = () => {
     try {
@@ -211,11 +239,14 @@ export default function OAuthConsent() {
 
   const handleSwitchAccount = async () => {
     setError(null);
+    setTypedEmail(null);
     await signOut(auth).catch((err) => console.error(err));
   };
 
   const handleSubmitCode = async (code: string) => {
+    const email = pendingEmail;
     const result = await verifyAndSignIn(code);
+    if (result === 'signed-in' && email) setTypedEmail(email);
     if (result === 'needs-confirm') {
       if (allowNewAccount) {
         setNewAccount({ kind: 'email', email: pendingEmail || '' });
@@ -268,6 +299,7 @@ export default function OAuthConsent() {
         });
       }
       // Signed in now: the Allow screen takes over.
+      if (newAccount.kind === 'email' && newAccount.email) setTypedEmail(newAccount.email);
       setNewAccount(null);
     } catch (err: any) {
       setError(err?.message || 'Could not create your account. Please try again.');
@@ -312,7 +344,10 @@ export default function OAuthConsent() {
   }
 
   if (user) {
-    const account = user.email || user.uid;
+    const account = accountLabel(
+      (docEmail?.uid === user.uid ? docEmail.email : null) || typedEmail || user.email,
+      user.uid,
+    );
     return shell(
       <>
         <h1 className="text-xl font-semibold text-gray-900 mb-2">Connect {params.appName}</h1>
