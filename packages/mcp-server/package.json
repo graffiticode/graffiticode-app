@@ -41,7 +41,7 @@
     "@graffiticode/l0180-view": "^0.2.0",
     "@graffiticode/l0181-view": "^0.1.0",
     "@graffiticode/l0182-view": "^0.1.0",
-    "@graffiticode/l0183-view": "^0.4.0",
+    "@graffiticode/l0183-view": "^0.4.1",
     "@graffiticode/l0184-view": "^0.2.1",
     "@graffiticode/l0186-view": "^0.2.0",
     "@types/node": "^20.10.0",
