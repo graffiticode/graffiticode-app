@@ -393,7 +393,9 @@ test("L0183 mounts, places a tray answer on a blank, and scores it", async () =>
   assert.match(root.textContent ?? "", /Whale/);
   const check = () => buttons().find((b) => b.textContent === "Check");
   assert.ok(check()?.disabled, "Check was enabled before every blank was filled");
-  await click(buttons().find((b) => b.textContent === "Bat"), "tray item Bat");
+  // The tray's own item, not its hidden measuring copy (l0183-view >= 0.4 reserves each tray's
+  // size from an aria-hidden copy of all its items).
+  await click(buttons().find((b) => b.textContent === "Bat" && !b.closest("[aria-hidden=true]")), "tray item Bat");
   await click(root.querySelector('[aria-label="Blank, empty"]') ?? undefined, "empty blank");
   assert.ok(root.querySelector('[aria-label="Blank, holding Bat"]'), "Bat was not placed on the blank");
   assert.ok(!buttons().some((b) => b.textContent === "Bat" && b.getAttribute("aria-pressed") !== null), "Bat is still in the tray");
