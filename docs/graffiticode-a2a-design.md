@@ -54,6 +54,17 @@ Connection writes and reconciliation already have frontend integration points in
 
 New frontend work includes service definitions, service-scope propagation, a durable service-job lifecycle above generation jobs, A2A adapters, a Learnosity-specific MCP catalog, and operation-specific completion validators. Backend work includes enforcing that scope and providing operation-specific execution, receipts, and recovery for Data Operations. Deployment readiness of backend policy, broker, language registry, compiler, interpreter, and gateway must be demonstrated before enabling provider execution.
 
+Service jobs observe backend execution through the backend's [execution observation contracts](https://github.com/graffiticode/graffiticode/blob/main/docs/graffiticode-interpreter-design.md#execution-observation-contracts-proposed) (interpreter design §9, delivered by plan Track E1 and E4). The contracts cover:
+- lifecycle classes;
+- typed interrupts;
+- per-run event cursors;
+- the error registry;
+- artifact manifests;
+- capability declarations;
+- a credential-free agent status representation.
+
+The backend owns these contracts, and this design translates them. It does not define parallel ones. They are proposed, not yet deployed. The protocol features in §7 and §8 that depend on them stay disabled until the corresponding backend steps ship.
+
 ## 4. General service architecture
 
 ### 4.1 Components and ownership
@@ -94,7 +105,47 @@ The internal request carries `serviceId`, authenticated principal and account bo
 
 `deliverableKind` distinguishes `content`, `integration_recipe`, `data_plan`, and `operation_result`. An operation request further specifies its required delivery state, such as prepared, saved, or exported. These are frontend domain fields, not claimed A2A standard fields.
 
-A result carries a concise summary, artifact references, scope processed, verification evidence, warnings, and unresolved exceptions. Persist an explicit external outcome such as `not_requested`, `not_started`, `applied`, `partially_applied`, or `unknown`. Never translate an unknown provider outcome into success.
+A result carries a concise summary, artifact references, scope processed, verification evidence, warnings, and unresolved exceptions. Persist an explicit external outcome: `not_requested`, `pending`, `not_started`, `applied`, `partially_applied`, or `unknown`. Never translate an unknown provider outcome into success.
+
+The external outcome describes what happened at the provider. It is derived only from evidence the backend has settled, never from a timeout, a deadline or a failed request.
+
+**Per effect.** Each requested external effect has a current status.
+
+An effect is one backend operation, identified by (command, stage, occurrence). For a run, the operations also roll up into per-target evidence. The command's aggregate outcome (`completed`, `failed`, `partial`, `uncertain`) never classifies an individual effect. A `partial` command can contain an effect that was applied and another that wasn't.
+
+The status comes from backend settlement evidence for that operation:
+- the operation's own recorded outcome, which the command record keeps for every operation (interpreter design §5);
+- updated by any linked reconciliation evidence;
+- updated by the repair ledger's entry for that (original command, stage, occurrence), which is its current outcome across the original command and every repair.
+
+An effect first recorded uncertain can therefore later be confirmed applied or confirmed not applied. The original operation outcome and the command's aggregate outcome stay in history, but no longer determine the current status.
+
+**Statuses:**
+- **Settled applied:** the provider confirms the requested state. This includes targets the backend recorded as already satisfied, which are reported separately.
+- **Settled partially applied:** the operation is `partial`. Some of its steps were written, and the rest are settled as not written.
+- **Settled not applied:** the operation is `failed`, so it wrote nothing. This includes a target the backend recorded as skipped with no write.
+- **Unresolved:** settled as `uncertain`, and not yet reconciled.
+- **Pending:** the backend hasn't settled it yet.
+
+These rules are the same for immediate commands and runs.
+
+**Aggregation over the job's effects**, applied in order:
+
+| Current effect statuses | External outcome |
+| --- | --- |
+| No external effect requested | `not_requested` |
+| Any effect pending | `pending` (not a terminal outcome) |
+| Any effect unresolved | `unknown`. The result still lists the effects known to be applied |
+| All settled not applied | `not_started` |
+| All settled applied | `applied` |
+| Otherwise: some write happened and some requested change didn't (any partially applied effect, or a mix of applied and not applied) | `partially_applied` |
+
+So one completed write followed by a definite failure is `partially_applied`, whether the two operations belong to one immediate command or to a run. Uncertainty resolved by later reconciliation stops counting as `unknown`.
+
+**Service success and provider outcome are separate.**
+- Frontend validators decide whether the service's completion contract is met (§6.3). They never change the external outcome.
+- A validation failure fails the service while preserving the known committed effects. For example, the job is `failed`, with external outcome `applied` and the validation findings.
+- The frontend never upgrades backend evidence.
 
 ## 5. Authorization and action boundaries
 
@@ -120,7 +171,13 @@ Content preparation cannot become a provider write through natural-language revi
 
 A **frontend service job** tracks responsibility for an outcome. An **A2A task** is that job's protocol representation. An **MCP extension task**, when supported, is another representation. A **frontend generation job** runs one generation or revision stage. A Graffiticode **Task = (lang, code)** identifies the generated language work submitted to the backend.
 
-Persist explicit mappings; do not overload `taskId`. A frontend service job may reference several generation jobs, Graffiticode tasks, backend executions, provider invocations, and artifacts. Protocol IDs are scoped to the relevant adapter, account, and service.
+On the backend:
+- A **backend command** is one admitted `POST /command`, with its own idempotency key and recorded outcome.
+- A **backend run** is the durable execution that a start command creates. Its record is authoritative for execution progress.
+
+Persist explicit mappings; do not overload `taskId`. A frontend service job may reference several generation jobs, Graffiticode tasks, backend commands and runs, provider invocations, and artifacts. Protocol IDs are scoped to the relevant adapter, account, and service.
+
+**Correlation.** The A2A `contextId` maps to the backend's account-scoped context id, passed on create, update and `/command`. That links generation, revisions, runs, reconciliations and repairs in one history. Like the protocol ID, it is correlation metadata only: it grants no access and doesn't deduplicate work. A reconciliation or repair still names the command it acts on explicitly.
 
 ### 6.2 Persistence
 
@@ -133,6 +190,13 @@ Introduce a frontend service-job record, provisionally `service-jobs/{jobId}`, w
 
 Persist events with monotonic per-job sequence numbers. Commit transitions and their dispatch intents atomically, then use the existing outbox/lease pattern for delivery. Generation remains in `generation-jobs`; the parent job does not copy or independently mutate its dispatch state.
 
+The same rule applies to backend runs. The job stores:
+- command and run references;
+- each run's last consumed event cursor;
+- the command outcomes it has observed.
+
+It does not mirror step state. The job reads the run's events after its stored cursor, translates them into job events, and advances the cursor only after committing them. Replays therefore deduplicate on (run id, sequence). A `cursor-expired` reset is handled by reading a fresh snapshot and recording the gap explicitly in the job's history. Job events and backend run events have separate sequences; a job event records the run sequence it was derived from.
+
 Do not store bearer tokens for replay. Resume work using the existing bounded grant model where applicable and current policy checks. Inputs and outputs containing assessment results require access-controlled storage, configured retention, and deletion behavior.
 
 ### 6.3 Lifecycle and clarification
@@ -140,6 +204,36 @@ Do not store bearer tokens for replay. Resume work using the existing bounded gr
 Internal lifecycle: `accepted` → `working` → `completed` or `failed`. `working` may pause at `input_required` or `auth_required`, then resume. `rejected` describes a task-level refusal under the selected protocol; malformed or unauthenticated requests can fail before job creation. `canceled` is terminal only after work has stopped or been safely fenced.
 
 Clarification records the specific missing fact, expected answer shape, affected plan revision, and expiry. Answers must name the existing job and current question, pass ownership checks, and be applied once. Missing bank identity or deployment details must not be guessed. New requirements that change a completed deliverable create a new job linked to the same conversation.
+
+**Two sources of interruption.** A job can be interrupted before or after it starts backend execution:
+- **Preparation questions** arise before any backend command. They are frontend clarification records. Answering one regenerates and recompiles a new task revision, without calling the backend.
+- **Run interrupts** are backend interrupt records, each with `interruptId`, revision, kind, resolver, question and answer schemas, and expiry. The job surfaces the backend's schema rather than restating it.
+  - An answer becomes a backend `dispatch` command that names the interrupt's id and revision, keyed by an answer submission (§6.4).
+  - The answer is not tied to the run's `stateVersion`. Unrelated progress doesn't make it stale; a revised interrupt does.
+
+The job records which source asked, so a continuation is routed correctly.
+
+**State mapping.** Three different things decide three different questions:
+- **Continuation** (whether the job is still going) is governed by the run's lifecycle class.
+- **Service success** (completed or failed) is governed by the frontend's completion validators.
+- **What happened at the provider** is the external outcome in §4.3.
+
+A terminal command alone determines none of these. For example, an initiating command can end `uncertain` while its run sits in a `reconciliation` interrupt. The job is then interrupted, not failed.
+
+| Backend | Job / A2A state |
+| --- | --- |
+| No command yet (preparing) | `accepted`, then `working` |
+| Run active, including provider waits and automatic reconciliation; or a command `pending` | `working` |
+| Interrupt `input` or `reconciliation` that the caller can resolve | `input_required` |
+| Interrupt `authorization` that the caller can resolve | `auth_required` |
+| Interrupt the caller can't resolve (resolver is an administrator or the operator, e.g. `dependency`) | `working`, with a status message naming the blocker and resolver. The deadline rule in §6.4 applies |
+| Run `stopped` (a stop requested by the caller) | `canceled` |
+| Run terminal otherwise, or an immediate command settled with no run | The completion validators decide: `completed` if the service's completion contract is met, otherwise `failed`. Completed with exceptions passes only if the request permitted those exclusions |
+| Refused by capability preflight before allocation | `rejected`, or a protocol error with no job |
+
+Each terminal job state carries the external outcome from §4.3. A `failed` job can carry `applied` or `partially_applied`, and a `completed` job can carry `applied` with exceptions. The job never claims a terminal state while the run is active or interrupted, or while any effect is `pending`.
+
+**After a terminal state.** A terminal job does not change. If its run later changes, for example through an admitted reconciliation, that is a new job in the same context. It references both the earlier job and the run.
 
 A2A maps these states through the selected SDK's task-state enum. MCP Tasks-extension execution maps to its supported states; authentication handling remains in the MCP adapter. Without the extension, return a domain job handle and use explicit status/continuation tools. Do not claim those handles are MCP protocol tasks. A status result must preserve the original requested deliverable and any unresolved external outcome.
 
@@ -149,9 +243,37 @@ Scope idempotency to account, principal, service, operation, and client key, and
 
 Assign deterministic child-step identities and provider operation keys. Reuse them after worker crashes or lost responses. Reuse existing gateway and broker invocation/receipt semantics where available. Exactly-once external execution is not assumed.
 
-A provider timeout after submission can mean the write happened. Mark the operation unknown, reconcile using provider references and supported readback, and block blind replay. Reconciliation itself requires authorization. A new key must never be silently generated to get past an uncertain receipt.
+**Backend command keys** are derived, never freshly minted:
+- a start key from (job, step);
+- a dispatch key from (job, answer submission id), or from (job, cancel request id).
 
-Cancellation is cooperative: stop scheduling, check cancellation between bounded operations, and report committed changes. It does not undo provider writes. Keep the job nonterminal while an in-flight effect can still commit. If an effect cannot be resolved before the job deadline, terminate as failed with external outcome unknown and preserve the reconciliation path. Compensation requires an explicit, separately authorized plan.
+An **answer submission** is persisted when the frontend accepts an answer, before it dispatches:
+- The submission names the interrupt id and revision. Retries of that submission reuse its id, and so its key.
+- A submission that is definitively refused doesn't resolve the interrupt. Two examples are `policy-refused`, and an answer that fails the interrupt's answer schema. A corrected answer, or a resubmission after authorization is restored, is a new submission with a new id. It neither conflicts with the refusal nor replays it.
+- The backend resolves an interrupt revision atomically, once. The first accepted submission resolves it, and later submissions for that revision get `event-not-applicable`.
+
+Generation retries are allowed only before a step's first start. Once a command for a step exists, the only routes forward are its recorded outcome, an admitted reconciliation, or a repair. A new key with regenerated code is never one of them.
+
+**Backend errors** arrive as registry codes with a category and recovery guidance:
+- **Translation.** Adapters translate by category and keep the backend code in the error details.
+- **Errors never settle outcomes.** Command outcomes are settled only by the backend (Policy and Broker receipts). An error neither creates nor overwrites one.
+  - After a transport failure or lost response, the job keeps the command's current recorded outcome, which may still be `pending`. It retries with the same key, or reads status, until the backend settles it.
+  - The job never records `not_started` or `unknown` because a request failed.
+- **The three dispatch refusals stay distinct:**
+  - `event-not-understood`: unsupported;
+  - `policy-refused`: an authorization refusal;
+  - `event-not-applicable`: a stale or conflicting answer, which leaves the job unchanged.
+
+A provider timeout after submission can mean the write happened. The frontend doesn't classify it. The backend settles the operation through its receipts: it records `uncertain` when the outcome can't be established, then reconciles using provider references and supported readback, and blocks blind replay. The job reflects that settled evidence (§4.3). Reconciliation itself requires authorization. A new key must never be silently generated to get past an uncertain receipt.
+
+Cancellation is cooperative: stop scheduling, check cancellation between bounded operations, and report committed changes. It does not undo provider writes. Keep the job nonterminal while an in-flight effect can still commit. Compensation requires an explicit, separately authorized plan.
+
+**Cancelling once a run exists.**
+- **Stop.** Cancellation sends a stop `dispatch`, and the job stays `working` until the run reaches `stopped`. The cancel artifact lists committed effects and any remote provider jobs that may still be active.
+- **Deadline.** The job deadline is carried into backend admission, so the run stops itself when it passes. A deadline determines neither the job's state nor the external outcome:
+  - When it passes, the job waits for the run to stop and the backend to settle its in-flight effects, then terminates. It is `failed` against its completion contract, with the settled external outcome, which may be `unknown` if the backend settled `uncertain`.
+  - If the backend can't be reached, the job stays `working`, with a status message, until settlement can be read.
+  - The frontend never fails a job on its deadline while the run keeps working unobserved, and never assigns an outcome the backend hasn't settled.
 
 ## 7. A2A interface
 
@@ -167,11 +289,25 @@ Each card describes responsibility, currently enabled skills, examples, input/ou
 
 Start with one HTTP binding, durable task retrieval, multi-turn continuation, and cancellation. Add streaming when a target client needs it; add push after authenticated callback delivery and retry behavior are implemented. Advertise optional features only after interoperability checks. Hosting both identities together does not grant either identity the other's scope.
 
+**Delivery and observation:**
+- **Pilot.** Get Task reads the job, which is kept current by polling backend runs with event cursors (§6.2).
+- **Later.** Streaming and push are built on the job's event log, and on the backend's replay streams and webhooks once those ship. A subscription starts from the current task and continues from the job's event sequence.
+- **Submission.** Backend submission is always nonblocking. Where the pinned A2A version blocks Send Message by default, the adapter either waits for the job without holding an execution worker or lease, or the skill's examples tell clients to request nonblocking mode. Durable data operations use the latter.
+
+**Skill advertisement** follows backend capability declarations. A skill that needs execution is advertised only when the interpreter manifest declares its operations and they are activated. A message that maps to an undeclared operation is refused before any backend allocation.
+
 ### 7.2 Messages and artifacts
 
 Accept natural-language intent with optional structured domain input. Return messages for clarification and progress; return artifacts for deliverables. Use plain text or Markdown for recipes and summaries, JSON for structured assessment payloads and manifests, and downloadable files for exports. Preview links are optional authenticated conveniences; completion must remain understandable to clients without embedded frontend components.
 
 Domain artifact manifests include schema version, content type, digest, provenance, service-job ID, relevant content revision, delivery state, and verification references. Resolve artifacts through authorized retrieval or narrowly scoped expiring URLs. Do not expose language-private ASTs as a general cross-service contract; use a platform-neutral spec when moving intent between languages.
+
+Backend outputs reach A2A from backend artifact manifests:
+- **Sealed manifests** become A2A artifacts. The domain manifest references the backend `artifactId`, manifest version and content digest.
+- **Open manifests** may be exposed for progress, for example a partial export. They are explicitly marked incomplete and never satisfy an export's completion contract.
+- **Exceptions** are their own named artifact.
+
+Status text comes from the backend's credential-free agent status representation, never from the form's `present` result, so A2A tasks and messages carry no signatures or bearer URLs. A refreshed presentation credential produces no status update. Run projections are mutable and are never published as artifacts.
 
 ## 8. MCP interface and compatibility
 
@@ -182,6 +318,11 @@ Each tool accepts rich intent within its named purpose. Save requires an immutab
 Filter discovery by authorization, and recheck authorization at invocation. MCP supports authorization-dependent tool catalogs; grouping into two toolsets is frontend configuration, with no assumption that every client exposes group toggles. See the [MCP tools specification](https://modelcontextprotocol.io/specification/2026-07-28/server/tools).
 
 Use the [MCP Tasks extension](https://github.com/modelcontextprotocol/ext-tasks/blob/main/specification/2026-07-28/tasks.md) only when negotiated and implemented. Client compatibility determines whether clarification uses elicitation, task-associated interactions, or explicit continuation. These are adapter choices over one service job.
+
+The fallback tools use the same contracts as A2A:
+- `job_get` returns the job state from §6.3, with backend artifacts and agent status.
+- `job_continue` answers the current preparation question or backend interrupt, by id and revision.
+- `job_cancel` issues the stop `dispatch` once a run exists.
 
 Initially deploy one Learnosity endpoint. Split it when authoring and data operations need independent installation, administration, access arrangements, distribution, or operational isolation. A client that trusts only entire connections is a concrete reason to split. Both endpoints would retain the same service IDs and execution rules.
 
@@ -291,5 +432,7 @@ Use deterministic provider doubles for failure injection and isolated Learnosity
 - What frontend scope propagation and backend policy/broker changes are required to enforce the service/job/action scope end to end, and which are deployed?
 - Which Learnosity record families and operations are the first executable Data Operations release, and what live verification is available for each?
 - What account-specific retention, size, runtime, cost, and approval policies apply to stored results and bulk writes?
+
+- When do the backend's execution observation contracts ship? Specifically: Track E1's event log, interrupts, artifact manifests, error registry and capability declarations, and E4's cursors and agent status. Can backend admission carry the service-scope claim and job deadline that §5 and §6.4 require?
 
 These decisions gate the affected execution features. They do not prevent implementing the shared contracts, content preparation, or documentation-only planning.
