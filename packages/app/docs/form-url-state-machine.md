@@ -116,3 +116,23 @@ a real item (a bad id, or a base64 form id the api can't find) report
 
 4. **Two spinners.** Loading (resolve) hands off to Rendered, which shows its own
    FormHarness spinner until the iframe posts back — a brief double-spinner.
+
+## Render grants (L0013 captures under a command)
+
+L0013's camera renders a private item under a command with no user token. It
+sends a Policy render grant instead, in its own header,
+`Graffiticode-Render-Grant` (`src/server/render-grant.ts`):
+
+- The grant is verified against Policy's JWKS (`POLICY_URL` + `/v1/jwks`), fetched
+  with the app's own Google ID token, since the route is behind Cloud Run IAM. If the
+  keys can't be fetched, the answer is 503.
+- The grant must be `typ gc-render+jwt` and `aud urn:graffiticode:render`, and last
+  five minutes at most.
+- The request must carry exactly one parameter, `id`, equal to the grant's item.
+  A request that also carries an `Authorization` header is refused.
+- The item is read at `users/{sub}/items/{itm}`. It resolves only to the task the
+  grant pinned; an item that now names another task is refused with 409.
+- It never touches the user flow above: no view event, no owner details.
+- Its answers are `no-store`, and only the grant's id is logged.
+- The task's ACLs are checked where it is read: the API's `/form` and `/data`,
+  under the same grant.
