@@ -25,7 +25,8 @@ export const DEFAULT_CALLERS = ["policy-run@graffiticode.iam.gserviceaccount.com
 export const ITEM_ID_RE = /^[A-Za-z0-9_:.-]{1,200}$/;
 const GOOGLE_ISSUERS = new Set(["https://accounts.google.com", "accounts.google.com"]);
 
-export type ItemRecord = { ownerUid: string | null; isPublic: boolean; taskId: string | null; lang: string | null };
+// `consistent`: the doc's own id is the item's (absent: true).
+export type ItemRecord = { ownerUid: string | null; isPublic: boolean; taskId: string | null; lang: string | null; consistent?: boolean };
 export type ItemAnswer =
   | { exists: false }
   | { ambiguous: true }
@@ -65,13 +66,17 @@ export const verifyCaller = async ({ authorization, audience, callers, verifyIdT
 };
 
 // The answer for one item, from the records `findItems` returns for its id
-// (at most two are needed to tell one owner from several).
+// (at most two are needed to tell one owner from several). Only exactly one
+// consistent record is an answer: any record whose own id differs from the
+// item's, or a second record, makes ownership ambiguous, since what lies past
+// the query's limit is unknown.
 export const itemAuthorityAnswer = async ({ itemId, findItems }: {
   itemId: string;
   findItems: (itemId: string) => Promise<ItemRecord[]>;
 }): Promise<ItemAnswer> => {
   const found = await findItems(itemId);
   if (found.length === 0) return { exists: false };
+  if (found.some(r => r.consistent === false)) return { ambiguous: true };
   const owners = new Set(found.map(r => r.ownerUid));
   if (found.length > 1 || owners.size > 1) return { ambiguous: true };
   const [item] = found;
@@ -80,19 +85,19 @@ export const itemAuthorityAnswer = async ({ itemId, findItems }: {
   return { exists: true, ownerUid: item.ownerUid, isPublic: item.isPublic === true, taskId: item.taskId ?? null, lang: item.lang ?? null };
 };
 
-// The console's store: every items doc whose `id` is the item's, under any
-// owner, at most two.
+// The console's store: the items docs whose `id` field is the item's, under
+// any owner, at most two, each marked whether its own doc id agrees. None is
+// dropped: a disagreeing doc is evidence the id isn't uniquely held.
 export const firestoreItems = (db: any) => async (itemId: string): Promise<ItemRecord[]> => {
   const snap = await db.collectionGroup("items").where("id", "==", itemId).limit(2).get();
-  return snap.docs
-    .filter((d: any) => d.id === itemId)
-    .map((d: any) => {
-      const data = d.data() ?? {};
-      return {
-        ownerUid: d.ref.parent?.parent?.id ?? null,
-        isPublic: data.isPublic === true,
-        taskId: typeof data.taskId === "string" ? data.taskId : null,
-        lang: typeof data.lang === "string" ? data.lang : null,
-      };
-    });
+  return snap.docs.map((d: any) => {
+    const data = d.data() ?? {};
+    return {
+      ownerUid: d.ref.parent?.parent?.id ?? null,
+      isPublic: data.isPublic === true,
+      taskId: typeof data.taskId === "string" ? data.taskId : null,
+      lang: typeof data.lang === "string" ? data.lang : null,
+      consistent: d.id === itemId,
+    };
+  });
 };

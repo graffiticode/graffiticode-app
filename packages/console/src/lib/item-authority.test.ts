@@ -76,6 +76,28 @@ test("reads the store by a collection-group query on id, at most two, under any 
   };
   const found = await firestoreItems(db)("item-1");
   assert.deepEqual(asked, [["items", "id", "==", "item-1", 2]]);
-  // A doc whose own id isn't the item's isn't that item.
-  assert.deepEqual(found, [{ ownerUid: "uid-1", isPublic: true, taskId: "t", lang: "0013" }]);
+  // Nothing is dropped: a doc whose own id isn't the item's is marked.
+  assert.deepEqual(found, [
+    { ownerUid: "uid-1", isPublic: true, taskId: "t", lang: "0013", consistent: true },
+    { ownerUid: "uid-2", isPublic: false, taskId: null, lang: null, consistent: false },
+  ]);
+});
+
+// The owner's review of app#116: the query's limit comes before any
+// filtering, so an inconsistent record can hide a third. Any inconsistent
+// record answers ambiguous; only exactly one consistent record is an answer.
+test("answers ambiguous when any match is inconsistent, whatever the query's limit hid", async () => {
+  // An inconsistent record first, a public duplicate second; the private
+  // owner's record would be third, past the limit.
+  const docs = [
+    { id: "not-item-1", ref: { parent: { parent: { id: "uid-9" } } }, data: () => ({ id: "item-1", isPublic: false }) },
+    { id: "item-1", ref: { parent: { parent: { id: "uid-2" } } }, data: () => ({ id: "item-1", isPublic: true }) },
+    { id: "item-1", ref: { parent: { parent: { id: "uid-1" } } }, data: () => ({ id: "item-1", isPublic: false }) },
+  ];
+  const db = { collectionGroup: () => ({ where: () => ({ limit: (n: number) => ({ get: async () => ({ docs: docs.slice(0, n) }) }) }) }) };
+  assert.deepEqual(await itemAuthorityAnswer({ itemId: "item-1", findItems: firestoreItems(db) }), { ambiguous: true });
+  assert.deepEqual(await answerFor([record({ consistent: false })]), { ambiguous: true });
+  // Exactly one consistent record is the answer.
+  const single = { collectionGroup: () => ({ where: () => ({ limit: (n: number) => ({ get: async () => ({ docs: docs.slice(2, 2 + n) }) }) }) }) };
+  assert.deepEqual(await itemAuthorityAnswer({ itemId: "item-1", findItems: firestoreItems(single) }), { exists: true, ownerUid: "uid-1", isPublic: false, taskId: null, lang: null });
 });
