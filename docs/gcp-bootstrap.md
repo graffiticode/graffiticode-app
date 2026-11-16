@@ -174,6 +174,13 @@ for s in INTERNAL_JOB_SECRET FREE_PLAN_API_KEY FREE_PLAN_NAMESPACE_SALT ACT_AS_G
 gcloud firestore fields ttls update expiresAt --collection-group=idempotency-keys \
   --enable-ttl --project=$P
 
+# Service-job idempotency bindings (service-job-keys/{hash}, core/service-jobs.ts)
+# carry expiresAt = null while their job is live, which TTL never collects, and
+# terminalAt + the service's retry window once it ends (execution observation
+# plan, D-1). An expired binding already reads as absent; the TTL reclaims space.
+gcloud firestore fields ttls update expiresAt --collection-group=service-job-keys \
+  --enable-ttl --project=$P
+
 # OAuth consent grants (oauth-grants/{sha256(code)}, core/oauth-grants.ts) live
 # 10 minutes; redemption deletes them, so the TTL only sweeps grants nobody
 # redeemed. The field is expireAt (a Timestamp) — expiresAt there is millis.
