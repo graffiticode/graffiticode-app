@@ -123,8 +123,11 @@ L0013's camera renders a private item under a command with no user token. It
 sends a Policy render grant instead, in its own header,
 `Graffiticode-Render-Grant` (`src/server/render-grant.ts`):
 
-- The grant is verified against Policy's JWKS (`POLICY_JWKS_URL`):
-  `typ gc-render+jwt`, `aud urn:graffiticode:render`, five minutes at most.
+- The grant is verified against Policy's JWKS (`POLICY_URL` + `/v1/jwks`), fetched
+  with the app's own Google ID token, since the route is behind Cloud Run IAM. If the
+  keys can't be fetched, the answer is 503.
+- The grant must be `typ gc-render+jwt` and `aud urn:graffiticode:render`, and last
+  five minutes at most.
 - The request must carry exactly one parameter, `id`, equal to the grant's item.
   A request that also carries an `Authorization` header is refused.
 - The item is read at `users/{sub}/items/{itm}`. It resolves only to the task the

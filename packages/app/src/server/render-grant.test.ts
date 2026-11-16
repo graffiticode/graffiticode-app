@@ -3,7 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type KeyLike } from "jose";
 import type { JWTVerifyGetKey } from "jose";
-import { GrantRefused, POLICY_ISSUER, RENDER_AUDIENCE, RENDER_TYP, resolveWithGrant, verifyRenderGrant, type HeldItem } from "./render-grant";
+import { GrantRefused, JWKS_REFETCH_MS, JWKS_TTL_MS, POLICY_ISSUER, RENDER_AUDIENCE, RENDER_TYP, buildPolicyJwks, resolveWithGrant, verifyRenderGrant, type HeldItem } from "./render-grant";
 
 const OWNER = "uid-owner";
 const ITEM = "item-1";
@@ -11,14 +11,14 @@ const TASK = "task-1";
 const NOW = Date.UTC(2026, 10, 16, 12);
 const nowSeconds = Math.floor(NOW / 1000);
 
-const keysFor = async () => {
+const keysFor = async (kid = "k1") => {
   const pair = await generateKeyPair("ES256", { extractable: true });
-  const jwk = { ...(await exportJWK(pair.publicKey)), kid: "k1", alg: "ES256", use: "sig" };
-  return { privateKey: pair.privateKey, keys: createLocalJWKSet({ keys: [jwk] }) };
+  const jwk = { ...(await exportJWK(pair.publicKey)), kid, alg: "ES256", use: "sig" };
+  return { privateKey: pair.privateKey, keys: createLocalJWKSet({ keys: [jwk] }), jwks: { keys: [jwk] } };
 };
 
 const claims = (over: Record<string, unknown> = {}) => ({ sub: OWNER, itm: ITEM, tsk: TASK, cmd: "cmd-1", fg: 1, stg: "s0", occ: "rt.snap:0.x", cseq: 3, ...over });
-const sign = async (privateKey: KeyLike, { payload = claims(), typ = RENDER_TYP, aud = RENDER_AUDIENCE, iss = POLICY_ISSUER, iat = nowSeconds, ttl = 300, alg = "ES256", kid = "k1" } = {}) =>
+const sign = async (privateKey: KeyLike, { payload = claims(), typ = RENDER_TYP, aud = RENDER_AUDIENCE, iss = POLICY_ISSUER, iat = nowSeconds, ttl = 300, alg = "ES256", kid = "k1" }: { payload?: Record<string, unknown>; typ?: string; aud?: string; iss?: string; iat?: number; ttl?: number; alg?: string; kid?: string } = {}) =>
   new SignJWT(payload).setProtectedHeader({ alg, kid, typ }).setIssuer(iss).setAudience(aud).setIssuedAt(iat).setExpirationTime(iat + ttl).setJti("jti-1").sign(privateKey);
 
 const held = (over: Partial<HeldItem> = {}): HeldItem => ({ exists: true, id: ITEM, taskId: TASK, ...over });
@@ -112,4 +112,58 @@ test("answers an item-store failure as temporary", async () => {
     now: () => NOW,
   });
   await refusedWith(failing, 503, "item-store-unavailable");
+});
+
+// The owner's review of app#117: Policy's JWKS route is private. Its keys are
+// fetched with this service's ID token, and a key-service failure is 503.
+const POLICY = "https://policy.example";
+const keysServer = (jwks: unknown, { fail = false } = {}) => {
+  const asked: unknown[] = [];
+  const fetch = async (url: string, { headers }: { headers: Record<string, string> }) => {
+    asked.push([url, headers.Authorization]);
+    if (fail || headers.Authorization !== `Bearer id-for-${POLICY}`) return { ok: false, status: 403, json: async () => ({}) };
+    return { ok: true, status: 200, json: async () => jwks };
+  };
+  return { asked, fetch };
+};
+
+test("fetches Policy's keys with an ID token for Policy, and verifies a grant with them", async () => {
+  const { privateKey, jwks } = await keysFor();
+  const server = keysServer(jwks);
+  const keys = buildPolicyJwks({ policyUrl: POLICY, idToken: async aud => `id-for-${aud}`, fetch: server.fetch, now: () => NOW });
+  const { answer } = await resolve(keys, await sign(privateKey));
+  assert.equal(answer.taskId, TASK);
+  await resolve(keys, await sign(privateKey));
+  assert.deepEqual(server.asked, [[`${POLICY}/v1/jwks`, `Bearer id-for-${POLICY}`]]);
+});
+
+test("answers 503 when Policy's keys can't be fetched", async () => {
+  const { privateKey, jwks } = await keysFor();
+  for (const keys of [
+    buildPolicyJwks({ policyUrl: POLICY, idToken: async aud => `id-for-${aud}`, fetch: keysServer(jwks, { fail: true }).fetch }),
+    buildPolicyJwks({ policyUrl: POLICY, idToken: async () => "not-policy's", fetch: keysServer(jwks).fetch }),
+    buildPolicyJwks({ policyUrl: POLICY, idToken: async aud => `id-for-${aud}`, fetch: async () => { throw new Error("unreachable"); } }),
+    buildPolicyJwks({ policyUrl: POLICY, idToken: async () => { throw new Error("no metadata server"); }, fetch: keysServer(jwks).fetch }),
+  ]) {
+    await refusedWith(resolve(keys, await sign(privateKey)), 503, "render-grants-unavailable");
+  }
+});
+
+test("holds the keys a while, refetches for an unknown key at most every 30 s, and never uses them stale", async () => {
+  const { privateKey, jwks } = await keysFor();
+  const stranger = await keysFor("k9");
+  let now = NOW;
+  let fail = false;
+  const server = keysServer(jwks);
+  const fetch = async (url: string, init: { headers: Record<string, string> }) => (fail ? { ok: false, status: 500, json: async () => ({}) } : server.fetch(url, init));
+  const keys = buildPolicyJwks({ policyUrl: POLICY, idToken: async aud => `id-for-${aud}`, fetch, now: () => now });
+  await verifyRenderGrant(await sign(privateKey), { keys, now: () => NOW });
+  await assert.rejects(verifyRenderGrant(await sign(stranger.privateKey, { kid: "k9" }), { keys, now: () => NOW }), (e: GrantRefused) => e.status === 401);
+  assert.equal(server.asked.length, 1);
+  now += JWKS_REFETCH_MS;
+  await assert.rejects(verifyRenderGrant(await sign(stranger.privateKey, { kid: "k9" }), { keys, now: () => NOW }), (e: GrantRefused) => e.status === 401);
+  assert.equal(server.asked.length, 2);
+  now += JWKS_TTL_MS;
+  fail = true;
+  await assert.rejects(verifyRenderGrant(await sign(privateKey), { keys, now: () => NOW }), (e: GrantRefused) => e.status === 503);
 });

@@ -18,7 +18,7 @@
 //   API's /form and /data under the same grant.
 // - Answers are no-store, and the grant itself is never logged.
 
-import { createRemoteJWKSet, jwtVerify, type JWTPayload, type JWTVerifyGetKey } from "jose";
+import { createLocalJWKSet, jwtVerify, type JWTPayload, type JWTVerifyGetKey } from "jose";
 
 export const RENDER_GRANT_HEADER = "graffiticode-render-grant";
 export const RENDER_TYP = "gc-render+jwt";
@@ -26,7 +26,9 @@ export const RENDER_AUDIENCE = "urn:graffiticode:render";
 export const POLICY_ISSUER = "urn:graffiticode:policy";
 export const MAX_LIFETIME_SECONDS = 5 * 60;
 export const CLOCK_SKEW_SECONDS = 10;
-export const DEFAULT_POLICY_JWKS_URL = "https://policy-sja7fatcta-uc.a.run.app/v1/jwks";
+export const DEFAULT_POLICY_URL = "https://policy-sja7fatcta-uc.a.run.app";
+export const JWKS_TTL_MS = 10 * 60 * 1000;
+export const JWKS_REFETCH_MS = 30 * 1000;
 
 export type RenderGrant = {
   sub: string;
@@ -67,7 +69,9 @@ export const verifyRenderGrant = async (
       clockTolerance: CLOCK_SKEW_SECONDS,
       currentDate: new Date(now()),
     }));
-  } catch {
+  } catch (e) {
+    // Policy's keys couldn't be had: temporary, never the grant's fault.
+    if (e instanceof KeysUnavailable) throw new GrantRefused(503, "render-grants-unavailable");
     throw new GrantRefused(401, "bad-render-grant");
   }
   const claims = payload as Record<string, unknown>;
@@ -81,11 +85,71 @@ export const verifyRenderGrant = async (
   return pick as RenderGrant;
 };
 
-// Policy's public keys, fetched and cached by jose.
-let remoteKeys: JWTVerifyGetKey | null = null;
+export class KeysUnavailable extends Error {}
+
+type Fetch = (url: string, init: { headers: Record<string, string> }) => Promise<{ ok: boolean; status: number; json: () => Promise<any> }>;
+
+// Policy's public keys, from its private JWKS route (`GET /v1/jwks`, behind
+// Cloud Run IAM), fetched with this service's own Google ID token for
+// Policy's audience. Held for JWKS_TTL_MS; an unknown key id fetches again, at
+// most every JWKS_REFETCH_MS. Any failure to fetch is KeysUnavailable, and keys
+// past their time are never used.
+export const buildPolicyJwks = ({
+  policyUrl,
+  idToken,
+  fetch: doFetch = fetch as unknown as Fetch,
+  now = () => Date.now(),
+}: {
+  policyUrl: string;
+  idToken: (audience: string) => Promise<string>;
+  fetch?: Fetch;
+  now?: () => number;
+}): JWTVerifyGetKey => {
+  const url = new URL("/v1/jwks", policyUrl).toString();
+  let held: { at: number; kids: Set<unknown>; keys: JWTVerifyGetKey } | null = null;
+  let fetchedAt = -Infinity;
+  const load = async () => {
+    fetchedAt = now();
+    let body: any;
+    try {
+      const token = await idToken(policyUrl);
+      const res = await doFetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error(`jwks answered ${res.status}`);
+      body = await res.json();
+    } catch (e: any) {
+      throw new KeysUnavailable(`policy jwks: ${e?.message ?? e}`);
+    }
+    if (!Array.isArray(body?.keys)) throw new KeysUnavailable("policy jwks: no keys");
+    held = { at: now(), kids: new Set(body.keys.map((k: any) => k.kid)), keys: createLocalJWKSet(body) };
+    return held;
+  };
+  return (async (header, token) => {
+    let keys = held;
+    const fresh = keys !== null && now() - keys.at < JWKS_TTL_MS;
+    if (!keys || !fresh || (!keys.kids.has(header?.kid) && now() - fetchedAt >= JWKS_REFETCH_MS)) keys = await load();
+    return keys.keys(header, token);
+  }) as JWTVerifyGetKey;
+};
+
+// This service's Google ID token for `audience`, from the Cloud Run metadata
+// server, held until shortly before it expires. Anywhere else there is none.
+const METADATA_IDENTITY = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity";
+const idTokens = new Map<string, { token: string; exp: number }>();
+export const metadataIdToken = async (audience: string): Promise<string> => {
+  const hit = idTokens.get(audience);
+  if (hit && hit.exp - 60 > Date.now() / 1000) return hit.token;
+  const res = await fetch(`${METADATA_IDENTITY}?audience=${encodeURIComponent(audience)}&format=full`, { headers: { "Metadata-Flavor": "Google" } });
+  if (!res.ok) throw new Error(`metadata identity token failed (${res.status})`);
+  const token = await res.text();
+  const payload = JSON.parse(Buffer.from(token.split(".")[1] ?? "", "base64url").toString("utf8"));
+  idTokens.set(audience, { token, exp: Number(payload.exp) || 0 });
+  return token;
+};
+
+let policyKeySource: JWTVerifyGetKey | null = null;
 export const policyKeys = (): JWTVerifyGetKey => {
-  remoteKeys ??= createRemoteJWKSet(new URL(process.env.POLICY_JWKS_URL || DEFAULT_POLICY_JWKS_URL));
-  return remoteKeys;
+  policyKeySource ??= buildPolicyJwks({ policyUrl: process.env.POLICY_URL || DEFAULT_POLICY_URL, idToken: metadataIdToken });
+  return policyKeySource;
 };
 
 // The item as its subject holds it, read directly at users/{sub}/items/{itm}:
