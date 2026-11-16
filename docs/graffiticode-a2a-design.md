@@ -134,7 +134,7 @@ These rules are the same for immediate commands and runs.
 | Current effect statuses | External outcome |
 | --- | --- |
 | No external effect requested | `not_requested` |
-| Any effect pending | `pending` (not a terminal outcome) |
+| Any effect pending | `pending`. Not a terminal outcome, except for a detached observer job (§6.3) |
 | Any effect unresolved | `unknown`. The result still lists the effects known to be applied |
 | All settled not applied | `not_started` |
 | All settled applied | `applied` |
@@ -231,7 +231,12 @@ A terminal command alone determines none of these. For example, an initiating co
 | Run terminal otherwise, or an immediate command settled with no run | The completion validators decide: `completed` if the service's completion contract is met, otherwise `failed`. Completed with exceptions passes only if the request permitted those exclusions |
 | Refused by capability preflight before allocation | `rejected`, or a protocol error with no job |
 
-Each terminal job state carries the external outcome from §4.3. A `failed` job can carry `applied` or `partially_applied`, and a `completed` job can carry `applied` with exceptions. The job never claims a terminal state while the run is active or interrupted, or while any effect is `pending`.
+Each terminal job state carries the external outcome from §4.3. A `failed` job can carry `applied` or `partially_applied`, and a `completed` job can carry `applied` with exceptions. The job never claims a terminal state while a run it submitted is active or interrupted, or while any effect it submitted is `pending`.
+
+**Observer steps.** A step can *adopt* an existing execution instead of submitting one, for example a save the console or another job already made (§6.4). Such a step observes the execution; it doesn't own it.
+- Its job's deadline and cancellation never touch the adopted execution.
+- When the job's deadline passes, or the job is cancelled, while the adopted execution is still `pending`, the job *detaches*. It ends `failed` against its completion contract, with external outcome `pending`, marked `detached`. It carries the owning execution reference, so a caller can follow it.
+- Detaching is the only way a job ends with a `pending` effect.
 
 **After a terminal state.** A terminal job does not change. If its run later changes, for example through an admitted reconciliation, that is a new job in the same context. It references both the earlier job and the run.
 
@@ -241,28 +246,49 @@ A2A maps these states through the selected SDK's task-state enum. MCP Tasks-exte
 
 Scope idempotency to account, principal, service, operation, and client key, and bind it to an input digest. The same key and digest returns the existing job; different input is a conflict. A retry through another interface reaches the same job only when the caller explicitly supplies the shared domain key and passes ownership checks. Conversation IDs alone do not deduplicate work.
 
+**Retention.** Job key bindings use the claim primitives in `packages/core/src/idempotency.ts`, but not generation's 24-hour TTL.
+- A binding never expires while its job is not terminal.
+- After the job ends, the binding is kept for a retry window that the service definition records.
+- A retry after the window is a new job. ([Execution observation plan](https://github.com/graffiticode/graffiticode/blob/main/docs/execution-observation-plan.md), D-1.)
+
 Assign deterministic child-step identities and provider operation keys. Reuse them after worker crashes or lost responses. Reuse existing gateway and broker invocation/receipt semantics where available. Exactly-once external execution is not assumed.
 
 **Backend command keys** are derived, never freshly minted:
 - a start key from (job, step);
 - a dispatch key from (job, answer submission id), or from (job, cancel request id).
 
+Keys are immutable per attempt, and persisted when the attempt is created.
+
+**Saves go through a shared save head** (execution observation plan, D-5):
+- **The head.** Each save identity, `saveWriteKey(item, task, connection)`, has one save head in Policy. It points at the current attempt through a protocol-aware **execution reference**: `{protocol: "command", commandId}` or `{protocol: "legacy", invocationId}`.
+- **Adopt or submit.** A save step resolves the head:
+  - **An attempt exists** (from the console, another job, or a recorded legacy save): the step *adopts* it under its existing admission, attaching no scope or deadline, and becomes an observer (§6.3).
+  - **No attempt exists:** the step *submits* a newly scoped command. The head, the allocation and the dispatch intent commit in one Policy transaction.
+  - **A race:** the loser gets an `adoptable` refusal carrying the winner's reference, and adopts it.
+- **Retries go through the head.**
+  - Only a `failed` command attempt can be retried, by atomically claiming the next attempt on the head. Concurrent claimants converge on one retry.
+  - `partial` and `uncertain` attempts go to reconciliation or repair.
+  - A legacy attempt is recovered only through its own recorded legacy path.
+- **One reference everywhere.** Step records, `job_get`, A2A status and detached-job references all use the execution reference.
+- **Status reads** resolve the reference by its protocol and never start or advance execution.
+
 An **answer submission** is persisted when the frontend accepts an answer, before it dispatches:
 - The submission names the interrupt id and revision. Retries of that submission reuse its id, and so its key.
-- A submission that is definitively refused doesn't resolve the interrupt. Two examples are `policy-refused`, and an answer that fails the interrupt's answer schema. A corrected answer, or a resubmission after authorization is restored, is a new submission with a new id. It neither conflicts with the refusal nor replays it.
+- A submission that is definitively refused doesn't resolve the interrupt. Two examples are a Policy refusal, which carries Policy's own registered reason, and an answer that fails the interrupt's answer schema. A corrected answer, or a resubmission after authorization is restored, is a new submission with a new id. It neither conflicts with the refusal nor replays it.
 - The backend resolves an interrupt revision atomically, once. The first accepted submission resolves it, and later submissions for that revision get `event-not-applicable`.
 
 Generation retries are allowed only before a step's first start. Once a command for a step exists, the only routes forward are its recorded outcome, an admitted reconciliation, or a repair. A new key with regenerated code is never one of them.
 
-**Backend errors** arrive as registry codes with a category and recovery guidance:
-- **Translation.** Adapters translate by category and keep the backend code in the error details.
+**Backend errors** arrive as reasons from the backend's FAIL-01 registry (`packages/common/src/failures.ts`). Each carries one of its five native categories (`authentication`, `permission`, `malformed`, `conflict`, `unavailable`), typed details, and context-aware recovery guidance:
+- **Translation.** The service job consumes the native category and reason. Adapters translate them only at the protocol boundary, and keep the backend reason in the error details.
+- **A category alone never authorizes a retry.** The job follows the recovery guidance, read against the recorded outcome.
 - **Errors never settle outcomes.** Command outcomes are settled only by the backend (Policy and Broker receipts). An error neither creates nor overwrites one.
   - After a transport failure or lost response, the job keeps the command's current recorded outcome, which may still be `pending`. It retries with the same key, or reads status, until the backend settles it.
   - The job never records `not_started` or `unknown` because a request failed.
 - **The three dispatch refusals stay distinct:**
-  - `event-not-understood`: unsupported;
-  - `policy-refused`: an authorization refusal;
-  - `event-not-applicable`: a stale or conflicting answer, which leaves the job unchanged.
+  - `event-not-understood` (`malformed`): unsupported;
+  - a Policy refusal, with Policy's own registered reason: not permitted;
+  - `event-not-applicable` (`conflict`): a stale or conflicting answer, which leaves the job unchanged.
 
 A provider timeout after submission can mean the write happened. The frontend doesn't classify it. The backend settles the operation through its receipts: it records `uncertain` when the outcome can't be established, then reconciles using provider references and supported readback, and blocks blind replay. The job reflects that settled evidence (§4.3). Reconciliation itself requires authorization. A new key must never be silently generated to get past an uncertain receipt.
 
@@ -274,6 +300,7 @@ Cancellation is cooperative: stop scheduling, check cancellation between bounded
   - When it passes, the job waits for the run to stop and the backend to settle its in-flight effects, then terminates. It is `failed` against its completion contract, with the settled external outcome, which may be `unknown` if the backend settled `uncertain`.
   - If the backend can't be reached, the job stays `working`, with a status message, until settlement can be read.
   - The frontend never fails a job on its deadline while the run keeps working unobserved, and never assigns an outcome the backend hasn't settled.
+- **Observers.** These rules apply to executions the job submitted. For an adopted execution, the job's cancel and deadline only detach it (§6.3). No stop is sent, and the owner's execution continues to its own settlement.
 
 ## 7. A2A interface
 
@@ -413,6 +440,13 @@ Before release, demonstrate:
 Use deterministic provider doubles for failure injection and isolated Learnosity banks for live execution verification. Keep production data out of these checks. The existing no-external-writes baseline remains a regression gate.
 
 ## 12. Delivery plan
+
+*The phases below are scheduled together with the backend work in the [execution observation plan](https://github.com/graffiticode/graffiticode/blob/main/docs/execution-observation-plan.md):*
+- *Phase 1 and the MCP part of Phase 2 are milestone M1, on immediate commands;*
+- *Phase 3 is M4;*
+- *Phase 4's data execution follows M2 and M3.*
+
+*That plan's decisions D-1, D-3 and D-5 govern this design's key retention, service scope and save adoption.*
 
 **Phase 1 — Shared service contracts.** Add the frontend service registry, normalized requests/results, completion validators, and durable parent-job model. Integrate existing frontend generation jobs with writes disabled. Pin portable artifact schemas and define caller identity, scope propagation, and backend enforcement. Exit when service tests prove preparation and planning boundaries independently of either protocol.
 
