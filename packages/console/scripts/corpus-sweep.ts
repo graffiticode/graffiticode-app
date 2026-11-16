@@ -18,6 +18,10 @@
  *   npm run corpus-sweep -- --langs 0175 --dry-run # how many prompts it WOULD generate
  *   npm run corpus-sweep -- --langs 0173 --json out.json
  *   npm run corpus-sweep -- --langs 0179 --sample --no-record   # an A/B arm, not corpus history
+ *   npm run corpus-sweep -- --langs 0182 --allow-fallback --no-record  # measure the fallback model
+ *
+ * Refuses to run when a language's first-choice provider has no credential here (OPENAI_API_KEY,
+ * or a Claude credential) — generation would quietly fail over and measure the wrong model.
  *
  * COST. Every prompt is one real generation on the eval account. --all is ~960 generations; the
  * script prints the count and, unless --yes is passed, requires confirmation above a threshold.
@@ -35,6 +39,7 @@ import {
   type SweepResult,
   type SweepRun,
 } from "../src/lib/corpus-sweep";
+import { unconfiguredPrimaries } from "../src/lib/corpus-conversation";
 
 const args = process.argv.slice(2);
 const flag = (name: string): string | null => {
@@ -98,12 +103,25 @@ async function main() {
 
   console.log(`corpus sweep — mode=${mode}`);
   for (const lang of langs) console.log(`  L${lang}: ${counts[lang]} prompts`);
-  console.log(`  TOTAL: ${total} generations\n`);
+  // A conversation row costs one generation per turn, so this is a floor, not the total.
+  console.log(`  TOTAL: ${total} prompts (one generation per turn)\n`);
+
+  // Without the first-choice provider's key, generation quietly fails over and the sweep
+  // measures the fallback model. --allow-fallback is for deliberately testing that model.
+  const unconfigured = unconfiguredPrimaries(langs);
+  if (unconfigured.length > 0 && !has("allow-fallback")) {
+    for (const { lang, provider } of unconfigured) {
+      console.error(`Error: L${lang} routes to ${provider} first, but no ${provider} credential is set here.`);
+    }
+    console.error(`       Set ${[...new Set(unconfigured.map((u) => u.provider === "openai" ? "OPENAI_API_KEY" : "ANTHROPIC_API_KEY"))].join(" and ")}, ` +
+      "or pass --allow-fallback to measure the fallback model on purpose.");
+    process.exit(1);
+  }
 
   if (has("dry-run")) { console.log("(dry run — nothing generated)"); return; }
 
   if (total > CONFIRM_ABOVE && !has("yes")) {
-    const a = await ask(`This will run ${total} real generations. Continue? [y/N] `);
+    const a = await ask(`This will run ${total} prompts' worth of real generations. Continue? [y/N] `);
     if (!/^y(es)?$/i.test(a.trim())) { console.log("aborted"); return; }
   }
 

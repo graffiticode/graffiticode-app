@@ -28,7 +28,12 @@
  *   npm run corpus-rebaseline -- --langs 0175 --count                 # how many, no generation
  *   npm run corpus-rebaseline -- --langs 0175 --dry-run --json out.json  # diffs only, no writes
  *
- * COST. One real generation per selected row on the eval account, whether or not it is written.
+ * COST. One real generation per TURN of each selected row (a conversation row replays every turn,
+ * as the sweep does), on the eval account, whether or not it is written.
+ *
+ * GUARDS. Refuses to start when a selected language's first-choice provider has no credential
+ * here, and never writes a row any turn of which a fallback model wrote: a baseline has to be
+ * what production generates, or every later sweep compares against the wrong model.
  * Above 100 the script asks before generating; writing always asks unless --yes is passed.
  */
 import "./eval-env"; // MUST be first: prod Firestore/auth/api bootstrap
@@ -41,13 +46,19 @@ import { createInterface } from "readline";
 import { FieldValue } from "firebase-admin/firestore";
 import { unparse } from "@graffiticode/parser";
 import { getFirestore } from "@graffiticode-app/core/utils/db/index";
-import { generateCodeForRequest } from "@graffiticode-app/core/lib/code-generation/generate-for-request";
 import { getCredentialsForApiKey } from "@graffiticode-app/core/lib/api-credentials";
-import { getBaseUrlForApi, getApiTask, getLanguageLexicon } from "@graffiticode-app/core/lib/api";
+import { getApiTask, getLanguageLexicon } from "@graffiticode-app/core/lib/api";
 import { compareShape, type ShapeLevel } from "../src/lib/code-shape";
 import { createEmbeddingText, generateBatchEmbeddings } from "@graffiticode-app/core/lib/embedding-service";
 import { verifyExampleForPrompt } from "@graffiticode-app/core/lib/lang-embedding";
-import { harnessItemId } from "../src/lib/harness-item-ids";
+import { harnessConversationId } from "../src/lib/harness-item-ids";
+import {
+  corpusTurns,
+  replayConversation,
+  unconfiguredPrimaries,
+  writtenByPrimary,
+  primaryProvider,
+} from "../src/lib/corpus-conversation";
 import { SWEEP_LANGUAGES } from "../src/lib/corpus-sweep";
 
 const args = process.argv.slice(2);
@@ -117,6 +128,8 @@ interface Row {
   lang: string;
   itemId: string;
   prompt: string;
+  /** One per request; a conversation is replayed turn by turn, as it was authored. */
+  turns: string[];
   code: string;
   taskId: string | null;
   data: FirebaseFirestore.DocumentData;
@@ -160,6 +173,7 @@ async function selectRows(): Promise<Row[]> {
     lang: String(d.get("lang") || ""),
     itemId: String(d.get("item_id") || ""),
     prompt: String(d.get("prompt") || "").trim(),
+    turns: corpusTurns({ messages: d.get("messages"), prompt: d.get("prompt") }),
     code: String(d.get("code") || "").trim(),
     taskId: (d.get("task_id") as string) ?? null,
     data: d.data() || {},
@@ -191,43 +205,24 @@ async function unparseTask(taskId: string, lang: string, token: string): Promise
   return { src, ast };
 }
 
-async function taskCompiles(taskId: string, token: string): Promise<string | null> {
-  try {
-    const resp = await fetch(`${getBaseUrlForApi()}/data?id=${encodeURIComponent(taskId)}&refresh=1`, {
-      headers: { Authorization: token },
-      signal: AbortSignal.timeout(STEP_TIMEOUT_MS),
-    });
-    if (resp.status !== 200) return `/data returned ${resp.status}`;
-    const obj: any = (await resp.json())?.data;
-    const errors = Array.isArray(obj?.errors) ? obj.errors : [];
-    if (errors.length) return errors.map((e: any) => (typeof e === "string" ? e : e?.message || JSON.stringify(e))).join("; ");
-    if (obj?.data == null) return "/data returned no compile output";
-    return null;
-  } catch (x: any) {
-    return `/data fetch failed: ${x?.message || x}`;
-  }
-}
-
 async function propose(row: Row, auth: { uid: string; token: string }): Promise<Proposal> {
   const base = { ref: row.ref, lang: row.lang, itemId: row.itemId, baselineModel: row.data.model ?? null, oldTaskId: row.taskId };
   try {
-    // Same call the sweep makes, so what gets written is what the sweep will next compare.
-    const gen: any = await withTimeout(
-      generateCodeForRequest({
-        auth,
-        prompt: row.prompt,
-        language: row.lang,
-        options: { maxTokens: 4096 },
-        currentSrc: null,
-        itemId: harnessItemId("rebaseline", row.lang),
-        skipScopeGate: true,
-      }),
-      `generate L${row.lang} ${row.ref}`,
-    );
-    if (gen?.errors?.length) return { ...base, status: "failed", reason: String(gen.errors[0]?.message || gen.errors[0]) };
-    if (!gen?.src || !gen?.taskId) return { ...base, status: "failed", reason: "generation returned no source or taskId" };
-    const compileError = await taskCompiles(gen.taskId, auth.token);
-    if (compileError) return { ...base, status: "failed", reason: `compile: ${compileError}` };
+    // Same replay the sweep makes — turn by turn, one session per row — so what gets written is
+    // what the sweep will next compare.
+    const replay = await replayConversation({
+      auth,
+      lang: row.lang,
+      turns: row.turns,
+      itemId: harnessConversationId("rebaseline", row.lang, row.itemId || row.ref),
+      timeoutMs: STEP_TIMEOUT_MS,
+      wrap: (p, label) => withTimeout(p, `${label} ${row.ref}`),
+    });
+    const gen = replay.gen;
+    if (replay.failure) {
+      const { stage, message } = replay.failure;
+      return { ...base, status: "failed", freshModel: gen?.model || undefined, reason: stage === "compile" ? `compile: ${message}` : message };
+    }
 
     const fresh = await unparseTask(gen.taskId, row.lang, auth.token);
     const baselineCode = row.taskId
@@ -241,6 +236,16 @@ async function propose(row: Row, auth: { uid: string; token: string }): Promise<
       freshCode: fresh.src,
       freshAst: fresh.ast,
     };
+
+    // A baseline must be production's model. A turn that failed over (no key, an outage) would
+    // store the fallback's program as the thing every later sweep compares against.
+    if (!writtenByPrimary(row.lang, replay.models)) {
+      return {
+        ...common,
+        status: "blocked",
+        reason: `not written by L${row.lang}'s first-choice provider (${primaryProvider(row.lang)}): ${replay.models.map((m) => m ?? "?").join(", ")}`,
+      };
+    }
 
     // The same two gates generate-embeddings-from-examples.ts applies before storing a row.
     const stubs = fresh.src.match(/\/\*\s*[A-Z][A-Z0-9_]*\s*\*\//g);
@@ -367,6 +372,16 @@ async function main() {
   for (const [lang, n] of Object.entries(byLang)) console.log(`  L${lang}: ${n} rows`);
   console.log(`  TOTAL: ${rows.length} generations\n`);
   if (countOnly || rows.length === 0) return;
+
+  // Without the first-choice provider's key, generation quietly fails over to the next one, and
+  // every row would be blocked after paying for its generation. Refuse before spending.
+  const unconfigured = unconfiguredPrimaries(Object.keys(byLang));
+  if (unconfigured.length > 0) {
+    for (const { lang, provider } of unconfigured) {
+      console.error(`Error: L${lang} routes to ${provider} first, but no ${provider} credential is set here.`);
+    }
+    process.exit(1);
+  }
 
   if (rows.length > CONFIRM_ABOVE && !has("yes")) {
     const a = await ask(`This will run ${rows.length} real generations. Continue? [y/N] `);
