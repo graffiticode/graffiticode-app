@@ -167,3 +167,51 @@ test("holds the keys a while, refetches for an unknown key at most every 30 s, a
   fail = true;
   await assert.rejects(verifyRenderGrant(await sign(privateKey), { keys, now: () => NOW }), (e: GrantRefused) => e.status === 503);
 });
+
+// The owner's second review of app#117: a key rotation seen by two requests at
+// once. The second waits for the first's refresh instead of deciding on the
+// keys being replaced; a failed refresh is both's 503.
+test("shares one refresh between concurrent requests, and its failure", async () => {
+  const old = await keysFor("k1");
+  const rotated = await keysFor("k2");
+  const both = { keys: [...old.jwks.keys, ...rotated.jwks.keys] };
+  let now = NOW;
+  let served: unknown = old.jwks;
+  // Each refresh after the first waits at a gate the test opens.
+  const gate = () => {
+    let open: () => void = () => {};
+    const shut = new Promise<void>(resolve => { open = resolve; });
+    return { shut, open };
+  };
+  let current = gate();
+  const release = () => current.open();
+  let fail = false;
+  let fetches = 0;
+  const fetch = async () => {
+    fetches++;
+    if (fetches > 1) await current.shut;
+    if (fail) return { ok: false, status: 500, json: async () => ({}) };
+    return { ok: true, status: 200, json: async () => served };
+  };
+  const keys = buildPolicyJwks({ policyUrl: POLICY, idToken: async aud => `id-for-${aud}`, fetch, now: () => now });
+  const verify = (token: string) => verifyRenderGrant(token, { keys, now: () => NOW });
+  // Signed beforehand, so both requests reach the keys together.
+  const [k1a, k1b, k2a, k2b] = [await sign(old.privateKey, { kid: "k1" }), await sign(old.privateKey, { kid: "k1" }), await sign(rotated.privateKey, { kid: "k2" }), await sign(rotated.privateKey, { kid: "k2" })];
+  await verify(k1a);
+  served = both;
+  now += JWKS_REFETCH_MS;
+  const pair = Promise.all([verify(k2a), verify(k2b)]);
+  await new Promise(resolve => setImmediate(resolve));
+  release();
+  assert.deepEqual((await pair).map(g => g.tsk), [TASK, TASK]);
+  assert.equal(fetches, 2);
+  now += JWKS_TTL_MS;
+  fail = true;
+  current = gate();
+  const failing = Promise.allSettled([verify(k1a), verify(k1b)]);
+  await new Promise(resolve => setImmediate(resolve));
+  release();
+  const outcomes = await failing;
+  assert.deepEqual(outcomes.map(o => o.status === "rejected" && (o.reason as GrantRefused).status), [503, 503]);
+  assert.equal(fetches, 3);
+});

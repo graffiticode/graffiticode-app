@@ -108,7 +108,18 @@ export const buildPolicyJwks = ({
   const url = new URL("/v1/jwks", policyUrl).toString();
   let held: { at: number; kids: Set<unknown>; keys: JWTVerifyGetKey } | null = null;
   let fetchedAt = -Infinity;
-  const load = async () => {
+  type Held = { at: number; kids: Set<unknown>; keys: JWTVerifyGetKey };
+  // One refresh at a time, shared: every request that arrives while it runs
+  // waits for it (the owner's second review of app#117), so none is decided on
+  // the keys it is replacing. Its failure is every waiter's 503.
+  let inflight: Promise<Held> | null = null;
+  const refresh = (): Promise<Held> => {
+    inflight ??= load().finally(() => {
+      inflight = null;
+    });
+    return inflight;
+  };
+  const load = async (): Promise<Held> => {
     fetchedAt = now();
     let body: any;
     try {
@@ -124,9 +135,10 @@ export const buildPolicyJwks = ({
     return held;
   };
   return (async (header, token) => {
+    if (inflight) await inflight;
     let keys = held;
     const fresh = keys !== null && now() - keys.at < JWKS_TTL_MS;
-    if (!keys || !fresh || (!keys.kids.has(header?.kid) && now() - fetchedAt >= JWKS_REFETCH_MS)) keys = await load();
+    if (!keys || !fresh || (!keys.kids.has(header?.kid) && now() - fetchedAt >= JWKS_REFETCH_MS)) keys = await refresh();
     return keys.keys(header, token);
   }) as JWTVerifyGetKey;
 };
