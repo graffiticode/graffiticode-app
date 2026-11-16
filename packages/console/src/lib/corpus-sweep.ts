@@ -26,12 +26,11 @@
 //
 // BILLING BOUNDARY, as with the ping: generate and stop. Never createItem/updateItem.
 import { getFirestore } from "@graffiticode-app/core/utils/db/index";
-import { generateCodeForRequest } from "@graffiticode-app/core/lib/code-generation/generate-for-request";
 import { getCredentialsForApiKey } from "@graffiticode-app/core/lib/api-credentials";
 import { getApiTask, getLanguageLexicon } from "@graffiticode-app/core/lib/api";
 import { compareShape, type ShapeLevel } from "./code-shape";
-import { harnessItemId } from "./harness-item-ids";
-import { fetchTaskData } from "./fetch-task-data";
+import { harnessConversationId } from "./harness-item-ids";
+import { corpusTurns, replayConversation } from "./corpus-conversation";
 import { PING_LANGUAGES } from "./corpus-ping";
 import { unparse } from "@graffiticode/parser";
 
@@ -108,6 +107,8 @@ async function withTimeout<T>(p: Promise<T>, label: string): Promise<T> {
 interface CorpusEntry {
   ref: string;
   prompt: string;
+  /** One per request; a conversation replays turn by turn (corpus-conversation.ts). */
+  turns: string[];
   code: string;
   taskId: string | null;
   model: string | null;
@@ -129,6 +130,7 @@ async function corpusFor(lang: string, week: number | null): Promise<CorpusEntry
     .map((d) => ({
       ref: d.id,
       prompt: String(d.get("prompt") || "").trim(),
+      turns: corpusTurns({ messages: d.get("messages"), prompt: d.get("prompt") }),
       code: String(d.get("code") || "").trim(),
       // task_id for AST-based comparison; absent on older rows.
       taskId: (d.get("task_id") as string) ?? null,
@@ -155,27 +157,6 @@ export async function sweepSize(lang: string, mode: "sample" | "full"): Promise<
     .select()
     .get();
   return mode === "full" ? snap.size : Math.min(SAMPLE_SIZE, snap.size);
-}
-
-async function taskCompiles(taskId: string, accessToken: string): Promise<{ compiled: boolean; error?: string }> {
-  try {
-    // ?refresh=1 — see fetch-task-data.ts.
-    const resp = await fetchTaskData(taskId, accessToken, STEP_TIMEOUT_MS);
-    if (resp.status !== 200) return { compiled: false, error: `/data returned ${resp.status}` };
-    const body: any = await resp.json();
-    const obj = body?.data;
-    const errors = Array.isArray(obj?.errors) ? obj.errors : [];
-    if (errors.length > 0) {
-      const message = errors
-        .map((e: any) => (typeof e === "string" ? e : e?.message || JSON.stringify(e)))
-        .join("; ");
-      return { compiled: false, error: `Compile error: ${message}` };
-    }
-    if (obj?.data == null) return { compiled: false, error: "/data returned no compile output" };
-    return { compiled: true };
-  } catch (x: any) {
-    return { compiled: false, error: `/data fetch failed: ${x?.message || x}` };
-  }
 }
 
 /**
@@ -213,32 +194,23 @@ async function sweepOne(
   const base = { lang, exampleRef: entry.ref, baselineModel: entry.model, latencyMs: 0 };
 
   try {
-    const gen: any = await withTimeout(
-      generateCodeForRequest({
-        auth,
-        prompt: entry.prompt,
-        language: lang,
-        options: { maxTokens: 4096 },
-        currentSrc: null,
-        // Both required for the same reason as the daily ping: itemId so a dialect reading
-        // get-val-public "itemId" resolves, skipScopeGate so a corpus prompt is replayed under
-        // the regime it was authored in (see corpus-ping.ts PingOutcome).
-        itemId: harnessItemId("sweep", lang),
-        skipScopeGate: true,
-      }),
-      `generate L${lang} ${entry.ref}`,
-    );
+    // Turn by turn, as the corpus was authored: a two-turn row's answer is an edit that sees the
+    // survey its first turn compiled to (corpus-conversation.ts). One id per row, so concurrent
+    // conversations keep their own L0182 session.
+    const replay = await replayConversation({
+      auth,
+      lang,
+      turns: entry.turns,
+      itemId: harnessConversationId("sweep", lang, entry.ref.split("_")[1] || entry.ref),
+      timeoutMs: STEP_TIMEOUT_MS,
+      wrap: (p, label) => withTimeout(p, `${label} ${entry.ref}`),
+    });
+    const gen = replay.gen;
 
     const elapsed = () => Date.now() - started;
-    if (gen?.errors?.length > 0) {
-      return { ...base, verdict: "failed", stage: "generate", error: String(gen.errors[0]?.message || gen.errors[0]), latencyMs: elapsed() };
-    }
-    if (!gen?.src || !gen?.taskId) {
-      return { ...base, verdict: "failed", stage: "empty", error: "generation returned no source or taskId", latencyMs: elapsed() };
-    }
-    const compile = await taskCompiles(gen.taskId, auth.token);
-    if (!compile.compiled) {
-      return { ...base, verdict: "failed", stage: "compile", error: compile.error, latencyMs: elapsed() };
+    if (replay.failure) {
+      const { stage, message } = replay.failure;
+      return { ...base, verdict: "failed", stage, error: message, freshModel: gen?.model || undefined, latencyMs: elapsed() };
     }
 
     // Compare unparsed ASTs when both sides have one; otherwise both fall back to raw source.

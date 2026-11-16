@@ -41,6 +41,17 @@ export function harnessItemId(kind: HarnessKind, lang: string): string {
 }
 
 /**
+ * A per-conversation id under the same prefix (e.g. `corpus-sweep-0182-o3f25HY9K0zv`), for a
+ * harness that replays several multi-turn rows at once. A dialect that keys state on the id needs
+ * one per conversation: L0182 remembers which survey version a `session-id` drew, so concurrent
+ * conversations sharing one id overwrite each other's draw and a turn 2 answers a version its
+ * turn 1 never saw. Still matched by prefix, so cost reporting still excludes it.
+ */
+export function harnessConversationId(kind: HarnessKind, lang: string, key: string): string {
+  return `${harnessItemId(kind, lang)}-${key.replace(/[^A-Za-z0-9]/g, "").slice(0, 24)}`;
+}
+
+/**
  * Does this `itemId` belong to an internal harness rather than a real item?
  *
  * Callers that measure per-item cost must exclude these from BOTH sides of the
