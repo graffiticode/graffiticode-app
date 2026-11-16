@@ -2,13 +2,42 @@ import { NextRequest, NextResponse } from "next/server";
 import { authFromRequest } from "@/server/request-auth";
 import { resolveFormTarget, evaluateAccess } from "@/server/resolvers";
 import { logArtifactView } from "@/server/events";
+import { getFirestore } from "@/server/db";
+import { GrantRefused, RENDER_GRANT_HEADER, policyKeys, resolveWithGrant } from "@/server/render-grant";
 
 export const runtime = "nodejs";
 
 // Resolves a /form/{id} segment to a renderable task id and decides access.
 // The viewer's token (if any) is forwarded so api-store access control (public
 // flag + acls + ownership) is enforced authoritatively by api.graffiticode.org.
+// A render grant's resolve (render-grant.ts): its own context, before and
+// apart from any user credential. No-store, and the grant is never logged.
+async function resolveForGrant(req: NextRequest, grantHeader: string) {
+  const noStore = { "Cache-Control": "no-store" };
+  try {
+    const { grant, answer } = await resolveWithGrant({
+      grantHeader,
+      authorization: req.headers.get("authorization"),
+      params: req.nextUrl.searchParams,
+      keys: policyKeys(),
+      readItem: async (uid, itemId) => {
+        const doc = await getFirestore().doc(`users/${uid}/items/${itemId}`).get();
+        const data = doc.exists ? (doc.data() as any) : null;
+        return { exists: doc.exists, id: data?.id, taskId: data?.taskId };
+      },
+    });
+    console.log("[form/resolve] render grant", { item: grant.itm, sub: grant.sub, command: grant.cmd, grant: grant.jti, allowed: true });
+    return NextResponse.json(answer, { headers: noStore });
+  } catch (err) {
+    const refused = err instanceof GrantRefused ? err : new GrantRefused(503, "unavailable");
+    console.warn("[form/resolve] render grant refused", { reason: refused.reason });
+    return NextResponse.json({ allowed: false, error: refused.reason }, { status: refused.status, headers: noStore });
+  }
+}
+
 export async function GET(req: NextRequest) {
+  const grantHeader = req.headers.get(RENDER_GRANT_HEADER);
+  if (grantHeader !== null) return resolveForGrant(req, grantHeader);
   const id = req.nextUrl.searchParams.get("id");
   if (!id) {
     return NextResponse.json({ error: "id required" }, { status: 400 });
