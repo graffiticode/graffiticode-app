@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  CLAIM_RELAY_DIRECTIVE,
   TOOL_SECURITY_SCHEMES,
   buildClaimFields,
   buildGeneratingResponse,
@@ -264,6 +265,13 @@ test("free-plan claim fields carry the host bucket and the reconnect hint", () =
   assert.match(fields.claim_url, /[?&]token=tok-abc(&|$)/);
   assert.ok(fields.claim_message.includes(fields.claim_url), "message must carry the link");
   assert.ok(fields.claim_message.includes(reconnectHint("editor")), "message must carry the hint");
+  // The deadline is the reason to act: without it "keep it permanently" never
+  // said the alternative was deletion.
+  assert.match(fields.claim_message, /deleted 48 hours after its last edit/);
+  // The relay directive is for the agent, so it lives in `message`, never in the
+  // claim_message a host may print verbatim.
+  assert.ok(!fields.claim_message.includes(CLAIM_RELAY_DIRECTIVE));
+  assert.match(CLAIM_RELAY_DIRECTIVE, /language they are writing in/);
 
   // Three surfaces can offer this claim and each needs its own value: `chat` (the
   // link an agent prints), `widget` (the in-host button, here), and `footer` (the

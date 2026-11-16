@@ -101,6 +101,16 @@ function promptLanguageRows(d: Digest): string {
   return `${rows(d.nonEnglish.byLang)}<p class="none">${esc(note)}</p>`;
 }
 
+/**
+ * Items whose request carried non-Latin content, whatever language the
+ * instruction was in — so mostly agent-written English around a user's Korean,
+ * Chinese, Arabic…, which "Prompt language" above never sees.
+ */
+function contentScriptRows(d: Digest): string {
+  if (Object.keys(d.contentScripts ?? {}).length === 0) return `<p class="none">none</p>`;
+  return rows(d.contentScripts);
+}
+
 function section(title: string, body: string): string {
   return `<section><h2>${esc(title)}</h2>${body}</section>`;
 }
@@ -313,6 +323,8 @@ function digestBlock(d: Digest): string {
   ${section("By country", countryRows(d))}
   ${section("By language", languageRows(d))}
   ${section("Prompt language", promptLanguageRows(d))}
+  ${section("Content script", contentScriptRows(d))}
+  ${section("Claim views by agent", Object.keys(d.context.claimViewsByAgent ?? {}).length ? rows(d.context.claimViewsByAgent) : `<p class="none">none</p>`)}
   ${section(
     "Conversion",
     conv ? `<p class="big">${esc(conv)}</p>` : `<p class="none">none</p>`,

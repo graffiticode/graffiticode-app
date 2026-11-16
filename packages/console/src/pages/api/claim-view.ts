@@ -16,6 +16,11 @@ const ALLOWED_SRC = new Set(["chat", "widget", "footer", "unknown"]);
 // unrecognised stage is the original behaviour, a view.
 const ALLOWED_STAGE = new Set<ClaimStage>(["view", "auth_shown", "email_submitted"]);
 
+// The coarse host bucket the MCP server stamps on claim_url as `agent=` (its
+// classifyClientHost taxonomy; mirrored by ConnectAgentInstructions' ClientHost).
+// Allowlisted for the same reason as `src`: the body is unauthenticated.
+const ALLOWED_AGENT = new Set(["claude-code", "claude-app", "codex-cli", "openai", "editor", "unknown"]);
+
 /**
  * Records a stage of the claim funnel — opened, offered sign-in, submitted email.
  *
@@ -38,9 +43,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return;
   }
 
-  const { token, src, stage } = (req.body || {}) as {
+  const { token, src, agent, stage } = (req.body || {}) as {
     token?: string;
     src?: string;
+    agent?: string;
     stage?: string;
   };
   if (!token) {
@@ -54,6 +60,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       stage: ALLOWED_STAGE.has(stage as ClaimStage) ? (stage as ClaimStage) : "view",
       session: sessionNamespace,
       src: ALLOWED_SRC.has(String(src)) ? String(src) : "unknown",
+      agent: ALLOWED_AGENT.has(String(agent)) ? String(agent) : "unknown",
     });
   } catch {
     // Expired or forged token — nothing to record, and nothing to report.

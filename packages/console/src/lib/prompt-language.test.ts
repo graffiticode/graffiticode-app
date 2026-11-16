@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { classifyPromptLanguage } from '@graffiticode-app/core/lib/prompt-language';
+import { classifyPromptLanguage, contentScript } from '@graffiticode-app/core/lib/prompt-language';
 
 // Fixtures are synthetic but shaped like the production prompts the gate caught in shadow mode (Oct 2026):
 // an English instruction whose quoted non-Latin content outweighs it letter for letter.
@@ -71,4 +71,19 @@ test('existing cases keep their verdicts', () => {
     'quiz',
   ];
   for (const text of proceed) assert.notEqual(classifyPromptLanguage(text).verdict, 'non_english', text);
+});
+
+test('contentScript reports non-Latin content the gate passes as English', () => {
+  // The gate calls this English (it is), and contentScript still sees the Han.
+  assert.equal(classifyPromptLanguage(HAN_CONTENT_IN_ENGLISH).verdict, 'english');
+  assert.equal(contentScript(HAN_CONTENT_IN_ENGLISH), 'han');
+  assert.equal(
+    contentScript('Create a spreadsheet budget with Korean headers: 월세, 식비, 교통비, 통신비, 합계 and a SUM row'),
+    'hangul',
+  );
+  // Latin-only, accented Latin, and a stray name or two are not content.
+  assert.equal(contentScript('Bar chart, quarterly revenue 2024'), undefined);
+  assert.equal(contentScript("Change the café name to Müller's"), undefined);
+  assert.equal(contentScript('Make a quiz: 水 means water, 火 means fire'), undefined);
+  assert.equal(contentScript(''), undefined);
 });

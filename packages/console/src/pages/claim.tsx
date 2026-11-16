@@ -76,6 +76,7 @@ export default function Claim() {
   // Only the URL-param visit carries `src`; a reload off the stashed token has
   // genuinely lost it, and 'unknown' is the honest answer there.
   const srcRef = useRef('unknown');
+  const agentRef = useRef('unknown');
 
   // Resolve the claim token once the router is ready and persist it. Prefer the
   // URL param; fall back to the stashed copy after a sign-in remount.
@@ -87,10 +88,12 @@ export default function Claim() {
     const agentFromQuery = typeof router.query.agent === 'string' ? router.query.agent : null;
     if (agentFromQuery) {
       sessionStorage.setItem(CLAIM_AGENT_KEY, agentFromQuery);
-      setHost(parseClientHost(agentFromQuery));
-    } else {
-      setHost(parseClientHost(sessionStorage.getItem(CLAIM_AGENT_KEY)));
     }
+    const resolvedHost = parseClientHost(agentFromQuery ?? sessionStorage.getItem(CLAIM_AGENT_KEY));
+    setHost(resolvedHost);
+    // Every funnel stage carries the host too, so claim conversion can be read per
+    // agent — Codex, a terminal with no widget, had no measurable claim rate.
+    agentRef.current = resolvedHost;
     if (fromQuery) {
       sessionStorage.setItem(CLAIM_TOKEN_KEY, fromQuery);
       setToken(fromQuery);
@@ -103,7 +106,7 @@ export default function Claim() {
         fetch('/api/claim-view', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: fromQuery, src: srcRef.current, stage: 'view' }),
+          body: JSON.stringify({ token: fromQuery, src: srcRef.current, agent: agentRef.current, stage: 'view' }),
         }).catch(() => {});
       }
     } else {
@@ -122,7 +125,7 @@ export default function Claim() {
     fetch('/api/claim-view', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: claimToken, src: srcRef.current, stage }),
+      body: JSON.stringify({ token: claimToken, src: srcRef.current, agent: agentRef.current, stage }),
     }).catch(() => {});
   }, [token]);
 

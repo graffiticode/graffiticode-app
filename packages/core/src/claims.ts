@@ -142,13 +142,16 @@ export const CLAIM_STAGE_EVENTS: Record<ClaimStage, string> = {
   email_submitted: "claim_email_submitted",
 };
 
-export function logClaimStage(fields: { stage: ClaimStage; session: string; src: string }) {
+export function logClaimStage(fields: { stage: ClaimStage; session: string; src: string; agent?: string }) {
   try {
     console.log(JSON.stringify({
       ev: CLAIM_STAGE_EVENTS[fields.stage],
       t: new Date().toISOString(),
       session: fields.session,
       src: fields.src,
+      // Coarse host bucket (claude-code | codex-cli | openai | …), never a raw
+      // client name. Absent on events from before 2026-11-15.
+      ...(fields.agent ? { agent: fields.agent } : {}),
     }));
   } catch {
     // ignore

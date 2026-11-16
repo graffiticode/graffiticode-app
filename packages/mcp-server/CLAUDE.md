@@ -158,7 +158,7 @@ Free-plan `create_item` and `update_item` responses include three extra fields s
 
 - `view_url` — `${APP_URL}/form/<id>`
 - `claim_url` — `${CONSOLE_URL}/claim?token=<jwt>&src=chat&agent=<host>`
-- `claim_message` — two lines: the URL, then a reconnect hint chosen for `<host>`
+- `claim_message` — two lines: the 48h deletion deadline plus the link, then a reconnect hint chosen for `<host>`. On the ready path `message` also carries `CLAIM_RELAY_DIRECTIVE`, asking the agent to relay the note in the user's language (kept out of `claim_message`, which hosts may print verbatim)
 
 `src` attributes the click (chat link vs render-host footer). `agent` is the coarse
 host bucket from `classifyClientHost` (`claude-code` | `claude-app` | `codex-cli` | `openai` |

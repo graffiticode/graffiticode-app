@@ -1,6 +1,7 @@
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { randomUUID } from "node:crypto";
 import { isDiscoverable } from "@graffiticode-app/core/discovery";
+import { FREE_PLAN_ITEM_TTL_MS } from "@graffiticode-app/core/lib/free-plan-context";
 import {
   getData,
   getItemWithTask as apiGetItemWithTask,
@@ -926,6 +927,20 @@ function buildViewUrl(itemId: string, claimToken?: string | null): string {
 // Only the console knows the effective workspace, so only the console can mint
 // this. That also retires the copy of the HS256 signing parameters this repo was
 // keeping in sync with the console's by hand.
+const FREE_PLAN_TTL_HOURS = Math.round(FREE_PLAN_ITEM_TTL_MS / 3_600_000);
+
+/**
+ * Appended to `message` (the agent-facing directive) whenever there is a
+ * claim_message — never to claim_message itself, which hosts may print verbatim.
+ *
+ * Without it the save offer reached non-English users in English, if at all:
+ * 14 items with Korean content in 90 days (all Codex, a terminal host with no
+ * widget, so the chat link is its ONLY claim surface) produced zero claim views.
+ */
+export const CLAIM_RELAY_DIRECTIVE =
+  "Pass the save note above on to the user in the language they are writing in, " +
+  "keeping its link and the deletion deadline.";
+
 export function buildClaimFields(
   auth: AuthContext,
   claimToken?: string | null,
@@ -973,7 +988,14 @@ export function buildClaimFields(
     // The hint goes on its own line so the link ends one: a sentence butted up
     // against a link is where renderers start swallowing trailing words into the
     // href, and this link is the whole point of the message.
+    //
+    // It leads with the expiry because that is the reason to act. "Keep it
+    // permanently" alone never said the alternative was deletion, and a returning
+    // free-plan user starts a fresh workspace every conversation, so each week's
+    // items vanish two days after their last edit — the person most worth
+    // converting is the one losing the most, and nothing told them.
     claim_message:
+      `This item is deleted ${FREE_PLAN_TTL_HOURS} hours after its last edit. ` +
       `To keep it permanently, [sign in to save it](${claim_url}).\n` +
       reconnectHint(host),
   };
@@ -1896,7 +1918,7 @@ async function handleItemResult(
       mode === "render" && clientMountsWidget(ctx.clientKind, ctx.declaresUi),
     );
     const message = hydration.claim_message
-      ? `${linkDirective}\n\n${hydration.claim_message as string}`
+      ? `${linkDirective}\n\n${hydration.claim_message as string}\n\n${CLAIM_RELAY_DIRECTIVE}`
       : linkDirective;
     if (mode === "render") {
       // Widget-only, and deliberately not written by applyViewAndClaim: it must

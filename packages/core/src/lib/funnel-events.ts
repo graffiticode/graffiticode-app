@@ -114,6 +114,13 @@ export interface FunnelEventFields {
    */
   script?: string;
   plang?: string;
+  /**
+   * item_created / item_updated (generation-job path): dominant non-Latin
+   * script of the turn's CONTENT ("hangul", "han", …), set even when the
+   * instruction is English and the gate passed it. Absent for Latin-only text.
+   * See contentScript() in src/lib/prompt-language.ts.
+   */
+  content_script?: string;
   /** non_english_request: whether the gate actually refused it. */
   blocked?: boolean;
   /** signup: whether the account was born from a claim link or on its own. */

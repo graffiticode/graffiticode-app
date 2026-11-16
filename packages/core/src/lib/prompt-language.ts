@@ -216,6 +216,36 @@ export function classifyPromptLanguage(text: string): PromptLanguageResult {
   return { ...base, verdict: "uncertain" };
 }
 
+/** Fewer non-Latin letters than this is a stray name or symbol, not content. */
+const CONTENT_SCRIPT_MIN_LETTERS = 10;
+
+/**
+ * The dominant non-Latin script in a request, whatever language its
+ * INSTRUCTION is written in — or undefined when there is none worth counting.
+ *
+ * This is the demand signal classifyPromptLanguage() deliberately does not
+ * give. Agent hosts (Codex, ChatGPT) translate a user's Korean request into an
+ * English create_item description that carries the Korean as content, so the
+ * gate rightly calls it "english" and never fires; this reports `hangul` for
+ * it. Script only, never the text — same privacy contract as the gate.
+ * Latin-script languages (es/fr/de/…) are not detectable this way and are
+ * reported only through the gate's Rule B.
+ */
+export function contentScript(text: string): string | undefined {
+  const counts: Record<string, number> = {};
+  for (const ch of text || "") {
+    if (!LETTER.test(ch) || LATIN.test(ch)) continue;
+    for (const [name, re] of NON_LATIN_SCRIPTS) {
+      if (re.test(ch)) {
+        counts[name] = (counts[name] || 0) + 1;
+        break;
+      }
+    }
+  }
+  const [top] = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  return top && top[1] >= CONTENT_SCRIPT_MIN_LETTERS ? top[0] : undefined;
+}
+
 /** Group key for reporting. See `plang` on why the granularity is mixed. */
 export function promptLanguageKey(r: PromptLanguageResult): string {
   return r.plang ?? r.script;

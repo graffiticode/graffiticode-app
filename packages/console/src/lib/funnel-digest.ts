@@ -267,11 +267,54 @@ export function mergeEvents(logged: LogEvent[], stored: LogEvent[]): LogEvent[] 
   return [...logged, ...stored].sort((a, b) => String(a.t ?? "").localeCompare(String(b.t ?? "")));
 }
 
+/**
+ * Long windows are read one day at a time, each slice with its own MAX_PAGES
+ * budget. A single oldest-first read capped at MAX_PAGES dropped the NEWEST
+ * days of a month report — the ones a reader cares about most — and with them
+ * every non_english_request of 2026-10-23..29 (the 30-day report said 0, the
+ * logs had 6). Hourly and daily windows are one slice, so the digest is
+ * unchanged. Slices run sequentially to stay inside entries:list's per-minute
+ * read quota.
+ */
+const SLICE_MS = 86_400_000;
+
 async function fetchLoggedEvents(
   from: Date,
   to: Date,
 ): Promise<{ events: LogEvent[]; truncated: boolean }> {
   const token = await getAccessToken();
+  const events: LogEvent[] = [];
+  let truncated = false;
+  for (let start = from.getTime(); start < to.getTime(); start += SLICE_MS) {
+    const end = new Date(Math.min(start + SLICE_MS, to.getTime()));
+    const slice = await fetchLoggedSlice(token, new Date(start), end);
+    for (const e of slice.events) events.push(e);
+    truncated ||= slice.truncated;
+  }
+  return { events, truncated };
+}
+
+/** entries:list with a short backoff on 429 (read quota), which a month of slices can hit. */
+async function listEntries(token: string, body: unknown): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch("https://logging.googleapis.com/v2/entries:list", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+    if (res.status !== 429 || attempt >= 4) return res;
+    await new Promise((r) => setTimeout(r, 2_000 * 2 ** attempt));
+  }
+}
+
+async function fetchLoggedSlice(
+  token: string,
+  from: Date,
+  to: Date,
+): Promise<{ events: LogEvent[]; truncated: boolean }> {
   const filter = [
     `timestamp >= "${from.toISOString()}"`,
     `timestamp < "${to.toISOString()}"`,
@@ -283,19 +326,12 @@ async function fetchLoggedEvents(
   let pages = 0;
 
   do {
-    const res = await fetch("https://logging.googleapis.com/v2/entries:list", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        resourceNames: [`projects/${PROJECT}`],
-        filter,
-        orderBy: "timestamp asc",
-        pageSize: PAGE_SIZE,
-        ...(pageToken ? { pageToken } : {}),
-      }),
+    const res = await listEntries(token, {
+      resourceNames: [`projects/${PROJECT}`],
+      filter,
+      orderBy: "timestamp asc",
+      pageSize: PAGE_SIZE,
+      ...(pageToken ? { pageToken } : {}),
     });
     if (!res.ok) {
       const text = await res.text().catch(() => "");
@@ -372,6 +408,13 @@ export interface Digest {
    * src/lib/prompt-language.ts.
    */
   nonEnglish: { total: number; blocked: number; byLang: Record<string, number> };
+  /**
+   * Items created whose request carried non-Latin CONTENT, by dominant script
+   * (`content_script` on item_created). The demand nonEnglish cannot see: agent
+   * hosts write English instructions around a user's Korean, so the gate
+   * passes them. Only the generation-job path stamps it, so this is a floor.
+   */
+  contentScripts: Record<string, number>;
   walls: Record<string, number>;
   claims: { count: number; transferred: number };
   signups: { direct: number; viaClaim: number };
@@ -390,6 +433,13 @@ export interface Digest {
     toolCalls: number;
     connectsWithoutUse: number;
     claimViews: number;
+    /**
+     * claim_view by the `agent` host bucket the claim link carried (codex-cli,
+     * openai, claude-code, …). "unrecorded" for views logged before the field
+     * existed (2026-11-15). Codex has no widget, so its only claim surface is the
+     * chat link — this is how its conversion becomes measurable.
+     */
+    claimViewsByAgent: Record<string, number>;
     claimAuthShown: number;
     claimEmailSubmitted: number;
     checkoutAbandoned: number;
@@ -510,6 +560,7 @@ export function aggregate(
     items: { ok: 0, failed: 0, outOfScope: 0, byApp: {}, firstForAccount: 0 },
     languages: { created: {}, attempted: {} },
     nonEnglish: { total: 0, blocked: 0, byLang: {} },
+    contentScripts: {},
     walls: {},
     claims: { count: 0, transferred: 0 },
     signups: { direct: 0, viaClaim: 0 },
@@ -523,6 +574,7 @@ export function aggregate(
       toolCalls: 0,
       connectsWithoutUse: 0,
       claimViews: 0,
+      claimViewsByAgent: {},
       claimAuthShown: 0,
       claimEmailSubmitted: 0,
       checkoutAbandoned: 0,
@@ -721,6 +773,7 @@ export function aggregate(
         bump(d.items.byApp, typeof e.app === "string" ? e.app : "console");
         bump(d.languages.created, langKey(e.lang));
         if (e.first_for_account) d.items.firstForAccount++;
+        if (typeof e.content_script === "string" && e.content_script) bump(d.contentScripts, e.content_script);
         break;
 
       case "item_updated":
@@ -762,6 +815,7 @@ export function aggregate(
 
       case "claim_view":
         d.context.claimViews++;
+        bump(d.context.claimViewsByAgent, typeof e.agent === "string" && e.agent ? e.agent : "unrecorded");
         break;
 
       case "claim_auth_shown":
@@ -1019,6 +1073,10 @@ export function formatDigest(d: Digest): string {
     if (d.nonEnglish.blocked > 0) line += ` (${d.nonEnglish.blocked} blocked)`;
     lines.push(line);
   }
+  const contentTotal = Object.values(d.contentScripts).reduce((a, b) => a + b, 0);
+  if (contentTotal > 0) {
+    lines.push(`🔤 ${contentTotal} item${plural(contentTotal)} with non-Latin content — ${breakdown(d.contentScripts)}`);
+  }
 
   const wallTotal = Object.values(d.walls).reduce((a, b) => a + b, 0);
   if (wallTotal > 0) {
@@ -1082,7 +1140,7 @@ export function formatDigest(d: Digest): string {
 
   if (lines.length === 1) lines.push("· quiet — no activity");
   // Never let a cap read as "that was everything".
-  if (d.truncated) lines.push(`⚠ read capped at ${MAX_PAGES * PAGE_SIZE} events — counts are floors`);
+  if (d.truncated) lines.push(`⚠ read capped at ${MAX_PAGES * PAGE_SIZE} events in a day — counts are floors`);
 
   return lines.join("\n");
 }

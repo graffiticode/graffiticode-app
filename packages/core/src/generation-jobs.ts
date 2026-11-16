@@ -30,6 +30,7 @@ import { generateCodeForRequest } from "./lib/code-generation/generate-for-reque
 import { getTask } from "./tasks.js";
 import { FREE_PLAN_ITEM_TTL_MS } from "./lib/free-plan-context.js";
 import { buildEventPayload, actor } from "./lib/funnel-events.js";
+import { contentScript } from "./lib/prompt-language.js";
 import { dailyDocRef } from "./lib/free-plan-quota.js";
 import { buildVersionDoc, versionPath, type VersionSource } from "./versions.js";
 import { accountFirstCompletion, billingRefs } from "./billing.js";
@@ -457,6 +458,9 @@ export async function completeJob(generationId: string, owner: string, auth: Pri
     const taskIdChanged = result.taskId !== item.taskId;
     const firstTaskId = !item.taskId;
     const billing = taskIdChanged && firstTaskId && !item.billed && !item.sharedFrom && !item.claimedFrom;
+    // Non-Latin CONTENT in this turn (e.g. Korean inside an English, agent-written
+    // instruction) — the demand the non-English gate cannot see. Script only.
+    const contentScriptOf = contentScript(env.modification || env.prompt);
 
     // All reads before any write.
     const versionRef = db().doc(versionPath(env.uid, env.itemId, result.taskId));
@@ -512,14 +516,16 @@ export async function completeJob(generationId: string, owner: string, auth: Pri
           auth, itemId: env.itemId, taskId: result.taskId, lang, client: item.client, source,
           now: new Date(now), refs, reads, trial,
         });
-        for (const e of accounted.events) recordEvent(tx, generationId, e.ev, e.fields, now);
+        for (const e of accounted.events) {
+          recordEvent(tx, generationId, e.ev, e.ev === "item_created" ? { ...e.fields, content_script: contentScriptOf } : e.fields, now);
+        }
         for (const e of accounted.effects) {
           recordEffect(tx, e.id, { kind: e.kind, sourceId: generationId, uid: env.uid, itemId: env.itemId, payload: e.payload, now });
         }
       } else if (!firstTaskId) {
         // A real revision: the edit signal, and one of the trial's revisions.
         recordEvent(tx, generationId, "item_updated", {
-          ...actor(auth), lang, app: item.client ?? "console", source,
+          ...actor(auth), lang, app: item.client ?? "console", source, content_script: contentScriptOf,
         }, now);
         if (auth.freePlan) updates.trialRevisions = admin.firestore.FieldValue.increment(1);
       }
