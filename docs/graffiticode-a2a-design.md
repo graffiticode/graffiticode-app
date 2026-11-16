@@ -246,7 +246,7 @@ A2A maps these states through the selected SDK's task-state enum. MCP Tasks-exte
 
 Scope idempotency to account, principal, service, operation, and client key, and bind it to an input digest. The same key and digest returns the existing job; different input is a conflict. A retry through another interface reaches the same job only when the caller explicitly supplies the shared domain key and passes ownership checks. Conversation IDs alone do not deduplicate work.
 
-**Retention.** Job key bindings use the claim primitives in `packages/core/src/idempotency.ts`, but not generation's 24-hour TTL.
+**Retention.** Job key bindings (`service-job-keys`, `packages/core/src/service-jobs.ts`) follow the pattern in `packages/core/src/idempotency.ts`: a hashed scope and key, an input fingerprint, and a mismatch on reuse. They are bound in the job's own creating transaction, and they don't inherit generation's 24-hour TTL.
 - A binding never expires while its job is not terminal.
 - After the job ends, the binding is kept for a retry window that the service definition records.
 - A retry after the window is a new job. ([Execution observation plan](https://github.com/graffiticode/graffiticode/blob/main/docs/execution-observation-plan.md), D-1.)
