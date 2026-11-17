@@ -22,6 +22,8 @@
     "@graffiticode/auth": "^2.1.2",
     "@graffiticode/l0175": "^0.3.0",
     "@graffiticode/parser": "^1.11.1",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
     "axios": "^1.11.0",
     "bent": "^7.3.12",
     "firebase-admin": "^13.5.0",
@@ -31,7 +33,7 @@
     "stripe": "^22.3.2"
   },
   "devDependencies": {
-    "typescript": "^5.9.2",
-    "@types/node": "^24.2.1"
+    "@types/node": "^24.2.1",
+    "typescript": "^5.9.2"
   }
 }

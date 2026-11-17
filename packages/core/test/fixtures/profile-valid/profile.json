@@ -1,0 +1,62 @@
+{
+  "profileVersion": 1,
+  "installation": { "id": "example", "production": false, "project": "example-installation" },
+  "brand": {
+    "name": "Example",
+    "operator": { "name": "Example Inc.", "url": "https://example.test", "supportEmail": "support@example.test" },
+    "assets": { "logo": "assets/logo.svg", "favicon": "assets/favicon.ico" },
+    "legal": { "privacy": "legal/privacy.md", "terms": "legal/terms.md" }
+  },
+  "hosts": {
+    "console": "https://console.example.test",
+    "app": "https://app.example.test",
+    "api": "https://api.graffiticode.org",
+    "auth": "https://auth.graffiticode.org",
+    "mcp": "https://mcp.example.test",
+    "openapi": "https://openapi.example.test",
+    "languageServer": "https://l{id}.graffiticode.org"
+  },
+  "auth": {
+    "issuer": "https://mcp.example.test",
+    "resources": { "mcp": "https://mcp.example.test/mcp", "openapi": "https://openapi.example.test/v1" }
+  },
+  "catalog": { "languages": ["L0176", "0178"] },
+  "services": [
+    {
+      "serviceId": "assessment-authoring",
+      "version": 1,
+      "name": "Assessment Authoring",
+      "responsibility": "Author assessment content.",
+      "limits": { "deadlineMs": 2700000, "retryWindowMs": 2592000000, "maxGenerationAttempts": 3 },
+      "skills": [
+        {
+          "skillId": "author_content",
+          "name": "Author content",
+          "description": "Author questions.",
+          "capability": "generate-content",
+          "deliverableKind": "content",
+          "deliveryStates": ["prepared"],
+          "languages": ["0176"]
+        },
+        {
+          "skillId": "plan_data_job",
+          "name": "Plan a data job",
+          "description": "Plan a data job.",
+          "capability": "generate-content",
+          "deliverableKind": "data_plan",
+          "deliveryStates": ["planned"],
+          "languages": ["0178"]
+        }
+      ]
+    }
+  ],
+  "surfaces": {
+    "mcp": [
+      { "path": "/mcp", "families": ["items"] },
+      { "path": "/services/mcp", "families": ["services"], "services": ["assessment-authoring"] }
+    ]
+  },
+  "copy": { "instructions": "copy/instructions.md" },
+  "freePlan": { "enabled": false },
+  "csp": { "mode": "report-only" }
+}

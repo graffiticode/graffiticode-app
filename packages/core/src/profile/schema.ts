@@ -1,0 +1,270 @@
+// The installation profile schema (installations plan, P1). A profile is an
+// operator's declarative description of one installation: its brand, hosts,
+// authentication boundary, catalog, services, surfaces and copy. It lives
+// outside this repo, in a directory holding `profile.json` plus the files it
+// references (assets, legal documents, copy templates).
+//
+// The schema is versioned. A profile names the version it was written for, and
+// this release accepts only the versions in SUPPORTED_PROFILE_VERSIONS.
+//
+// What a profile can't do: declare that a capability exists, is implemented,
+// is write-free or needs less authorization. Those facts come from the code
+// (capabilities.ts); a profile only selects and parameterizes.
+
+export const PROFILE_SCHEMA_VERSION = 1;
+export const SUPPORTED_PROFILE_VERSIONS: readonly number[] = [1];
+
+const id = { type: "string", pattern: "^[a-z][a-z0-9-]{1,62}$" } as const;
+const origin = { type: "string", pattern: "^https?://[^/\\s]+$" } as const;
+const url = { type: "string", pattern: "^https?://\\S+$" } as const;
+// A file inside the profile directory: relative, no parent segments.
+const file = { type: "string", pattern: "^(?!/)(?!.*(^|/)\\.\\.(/|$))[^\\s\\\\]+$" } as const;
+const text = { type: "string", minLength: 1 } as const;
+const strings = { type: "array", items: text } as const;
+
+const deliverableKind = { enum: ["content", "integration_recipe", "data_plan", "operation_result"] } as const;
+const deliveryState = { enum: ["prepared", "previewed", "saved", "planned", "exported", "applied"] } as const;
+
+export const profileSchema = {
+  $schema: "https://json-schema.org/draft/2020-12/schema",
+  $id: "https://graffiticode.org/schemas/installation-profile/v1",
+  type: "object",
+  additionalProperties: false,
+  required: ["profileVersion", "installation", "brand", "hosts", "auth", "surfaces"],
+  properties: {
+    profileVersion: { type: "integer" },
+    installation: {
+      type: "object",
+      additionalProperties: false,
+      required: ["id", "production", "project"],
+      properties: {
+        id,
+        // Production installations keep their generation-protocol floor; others
+        // are treated as staging (generation-protocol.ts).
+        production: { type: "boolean" },
+        // The GCP project holding this installation's database and queues.
+        project: { type: "string", pattern: "^[a-z][a-z0-9-]{4,28}[a-z0-9]$" },
+      },
+    },
+    brand: {
+      type: "object",
+      additionalProperties: false,
+      required: ["name", "operator", "assets", "legal"],
+      properties: {
+        name: text,
+        tagline: text,
+        operator: {
+          type: "object",
+          additionalProperties: false,
+          required: ["name", "url"],
+          properties: { name: text, url, supportEmail: { type: "string", format: "email" } },
+        },
+        assets: {
+          type: "object",
+          additionalProperties: false,
+          required: ["logo", "favicon"],
+          properties: { logo: file, favicon: file, icon: file },
+        },
+        legal: {
+          type: "object",
+          additionalProperties: false,
+          required: ["privacy", "terms"],
+          properties: { privacy: file, terms: file, about: file },
+        },
+        links: {
+          type: "object",
+          additionalProperties: false,
+          properties: { product: url, docs: url, forum: url, source: url, signup: url },
+        },
+      },
+    },
+    hosts: {
+      type: "object",
+      additionalProperties: false,
+      required: ["console", "app", "api", "auth", "mcp"],
+      properties: {
+        console: origin,
+        app: origin,
+        api: origin,
+        auth: origin,
+        mcp: origin,
+        openapi: origin,
+        widgetAssets: origin,
+        // A language server's origin, with {id} for the four-digit language id.
+        languageServer: { type: "string", pattern: "^https?://\\S*\\{id\\}\\S*$" },
+      },
+    },
+    auth: {
+      type: "object",
+      additionalProperties: false,
+      required: ["issuer", "resources"],
+      properties: {
+        // The authorization server this installation delegates sign-in to.
+        issuer: origin,
+        // This installation's protected resources: tokens are bound to these.
+        resources: {
+          type: "object",
+          additionalProperties: false,
+          required: ["mcp"],
+          properties: { mcp: url, openapi: url },
+        },
+      },
+    },
+    catalog: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        // Language ids this installation offers ("0176" or "L0176").
+        languages: { type: "array", items: { type: "string", pattern: "^L?[0-9]{4}$" } },
+        // Per-language entries; their shape is fixed when the catalog moves
+        // out of code (P2).
+        entries: { type: "object" },
+      },
+    },
+    services: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["serviceId", "version", "name", "responsibility", "skills", "limits"],
+        properties: {
+          serviceId: id,
+          version: { type: "integer", minimum: 1 },
+          name: text,
+          responsibility: text,
+          exclusions: strings,
+          limits: {
+            type: "object",
+            additionalProperties: false,
+            required: ["deadlineMs", "retryWindowMs", "maxGenerationAttempts"],
+            properties: {
+              deadlineMs: { type: "integer", minimum: 60_000 },
+              retryWindowMs: { type: "integer", minimum: 0 },
+              maxGenerationAttempts: { type: "integer", minimum: 1 },
+            },
+          },
+          skills: {
+            type: "array",
+            minItems: 1,
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["skillId", "name", "description", "capability", "deliverableKind", "deliveryStates", "languages"],
+              properties: {
+                // Public; never encodes a language number.
+                skillId: { type: "string", pattern: "^(?!.*[0-9]{4})[a-z][a-z0-9_]{1,62}$" },
+                name: text,
+                description: text,
+                // A capability id from the registry in code.
+                capability: id,
+                deliverableKind,
+                deliveryStates: { type: "array", minItems: 1, items: deliveryState },
+                languages: { type: "array", minItems: 1, items: { type: "string", pattern: "^[0-9]{4}$" } },
+                examples: strings,
+              },
+            },
+          },
+        },
+      },
+    },
+    surfaces: {
+      type: "object",
+      additionalProperties: false,
+      required: ["mcp"],
+      properties: {
+        mcp: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["path", "families"],
+            properties: {
+              path: { type: "string", pattern: "^/[a-z0-9/_-]*$" },
+              // "items": the generic item tools; "services": tools generated from services.
+              families: { type: "array", minItems: 1, uniqueItems: true, items: { enum: ["items", "services"] } },
+              // Which services a "services" family serves (default: all).
+              services: { type: "array", items: id },
+            },
+          },
+        },
+        a2a: { type: "object", additionalProperties: false, properties: { enabled: { type: "boolean" } } },
+        rest: { type: "object", additionalProperties: false, properties: { enabled: { type: "boolean" } } },
+      },
+    },
+    // Copy templates by key (server instructions, tool descriptions, ...), as files.
+    copy: { type: "object", additionalProperties: file },
+    billing: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        // Plan shapes are fixed when billing moves out of code (P2).
+        plans: { type: "array", items: { type: "object" } },
+      },
+    },
+    freePlan: {
+      type: "object",
+      additionalProperties: false,
+      required: ["enabled"],
+      properties: { enabled: { type: "boolean" }, itemTtlHours: { type: "integer", minimum: 1 } },
+    },
+    csp: {
+      type: "object",
+      additionalProperties: false,
+      required: ["mode"],
+      properties: { mode: { enum: ["report-only", "enforce"] } },
+    },
+  },
+} as const;
+
+export type DeliverableKindName = "content" | "integration_recipe" | "data_plan" | "operation_result";
+export type DeliveryStateName = "prepared" | "previewed" | "saved" | "planned" | "exported" | "applied";
+
+export type ProfileSkill = {
+  skillId: string;
+  name: string;
+  description: string;
+  capability: string;
+  deliverableKind: DeliverableKindName;
+  deliveryStates: DeliveryStateName[];
+  languages: string[];
+  examples?: string[];
+};
+
+export type ProfileService = {
+  serviceId: string;
+  version: number;
+  name: string;
+  responsibility: string;
+  exclusions?: string[];
+  limits: { deadlineMs: number; retryWindowMs: number; maxGenerationAttempts: number };
+  skills: ProfileSkill[];
+};
+
+export type Profile = {
+  profileVersion: number;
+  installation: { id: string; production: boolean; project: string };
+  brand: {
+    name: string;
+    tagline?: string;
+    operator: { name: string; url: string; supportEmail?: string };
+    assets: { logo: string; favicon: string; icon?: string };
+    legal: { privacy: string; terms: string; about?: string };
+    links?: { product?: string; docs?: string; forum?: string; source?: string; signup?: string };
+  };
+  hosts: {
+    console: string; app: string; api: string; auth: string; mcp: string;
+    openapi?: string; widgetAssets?: string; languageServer?: string;
+  };
+  auth: { issuer: string; resources: { mcp: string; openapi?: string } };
+  catalog?: { languages?: string[]; entries?: Record<string, unknown> };
+  services?: ProfileService[];
+  surfaces: {
+    mcp: { path: string; families: ("items" | "services")[]; services?: string[] }[];
+    a2a?: { enabled?: boolean };
+    rest?: { enabled?: boolean };
+  };
+  copy?: Record<string, string>;
+  billing?: { plans?: Record<string, unknown>[] };
+  freePlan?: { enabled: boolean; itemTtlHours?: number };
+  csp?: { mode: "report-only" | "enforce" };
+};
