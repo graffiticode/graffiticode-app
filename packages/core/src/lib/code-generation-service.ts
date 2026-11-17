@@ -10,6 +10,7 @@
  * 6. Retrieval of relevant examples to enhance generation accuracy
  */
 
+import { db } from "../db.js";
 import * as fs from "fs";
 import * as path from "path";
 import { postApiCompile, getLanguageAsset, getLanguageLexicon, isLangOverridden, languageOfflineMessage, isLanguageOfflineError } from "./api.js";
@@ -155,16 +156,8 @@ function detectLanguage(prompt) {
  * @returns {FirebaseFirestore.Firestore} Firestore database instance
  */
 function getFirestoreDb() {
-  // Get existing Firestore instance or initialize if needed
-  try {
-    return admin.firestore();
-  } catch (error) {
-    // If admin isn't initialized, initialize it
-    if (!admin.apps.length) {
-      admin.initializeApp();
-    }
-    return admin.firestore();
-  }
+  // The installation's Firestore (storage.ts).
+  return db();
 }
 
 /**

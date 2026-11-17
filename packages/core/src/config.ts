@@ -9,6 +9,7 @@
 
 import { installedProfile } from "./profile/current.js";
 import { resolveHosts } from "./profile/hosts.js";
+import { storageProjectOrNull } from "./profile/storage-config.js";
 
 const list = (raw: string | undefined) => (raw ?? "").split(",").map(s => s.trim()).filter(Boolean);
 
@@ -29,7 +30,9 @@ export function configFromEnv(env: NodeJS.ProcessEnv = process.env) {
     authUrl: hosts.auth,
     firebaseWebApiKey: env.NEXT_PUBLIC_FIREBASE_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "",
     generationQueue: {
-      project: env.GENERATION_QUEUE_PROJECT || env.GOOGLE_CLOUD_PROJECT || env.GCLOUD_PROJECT || "graffiticode-app",
+      // The installation's project unless the queue lives elsewhere; never a
+      // built-in project (profile/storage-config.ts).
+      project: env.GENERATION_QUEUE_PROJECT || storageProjectOrNull(installed?.profile ?? null, env) || "",
       location: env.GENERATION_QUEUE_LOCATION || "us-central1",
       name: env.GENERATION_QUEUE_NAME || "generation-jobs",
       secret: env.INTERNAL_JOB_SECRET || "",

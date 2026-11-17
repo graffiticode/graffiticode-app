@@ -1598,7 +1598,8 @@ const httpServer = createServer((req, res) => {
 
 // The installation profile (PROFILE_DIR), loaded and validated before the
 // first request. An invalid profile stops the start.
-const installationReceipt = loadInstallation();
+// Storage is required in core mode, where this server reads and writes Firestore.
+const installationReceipt = loadInstallation(process.env, { requireStorage: coreBackendEnabled() });
 if (installationReceipt) console.log(`[installation] ${JSON.stringify(installationReceipt)}`);
 
 httpServer.listen(PORT, () => {

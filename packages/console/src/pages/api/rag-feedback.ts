@@ -5,14 +5,11 @@
  * which is then stored in the RAG analytics system for analysis and fine-tuning.
  */
 
+import { getFirestore } from "@graffiticode-app/core/utils/db/index";
 import { NextApiRequest, NextApiResponse } from "next";
 import { ragAnalytics, UserFeedback } from "@graffiticode-app/core/lib/rag-analytics";
 import admin from "firebase-admin";
 
-// Initialize Firebase Admin if not already initialized
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
 
 interface FeedbackRequest {
   requestId: string;
@@ -78,7 +75,7 @@ export default async function handler(
     // If user edited the code, we might want to store that separately for learning
     if (editedCode) {
       // Store edited code as a potential training example
-      const db = admin.firestore();
+      const db = getFirestore();
       await db.collection("rag_feedback_examples").add({
         requestId,
         originalRequestId: requestId,

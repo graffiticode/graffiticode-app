@@ -1,6 +1,8 @@
 import { client } from '../../../lib/auth';
+import { coreConfig } from "@graffiticode-app/core/config";
 
-const AUTH_SERVICE_URL = process.env.NEXT_PUBLIC_GC_AUTH_URL || 'https://auth.graffiticode.org';
+// The installation's auth host, read at use time (core config).
+const AUTH_SERVICE_URL = () => coreConfig().authUrl;
 const INTERNAL_API_KEY = process.env.AUTH_SERVICE_INTERNAL_API_KEY || process.env.INTERNAL_API_KEY || '';
 
 // Pre-OTP availability check. Lets AddEmailDialog avoid sending a code (and
@@ -33,7 +35,7 @@ const handler = async (req, res) => {
     return res.status(500).json({ error: { message: 'Internal API key not configured' } });
   }
 
-  const url = `${AUTH_SERVICE_URL.replace(/\/$/, '')}/linked-emails/internal/lookup?email=${encodeURIComponent(email.trim())}`;
+  const url = `${AUTH_SERVICE_URL().replace(/\/$/, '')}/linked-emails/internal/lookup?email=${encodeURIComponent(email.trim())}`;
   const upstream = await fetch(url, {
     method: 'GET',
     headers: { 'X-Internal-API-Key': INTERNAL_API_KEY },

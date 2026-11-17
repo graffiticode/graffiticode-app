@@ -69,7 +69,8 @@ async function startConsole(env: Record<string, string>) {
     cwd: SERVER_DIR,
     env: {
       PATH: process.env.PATH!, NODE_ENV: "production", PORT: String(port), HOSTNAME: "127.0.0.1",
-      FIRESTORE_EMULATOR_HOST: process.env.FIRESTORE_EMULATOR_HOST ?? "", GCLOUD_PROJECT: "demo-installation", GOOGLE_CLOUD_PROJECT: "demo-installation",
+      // No project here: each run states its own (a profile, or GOOGLE_CLOUD_PROJECT).
+      FIRESTORE_EMULATOR_HOST: process.env.FIRESTORE_EMULATOR_HOST ?? "",
       INTERNAL_JOB_SECRET: "job-secret", FREE_PLAN_NAMESPACE_SALT: "salt",
       ...env,
     },
@@ -108,7 +109,7 @@ const workerHeader = async (base: string) =>
   (await fetch(`${base}/api/generate-job`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).headers.get("x-installation");
 
 test("no profile: built-in policy, no installation, vendor requests route as before", async () => {
-  const s = await startConsole({ NEXT_PUBLIC_GC_AUTH_URL: authOrigin, NEXT_PUBLIC_GC_API_URL: authOrigin });
+  const s = await startConsole({ NEXT_PUBLIC_GC_AUTH_URL: authOrigin, NEXT_PUBLIC_GC_API_URL: authOrigin, GOOGLE_CLOUD_PROJECT: "demo-installation" });
   try {
     assert.deepEqual(await (await fetch(`${s.base}/api/health`)).json(), { ok: true });
     assert.equal(await workerHeader(s.base), null);
@@ -120,8 +121,8 @@ test("no profile: built-in policy, no installation, vendor requests route as bef
 });
 
 test("two profiles, one build: each route runs with its own installation", async () => {
-  const alpha = profile("alpha", p => { p.catalog = { languages: ["0176", "0180"] }; });
-  const beta = profile("beta", p => { p.catalog = { languages: ["0180"] }; });
+  const alpha = profile("alpha", p => { p.catalog = { languages: ["0176", "0180"] }; p.installation.project = "alpha-installation"; });
+  const beta = profile("beta", p => { p.catalog = { languages: ["0180"] }; p.installation.project = "beta-installation"; });
   for (const [dir, id, offersLearnosity] of [[alpha, "alpha", true], [beta, "beta", false]] as const) {
     const s = await startConsole({ PROFILE_DIR: dir });
     try {
@@ -155,4 +156,43 @@ test("an invalid profile stops the console from starting", async () => {
   const dir = mkdtempSync(join(tmpdir(), "profile-bad-"));
   writeFileSync(join(dir, "profile.json"), JSON.stringify({ profileVersion: 1 }));
   await assert.rejects(startConsole({ PROFILE_DIR: dir }), (e: any) => /console did not start/.test(e.message) && /Invalid installation profile/.test(e.output));
+});
+
+// Application storage (P3, slice 1): each installation's writes land in its
+// own project, and nothing falls back to a built-in one.
+async function emulatorDoc(project: string, path: string) {
+  const admin = (await import("firebase-admin")).default;
+  const name = `check:${project}`;
+  const app = admin.apps.find(a => a?.name === name) ?? admin.initializeApp({ projectId: project }, name);
+  return (await app.firestore().doc(path).get()).exists;
+}
+const createUser = async (base: string, uid: string) =>
+  (await fetch(`${base}/api/user`, { method: "POST", headers: { authorization: `user:${uid}` } })).status;
+
+test("two profiles, one build: each installation's writes land in its own project", async () => {
+  const alpha = profile("alpha", p => { p.installation.project = "alpha-installation"; });
+  const beta = profile("beta", p => { p.installation.project = "beta-installation"; });
+  for (const [dir, uid] of [[alpha, "alice-a"], [beta, "bob-b"]] as const) {
+    const s = await startConsole({ PROFILE_DIR: dir });
+    try {
+      assert.equal(await createUser(s.base, uid), 200);
+    } finally {
+      await stop(s.child);
+    }
+  }
+  assert.equal(await emulatorDoc("alpha-installation", "users/alice-a"), true);
+  assert.equal(await emulatorDoc("beta-installation", "users/bob-b"), true);
+  assert.equal(await emulatorDoc("beta-installation", "users/alice-a"), false);
+  assert.equal(await emulatorDoc("alpha-installation", "users/bob-b"), false);
+  assert.equal(await emulatorDoc("graffiticode-app", "users/alice-a"), false, "nothing reaches a built-in project");
+});
+
+test("a project the environment contradicts, or no project at all, stops the start", async () => {
+  const alpha = profile("alpha", p => { p.installation.project = "alpha-installation"; });
+  await assert.rejects(startConsole({ PROFILE_DIR: alpha, GOOGLE_CLOUD_PROJECT: "graffiticode-app" }),
+    (e: any) => /contradicts the installation profile's project/.test(e.output));
+  // Without a profile or a project, the console doesn't start: there is no
+  // built-in project to fall back to.
+  await assert.rejects(startConsole({ NEXT_PUBLIC_GC_AUTH_URL: authOrigin, NEXT_PUBLIC_GC_API_URL: authOrigin }),
+    (e: any) => /console did not start/.test(e.message) && /GOOGLE_CLOUD_PROJECT is required: there is no built-in project/.test(e.output));
 });

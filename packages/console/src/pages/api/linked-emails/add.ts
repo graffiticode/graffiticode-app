@@ -1,7 +1,9 @@
 import { PrivyClient } from '@privy-io/server-auth';
 import { client } from '../../../lib/auth';
+import { coreConfig } from "@graffiticode-app/core/config";
 
-const AUTH_SERVICE_URL = process.env.NEXT_PUBLIC_GC_AUTH_URL || 'https://auth.graffiticode.org';
+// The installation's auth host, read at use time (core config).
+const AUTH_SERVICE_URL = () => coreConfig().authUrl;
 const INTERNAL_API_KEY = process.env.AUTH_SERVICE_INTERNAL_API_KEY || process.env.INTERNAL_API_KEY || '';
 const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID || '';
 const PRIVY_APP_SECRET = process.env.PRIVY_APP_SECRET || '';
@@ -66,7 +68,7 @@ const handler = async (req, res) => {
     return res.status(500).json({ error: { message: 'Internal API key not configured' } });
   }
 
-  const upstream = await fetch(`${AUTH_SERVICE_URL.replace(/\/$/, '')}/linked-emails/internal`, {
+  const upstream = await fetch(`${AUTH_SERVICE_URL().replace(/\/$/, '')}/linked-emails/internal`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

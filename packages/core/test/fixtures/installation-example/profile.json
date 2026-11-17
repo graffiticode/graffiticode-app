@@ -3,7 +3,8 @@
   "installation": {
     "id": "example",
     "production": false,
-    "project": "example-installation"
+    "project": "example-installation",
+    "database": "(default)"
   },
   "brand": {
     "name": "Example",

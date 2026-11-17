@@ -42,7 +42,7 @@ test("a profile that fails to load leaves nothing installed, so reads keep faili
 });
 
 test("without PROFILE_DIR there is nothing to load, and built-in policy applies", () => {
-  assert.equal(ensureInstallation({} as any), null);
+  assert.equal(ensureInstallation({ GOOGLE_CLOUD_PROJECT: "p-1" } as any), null);
   assert.equal(installedProfile(), null);
   assert.ok(findLanguageById("0180"));
 });
@@ -61,4 +61,25 @@ test("separate module instances of core share the process's installation", async
   assert.deepEqual(b.ensureInstallation({ PROFILE_DIR: EXAMPLE } as any), receipt);
   b.resetInstallation();
   assert.equal(a.profile(), null);
+});
+
+test("with PROFILE_DIR set and nothing loaded, hosts and storage fail closed too", async () => {
+  const { installationHosts, installationStorage } = await import("../src/profile/runtime.js");
+  process.env.PROFILE_DIR = EXAMPLE;
+  process.env.GOOGLE_CLOUD_PROJECT = "would-be-wrong";
+  try {
+    assert.throws(() => installationStorage(), /PROFILE_DIR is set, but the installation isn't initialized here/);
+    assert.throws(() => installationHosts(), /PROFILE_DIR is set, but the installation isn't initialized here/);
+  } finally {
+    delete process.env.GOOGLE_CLOUD_PROJECT;
+  }
+});
+
+test("a server that uses storage won't start without a project", async () => {
+  const { loadInstallation } = await import("../src/profile/runtime.js");
+  assert.throws(() => ensureInstallation({} as any), /GOOGLE_CLOUD_PROJECT is required: there is no built-in project/);
+  assert.throws(() => loadInstallation({} as any), /GOOGLE_CLOUD_PROJECT is required/);
+  // A server that never touches Firestore (MCP outside core mode) may start without one.
+  assert.equal(loadInstallation({} as any, { requireStorage: false }), null);
+  assert.equal(ensureInstallation({} as any, { requireStorage: false }), null);
 });

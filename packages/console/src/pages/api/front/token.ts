@@ -1,8 +1,10 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { createHash } from 'crypto';
 import { getFirestore } from '@graffiticode-app/core/utils/db/index';
+import { coreConfig } from "@graffiticode-app/core/config";
 
-const authUrl = process.env.NEXT_PUBLIC_GC_AUTH_URL || "https://auth.graffiticode.org";
+// The installation's auth host, read at use time (core config).
+const authUrl = () => coreConfig().authUrl;
 
 // Allowed origins for CORS
 const allowedOrigins = [
@@ -75,7 +77,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Exchange the API key for a firebaseCustomToken via the legacy auth service endpoint
     // The editor needs a Firebase custom token to sign in with signInWithCustomToken()
-    const authResponse = await fetch(`${authUrl}/authenticate/api-key`, {
+    const authResponse = await fetch(`${authUrl()}/authenticate/api-key`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

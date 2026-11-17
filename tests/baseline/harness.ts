@@ -337,7 +337,11 @@ export async function start(): Promise<Harness> {
 
   const apiHandler = (await import("../../packages/console/src/pages/api/index")).default;
   jobHandler = (await import("../../packages/console/src/pages/api/generate-job")).default;
-  const admin = (await import("firebase-admin")).default;
+  // The installation's Firestore, as core resolves it (core/src/storage.ts):
+  // the harness reads and writes the same handle the code under test uses.
+  // (core's db module: utils/db/index default-exports the firebase-admin
+  // namespace, which tsx's interop then returns in place of the module.)
+  const { db: installationFirestore } = await import("@graffiticode-app/core/db");
 
   const consoleServer = await listen(async (req, res) => {
     const url = new URL(req.url!, "http://x");
@@ -387,7 +391,7 @@ export async function start(): Promise<Harness> {
       // seeded plan it falls back to Bronze's 25, which paces to 1 item/day for
       // most of a 30-day month, so any test creating two free-plan items fails
       // depending on the calendar date. Seed a large plan, as production does.
-      await admin.firestore().doc(`users/${TRIAL_UID}`).set({ subscription: { plan: "teams", status: "active" } });
+      await installationFirestore().doc(`users/${TRIAL_UID}`).set({ subscription: { plan: "teams", status: "active" } });
       calls.length = 0;
       llmRequests.length = 0;
       jobPayloads.length = 0;
@@ -396,7 +400,7 @@ export async function start(): Promise<Harness> {
       state.connections = [];
       delete process.env.POLICY_URL;
     },
-    db: admin.firestore(),
+    db: installationFirestore(),
     async stop() {
       await this.drainJobs();
       backend.server.close();

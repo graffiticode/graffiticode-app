@@ -37,7 +37,7 @@ export const profileSchema = {
     installation: {
       type: "object",
       additionalProperties: false,
-      required: ["id", "production", "project"],
+      required: ["id", "production", "project", "database"],
       properties: {
         id,
         // Production installations keep their generation-protocol floor; others
@@ -45,6 +45,9 @@ export const profileSchema = {
         production: { type: "boolean" },
         // The GCP project holding this installation's database and queues.
         project: { type: "string", pattern: "^[a-z][a-z0-9-]{4,28}[a-z0-9]$" },
+        // Its Firestore database: "(default)" or a named database. Stated, not
+        // assumed, so two installations can't share one by accident.
+        database: { type: "string", pattern: "^(\\(default\\)|[a-z][a-z0-9-]{2,61}[a-z0-9])$" },
       },
     },
     brand: {
@@ -307,7 +310,7 @@ export type ProfileService = {
 
 export type Profile = {
   profileVersion: number;
-  installation: { id: string; production: boolean; project: string };
+  installation: { id: string; production: boolean; project: string; database: string };
   brand: {
     name: string;
     tagline?: string;

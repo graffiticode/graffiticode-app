@@ -35,6 +35,8 @@ function install(freePlan: unknown) {
   p.hosts.api = process.env.NEXT_PUBLIC_GC_API_URL;
   p.hosts.auth = process.env.NEXT_PUBLIC_GC_AUTH_URL;
   p.hosts.console = process.env.CONSOLE_URL;
+  // The harness's storage: the profile states the same project.
+  p.installation.project = process.env.GOOGLE_CLOUD_PROJECT;
   if (freePlan === undefined) delete p.freePlan; else p.freePlan = freePlan;
   writeFileSync(join(dir, "profile.json"), JSON.stringify(p));
   runtime.loadInstallation({ ...process.env, PROFILE_DIR: dir });

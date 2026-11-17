@@ -1,9 +1,11 @@
+import { coreConfig } from "@graffiticode-app/core/config";
 // Sessions: the places this account is signed in. Each is an auth-service refresh token
 // (30 days), started by a wallet, email or Google sign-in. The browser's own session is the
 // one in the HttpOnly `gc_sso` cookie, which only the console server can read, so the page
 // talks to auth through /api/sessions (helpers below), and the server attaches the cookie.
 
-const authUrl = () => (process.env.NEXT_PUBLIC_GC_AUTH_URL || "https://auth.graffiticode.org").replace(/\/$/, "");
+// The installation's auth host, read at use time (core config).
+const authUrl = () => coreConfig().authUrl.replace(/\/$/, "");
 
 export type SessionMethod = "wallet" | "email" | "google";
 

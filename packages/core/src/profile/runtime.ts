@@ -9,6 +9,7 @@ import { setInstalledProfile } from "./current.js";
 import { renderTemplate, stripTrailingNewline } from "./template.js";
 import type { Profile } from "./schema.js";
 import { resolveHosts, type InstallationHosts } from "./hosts.js";
+import { resolveStorage, type InstallationStorage } from "./storage-config.js";
 import { setCoreConfig } from "../config.js";
 import { resolve as resolvePath } from "node:path";
 
@@ -19,17 +20,22 @@ type RuntimeState = {
   rendered: Map<string, string>;
   receipt: ReturnType<typeof profileReceipt> | null;
   hostsMemo: InstallationHosts | null;
+  storageMemo: InstallationStorage | null;
   // The directory the profile was loaded from: pinned for the process's life.
   pinnedDir: string | null;
 };
 const STATE = Symbol.for("graffiticode-app.installation-runtime");
-const state = ((globalThis as any)[STATE] ??= { loaded: null, rendered: new Map(), receipt: null, hostsMemo: null, pinnedDir: null }) as RuntimeState;
+const state = ((globalThis as any)[STATE] ??= { loaded: null, rendered: new Map(), receipt: null, hostsMemo: null, storageMemo: null, pinnedDir: null }) as RuntimeState;
 
-export function loadInstallation(env: NodeJS.ProcessEnv = process.env) {
+// `requireStorage`: whether this process uses application storage, so a
+// missing or contradicting project stops the start (true unless the server
+// never touches Firestore, like the MCP server outside core mode).
+export function loadInstallation(env: NodeJS.ProcessEnv = process.env, { requireStorage = true }: { requireStorage?: boolean } = {}) {
   if (!env.PROFILE_DIR) {
-    // No profile: still check the environment's hosts now, so a conflict
-    // stops the start rather than a request.
+    // No profile: still check the environment's hosts and storage now, so a
+    // conflict or a missing project stops the start rather than a request.
     resolveHosts(null, env);
+    if (requireStorage) resolveStorage(null, env);
     return null;
   }
   const l = loadProfile(env.PROFILE_DIR);
@@ -37,6 +43,8 @@ export function loadInstallation(env: NodeJS.ProcessEnv = process.env) {
   // Resolved once, after loading: a contradicting environment variable or an
   // inconsistent resource stops the start (profile/hosts.ts).
   const hosts = resolveHosts(l.profile, env);
+  // And where its data lives: a contradicting project or database stops the start.
+  const storage = resolveStorage(l.profile, env);
   const copy = new Map<string, string>();
   for (const [key, file] of Object.entries(l.profile.copy ?? {})) {
     copy.set(key, renderTemplate(key, l.readText(file), l.profile));
@@ -44,6 +52,7 @@ export function loadInstallation(env: NodeJS.ProcessEnv = process.env) {
   state.loaded = l;
   state.rendered = copy;
   state.hostsMemo = hosts;
+  state.storageMemo = storage;
   setInstalledProfile({ profile: l.profile, digest: l.digest });
   // Core's configuration reads hosts from the installed profile; rebuild it.
   setCoreConfig(null);
@@ -62,6 +71,7 @@ export function resetInstallation() {
   state.rendered = new Map();
   state.receipt = null;
   state.hostsMemo = null;
+  state.storageMemo = null;
   state.pinnedDir = null;
   setInstalledProfile(null);
   setCoreConfig(null);
@@ -92,7 +102,17 @@ export function document(kind: "privacy" | "terms" | "about"): string | null {
 // environment, read on each call (profile/hosts.ts).
 export function installationHosts(env: NodeJS.ProcessEnv = process.env): InstallationHosts {
   if (state.loaded) return (state.hostsMemo ??= resolveHosts(state.loaded.profile, env));
+  failClosed(env);
   return resolveHosts(null, env);
+}
+
+// With PROFILE_DIR set, nothing may be resolved from the environment before
+// the profile is loaded: that would pick the wrong hosts or the wrong database
+// and could be cached by whoever asked.
+function failClosed(env: NodeJS.ProcessEnv) {
+  if (env.PROFILE_DIR) {
+    throw new Error("PROFILE_DIR is set, but the installation isn't initialized here. Initialize it (ensureInstallation) before using hosts or storage.");
+  }
 }
 
 // Idempotent initialization, for entry points that can't rely on startup
@@ -101,10 +121,13 @@ export function installationHosts(env: NodeJS.ProcessEnv = process.env): Install
 // life, never re-reading files; a different PROFILE_DIR later is an error. A
 // failed load throws, so the caller fails closed. Without PROFILE_DIR: checks
 // the environment's hosts and returns null.
-export function ensureInstallation(env: NodeJS.ProcessEnv = process.env) {
+export function ensureInstallation(env: NodeJS.ProcessEnv = process.env, { requireStorage = true }: { requireStorage?: boolean } = {}) {
   const dir = env.PROFILE_DIR;
   if (!dir) {
-    if (!state.loaded) resolveHosts(null, env);
+    if (!state.loaded) {
+      resolveHosts(null, env);
+      if (requireStorage) resolveStorage(null, env);
+    }
     return null;
   }
   if (state.loaded) {
@@ -113,5 +136,14 @@ export function ensureInstallation(env: NodeJS.ProcessEnv = process.env) {
     }
     return state.receipt;
   }
-  return loadInstallation(env);
+  return loadInstallation(env, { requireStorage });
+}
+
+// Where this installation's application data lives. With a profile it's fixed
+// at load; without one it follows the environment, and a missing project is an
+// error (profile/storage-config.ts).
+export function installationStorage(env: NodeJS.ProcessEnv = process.env): InstallationStorage {
+  if (state.loaded) return (state.storageMemo ??= resolveStorage(state.loaded.profile, env));
+  failClosed(env);
+  return resolveStorage(null, env);
 }
