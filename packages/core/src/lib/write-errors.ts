@@ -2,7 +2,9 @@
 // (an item's lastWrite). The recorded message is whatever the compile, policy
 // or broker said; policy refusals carry their reason code in it, e.g.
 // "permission denied (system-connection)". Shared by the browser and the
-// server, so it imports nothing.
+// server, so it imports only browser-safe modules (the installation's name).
+
+import { installationBrand } from "../profile/brand.js";
 
 export type WriteProblem = {
   // "Not saved to …", to lead the reason with.
@@ -48,7 +50,7 @@ export function describeWriteProblem(write: LastWriteLike): WriteProblem | null 
     return failed("The save is uncertain — it may or may not have been written. Check the item bank; to save again anyway, recompile the item (the write may repeat).", false);
   }
   if (has(message, "system-connection")) {
-    return failed("This is Graffiticode's preview account; it can't write to an item bank. Add your own Learnosity connection in Settings.", false);
+    return failed(`This is ${installationBrand().name}'s preview account; it can't write to an item bank. Add your own Learnosity connection in Settings.`, false);
   }
   if (has(message, "not-granted", "fn-not-in-session")) {
     // The owner's own settings for the connection refuse it the same way a

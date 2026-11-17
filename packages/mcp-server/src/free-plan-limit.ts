@@ -1,3 +1,4 @@
+import { installationBrand, signupUrlWith } from "@graffiticode-app/core/profile/brand";
 /**
  * Free-plan refusals from the console, made legible.
  *
@@ -38,7 +39,8 @@ export class FreePlanLimitError extends Error {
   }
 }
 
-const DEFAULT_SIGNUP_URL = "https://graffiticode.org/signup?utm_source=free_plan&utm_medium=mcp";
+// The installation's signup page, attributed to this surface.
+export const defaultSignupUrl = () => signupUrlWith({ utm_source: "free_plan", utm_medium: "mcp" });
 
 /**
  * Recognise a console free-plan payload. Accepts the HTTP body shape
@@ -81,16 +83,17 @@ export function parseFreePlanErrorBody(body: string): FreePlanLimitError | null 
 export function buildFreePlanLimitText(err: FreePlanLimitError): string {
   if (!err.isLimit) {
     return (
-      `Graffiticode rejected this request: ${err.detail}\n\n` +
+      `${installationBrand().name} rejected this request: ${err.detail}\n\n` +
       `Adjust the request as the message says and try again.`
     );
   }
-  const signup = err.signupUrl ?? DEFAULT_SIGNUP_URL;
+  const signup = err.signupUrl ?? defaultSignupUrl();
+  const name = installationBrand().name;
   const lines = [
-    `**Graffiticode free-plan limit reached** (${err.code}). ${err.detail}`,
+    `**${name} free-plan limit reached** (${err.code}). ${err.detail}`,
     ``,
-    `This is a limit of Graffiticode's anonymous free plan — not of this chat app or the user's account with it. ` +
-      `[Create a free Graffiticode account](${signup}) to remove it.`,
+    `This is a limit of ${name}'s anonymous free plan — not of this chat app or the user's account with it. ` +
+      `[Create a free ${name} account](${signup}) to remove it.`,
     ``,
     err.retryAfterSeconds !== undefined
       ? `Do not retry automatically. Tell the user what happened; if they ask to try again, wait at least ${err.retryAfterSeconds} seconds first.`

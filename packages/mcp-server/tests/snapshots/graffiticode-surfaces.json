@@ -750,6 +750,35 @@
       }
     ]
   },
+  "resources/list claude-ai": [
+    {
+      "uri": "ui://graffiticode/widget-mcp.1f38d084.html",
+      "name": "Graffiticode Form Widget",
+      "mimeType": "text/html;profile=mcp-app",
+      "description": "Interactive item widget for MCP Apps hosts such as Claude",
+      "_meta": {
+        "ui": {
+          "csp": {
+            "resourceDomains": [
+              "https://mcp.graffiticode.org"
+            ],
+            "frameDomains": [
+              "https://l0176.graffiticode.org"
+            ]
+          }
+        },
+        "openai/widgetCSP": {
+          "resource_domains": [
+            "https://mcp.graffiticode.org"
+          ],
+          "frame_domains": [
+            "https://l0176.graffiticode.org"
+          ]
+        },
+        "openai/widgetDescription": "Shows the Graffiticode item itself, interactive where the language supports it. The assistant need not restate its contents; one sentence and the item's link are enough."
+      }
+    }
+  ],
   "initialize openai-mcp": {
     "serverInfo": {
       "name": "graffiticode",
@@ -1469,6 +1498,35 @@
       }
     ]
   },
+  "resources/list openai-mcp": [
+    {
+      "uri": "ui://graffiticode/widget-mcp.1f38d084.html",
+      "name": "Graffiticode Form Widget",
+      "mimeType": "text/html;profile=mcp-app",
+      "description": "Interactive item widget for MCP Apps hosts such as Claude",
+      "_meta": {
+        "ui": {
+          "csp": {
+            "resourceDomains": [
+              "https://mcp.graffiticode.org"
+            ],
+            "frameDomains": [
+              "https://l0176.graffiticode.org"
+            ]
+          }
+        },
+        "openai/widgetCSP": {
+          "resource_domains": [
+            "https://mcp.graffiticode.org"
+          ],
+          "frame_domains": [
+            "https://l0176.graffiticode.org"
+          ]
+        },
+        "openai/widgetDescription": "Shows the Graffiticode item itself, interactive where the language supports it. The assistant need not restate its contents; one sentence and the item's link are enough."
+      }
+    }
+  ],
   "initialize some-editor": {
     "serverInfo": {
       "name": "graffiticode",
@@ -2180,5 +2238,6 @@
         }
       }
     ]
-  }
+  },
+  "resources/list some-editor": []
 }

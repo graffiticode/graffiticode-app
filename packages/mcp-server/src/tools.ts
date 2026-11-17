@@ -1,3 +1,4 @@
+import { installationBrand } from "@graffiticode-app/core/profile/brand";
 import { copy } from "./installation.js";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { randomUUID } from "node:crypto";
@@ -802,27 +803,27 @@ export function reconnectHint(host: ClientHost): string {
     case "claude-code":
       return (
         "After signing in, connect this account: " +
-        `claude mcp add --transport http graffiticode ${mcpEndpoint()} ` +
+        `claude mcp add --transport http ${installationBrand().id} ${mcpEndpoint()} ` +
         '--header "Authorization: Bearer <api-key>" — the sign-in page issues the key.'
       );
     case "editor":
       return (
         "After signing in, add an Authorization: Bearer <api-key> header to the " +
-        "graffiticode entry in your MCP config — the sign-in page issues the key."
+        `${installationBrand().id} entry in your MCP config — the sign-in page issues the key.`
       );
     case "codex-cli":
       return (
-        "After signing in, connect this account: run codex mcp login graffiticode " +
+        `After signing in, connect this account: run codex mcp login ${installationBrand().id} ` +
         "(use the name codex mcp list shows), sign in with the same account, then restart Codex."
       );
     case "claude-app":
       return (
         "After signing in, connect this account: in Claude, open Settings → Connectors, " +
-        "disconnect Graffiticode and connect it again, then sign in with the same account."
+        `disconnect ${installationBrand().name} and connect it again, then sign in with the same account.`
       );
     case "openai":
       return OAUTH_RECONNECT_ENABLED
-        ? "After signing in, reconnect the Graffiticode connector and sign in there too, " +
+        ? `After signing in, reconnect the ${installationBrand().name} connector and sign in there too, ` +
             "so new items save to your account automatically."
         : "New items will keep starting out anonymous, so save each one with the link above; " +
             "the sign-in page explains how to connect this connector to your account.";
@@ -893,8 +894,8 @@ export function toolsForClient(clientName?: string, declaresUiExtension?: boolea
       // Shown in ChatGPT while the call runs and after it returns. Generation is
       // asynchronous and routinely outlives one render_item poll, so the invoking
       // string is what a user reads for most of the wait.
-      ui["openai/toolInvocation/invoking"] = "Working in Graffiticode…";
-      ui["openai/toolInvocation/invoked"] = "Opened in Graffiticode";
+      ui["openai/toolInvocation/invoking"] = `Working in ${installationBrand().name}…`;
+      ui["openai/toolInvocation/invoked"] = `Opened in ${installationBrand().name}`;
     }
     return { ...rec, _meta: ui } as unknown as Tool;
   });
@@ -1259,7 +1260,7 @@ export function buildLinkDirective(viewUrl: string, mountsWidget = false): strin
   // stays the last word either way.
   if (mountsWidget) {
     return (
-      "The item is displayed above in the Graffiticode view. Reply with one short " +
+      `The item is displayed above in the ${installationBrand().name} view. Reply with one short ` +
       "sentence about it (from `summary`) and give the user this link to open it: " +
       `${viewUrl}. Do not reproduce its contents — no tables, lists or mock-ups; ` +
       "the view already shows them. A description alone is not a substitute for the link."

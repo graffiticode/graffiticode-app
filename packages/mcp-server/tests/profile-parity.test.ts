@@ -29,21 +29,34 @@ const CLIENTS = [
 ];
 
 async function startServer(env: Record<string, string>): Promise<{ port: number; child: ChildProcess }> {
-  const port = 3990 + Math.floor(Math.random() * 400);
+  // PORT=0: the OS assigns a free port, and the child reports the one it bound
+  // over IPC, so this test only ever talks to its own server. A child that
+  // exits first (an invalid profile, a contradicting host) never started.
   const child = spawn("node", ["dist/server.js"], {
-    env: { ...process.env, PORT: String(port), FREE_PLAN_NAMESPACE_SALT: "test-salt-not-a-real-secret", ...env },
-    stdio: "ignore",
+    // The console API (internal wiring) points nowhere: the server warms its
+    // language catalog from it on the first request, and a catalog that
+    // arrives mid-test would change the instructions. No network, no timing.
+    env: { ...process.env, PORT: "0", FREE_PLAN_NAMESPACE_SALT: "test-salt-not-a-real-secret", GRAFFITICODE_CONSOLE_URL: "http://127.0.0.1:9/api", ...env },
+    stdio: ["ignore", "ignore", "ignore", "ipc"],
   });
-  for (let i = 0; i < 80; i++) {
-    try {
-      if ((await fetch(`http://localhost:${port}/health`)).ok) return { port, child };
-    } catch {
-      /* not listening yet */
-    }
-    await new Promise(r => setTimeout(r, 100));
+  const port = await new Promise<number | null>(resolve => {
+    const timer = setTimeout(() => resolve(null), 15_000);
+    child.on("message", (m: any) => { if (m?.type === "listening") { clearTimeout(timer); resolve(m.port); } });
+    child.once("exit", () => { clearTimeout(timer); resolve(null); });
+  });
+  if (port === null) {
+    await stop(child);
+    throw new Error("server did not start");
   }
+  return { port, child };
+}
+
+// Kills a server and waits for it to exit, so its port is free again.
+async function stop(child: ChildProcess) {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  const exited = new Promise(r => child.once("exit", r));
   child.kill();
-  throw new Error("server did not start");
+  await exited;
 }
 
 const rpcBody = async (res: Response) => {
@@ -71,6 +84,9 @@ async function capture(port: number) {
     const list = await fetch(`${base}/mcp`, { method: "POST", headers: { ...headers, "mcp-session-id": session }, body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list" }) });
     out[`initialize ${client.name}`] = { serverInfo: initResult.serverInfo, instructions: initResult.instructions, capabilities: initResult.capabilities };
     out[`tools/list ${client.name}`] = (await rpcBody(list)).result;
+    const resources = await fetch(`${base}/mcp`, { method: "POST", headers: { ...headers, "mcp-session-id": session }, body: JSON.stringify({ jsonrpc: "2.0", id: 3, method: "resources/list" }) });
+    // Only this server's own resources: skills are fetched live from GitHub.
+    out[`resources/list ${client.name}`] = (await rpcBody(resources)).result.resources.filter((r: any) => r.uri.startsWith("ui://"));
   }
   return out;
 }
@@ -80,7 +96,7 @@ async function surfaces(env: Record<string, string>) {
   try {
     return await capture(port);
   } finally {
-    child.kill();
+    await stop(child);
   }
 }
 
@@ -135,7 +151,7 @@ test("the profile is what the surfaces read: the example installation's surfaces
     // A tool the profile doesn't word keeps its built-in description.
     assert.match(tools.find((t: any) => t.name === "get_item").description, /^Get an existing Graffiticode item by ID\./);
   } finally {
-    child.kill();
+    await stop(child);
   }
 });
 
@@ -169,7 +185,7 @@ test("the MCP server's advertised endpoint, its OAuth resource and its issuer ag
       assert.equal(server.authorization_endpoint, `${server.issuer}/oauth/authorize`);
       assert.equal(new URL(server.issuer).origin, new URL(discovery.site).origin);
     } finally {
-      child.kill();
+      await stop(child);
     }
   }
 });
@@ -178,5 +194,25 @@ test("with a profile, a contradicting host variable stops the start; a repeated 
   await assert.rejects(startServer({ PROFILE_DIR: EXAMPLE, MCP_SERVER_URL: "https://mcp.graffiticode.org" }), /server did not start/);
   await assert.rejects(startServer({ PROFILE_DIR: EXAMPLE, CONSOLE_URL: "https://console.graffiticode.org" }), /server did not start/);
   const { child } = await startServer({ PROFILE_DIR: EXAMPLE, MCP_SERVER_URL: "https://mcp.example.test", CONSOLE_URL: "https://console.example.test" });
-  child.kill();
+  await stop(child);
+});
+
+test("the example installation's widget resource carries its name", async () => {
+  const { port, child } = await startServer({ PROFILE_DIR: EXAMPLE });
+  try {
+    const base = `http://localhost:${port}`;
+    const headers = { "Content-Type": "application/json", Accept: "application/json, text/event-stream" };
+    const init = await fetch(`${base}/mcp`, {
+      method: "POST", headers,
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: { extensions: { "io.modelcontextprotocol/ui": {} } }, clientInfo: { name: "claude-ai", version: "1" } } }),
+    });
+    const session = init.headers.get("mcp-session-id")!;
+    await fetch(`${base}/mcp`, { method: "POST", headers: { ...headers, "mcp-session-id": session }, body: JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) });
+    const list = await fetch(`${base}/mcp`, { method: "POST", headers: { ...headers, "mcp-session-id": session }, body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "resources/list" }) });
+    const widget = (await rpcBody(list)).result.resources.find((r: any) => r.uri.startsWith("ui://"));
+    assert.equal(widget.name, "Example Form Widget");
+    assert.match(widget._meta["openai/widgetDescription"], /^Shows the Example item itself/);
+  } finally {
+    await stop(child);
+  }
 });

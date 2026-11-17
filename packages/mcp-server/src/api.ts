@@ -2,6 +2,7 @@
  * Graffiticode GraphQL API client
  */
 
+import { installationBrand } from "@graffiticode-app/core/profile/brand";
 import { AsyncLocalStorage } from "async_hooks";
 import { FreePlanLimitError, parseFreePlanError, parseFreePlanErrorBody } from "./free-plan-limit.js";
 import { coreBackendEnabled, coreHandles, coreExecute } from "./core-backend.js";
@@ -715,15 +716,16 @@ export async function warmCatalog(auth: AuthContext): Promise<void> {
 
 /** The one error list_languages surfaces: worded so a model tells the user rather than retrying. */
 class CatalogUnavailable extends Error {}
-function catalogUnavailable(err: unknown): CatalogUnavailable | FreePlanLimitError {
+export function catalogUnavailable(err: unknown): CatalogUnavailable | FreePlanLimitError {
   // A free-plan refusal is not an outage: pass it through so it reads as ours.
   if (err instanceof FreePlanLimitError) return err;
   const why = (err as Error)?.message ?? String(err);
+  const name = installationBrand().name;
   return new CatalogUnavailable(
-    "The Graffiticode language catalog is temporarily unavailable " +
+    `The ${name} language catalog is temporarily unavailable ` +
       `(${why}). This is a transient upstream problem, not a ` +
       "problem with your request. Do NOT retry list_languages — tell the user " +
-      "Graffiticode can't be reached right now and ask them to try again shortly."
+      `${name} can't be reached right now and ask them to try again shortly.`
   );
 }
 

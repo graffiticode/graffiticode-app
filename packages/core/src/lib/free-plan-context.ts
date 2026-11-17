@@ -1,3 +1,4 @@
+import { displayUrl, installationBrand, signupUrlWith } from "../profile/brand.js";
 import crypto from "crypto";
 import { getCredentialsForApiKey, type ApiKeyCredentials } from "./api-credentials.js";
 import { looksLikeSessionToken, verifySessionToken } from "./free-plan-session-token.js";
@@ -56,13 +57,7 @@ export async function isFreePlanRequest(
   }
 
   if (process.env.FREE_PLAN_REQUIRE_SIGNED_SESSION === "true") {
-    throw new FreePlanError("free_plan_session_invalid", 401, {
-      error: "free_plan_session_invalid",
-      message:
-        "This free-plan session is not recognized. Reconnect to the Graffiticode MCP server " +
-        "to start a new session, or create a free account at graffiticode.org/signup.",
-      signup_url: buildSignupUrl("invalid_session"),
-    });
+    throw buildSessionInvalidError();
   }
 
   return {
@@ -101,11 +96,18 @@ export class FreePlanError extends Error {
   }
 }
 
-export function buildSignupUrl(medium: string, brand?: string): string {
-  const params = new URLSearchParams({
-    utm_source: "free_plan",
-    utm_medium: medium,
+// A free-plan session that isn't signed (once signed sessions are required).
+export function buildSessionInvalidError(): FreePlanError {
+  const b = installationBrand();
+  return new FreePlanError("free_plan_session_invalid", 401, {
+    error: "free_plan_session_invalid",
+    message:
+      `This free-plan session is not recognized. Reconnect to the ${b.name} MCP server ` +
+      `to start a new session, or create a free account at ${displayUrl(b.signupUrl)}.`,
+    signup_url: buildSignupUrl("invalid_session"),
   });
-  if (brand) params.set("utm_campaign", brand);
-  return `https://graffiticode.org/signup?${params.toString()}`;
+}
+
+export function buildSignupUrl(medium: string, brand?: string): string {
+  return signupUrlWith({ utm_source: "free_plan", utm_medium: medium, ...(brand ? { utm_campaign: brand } : {}) });
 }

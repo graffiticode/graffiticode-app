@@ -22,6 +22,7 @@
  *   }
  */
 
+import { installationBrand } from "@graffiticode-app/core/profile/brand";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { handleIntrospect } from "./oauth/introspection.js";
 import { coreReadiness } from "@graffiticode-app/core/readiness";
@@ -892,7 +893,7 @@ function createMcpServer(authProvider: AuthProvider, sessionMeta: SessionMeta = 
           content: [
             {
               type: "text",
-              text: "Your Graffiticode session has expired. Please reconnect your account to continue.",
+              text: `Your ${installationBrand().name} session has expired. Please reconnect your account to continue.`,
             },
           ],
           isError: true,
@@ -932,7 +933,7 @@ function createMcpServer(authProvider: AuthProvider, sessionMeta: SessionMeta = 
       const uris = widgetResourceUris();
       resources.push({
         uri: uris.mcp,
-        name: "Graffiticode Form Widget",
+        name: `${installationBrand().name} Form Widget`,
         mimeType: CLAUDE_WIDGET_MIME_TYPE,
         description: "Interactive item widget for MCP Apps hosts such as Claude",
         _meta: widgetResourceMeta(),
@@ -1597,6 +1598,10 @@ const installationReceipt = loadInstallation();
 if (installationReceipt) console.log(`[installation] ${JSON.stringify(installationReceipt)}`);
 
 httpServer.listen(PORT, () => {
+  // A parent that started this server with an IPC channel (tests, with PORT=0)
+  // learns the port the OS actually bound. In production there is no channel.
+  const bound = httpServer.address();
+  if (process.send && bound && typeof bound === "object") process.send({ type: "listening", port: bound.port });
   // The catalog is warmed by the first request, not here — see warmCatalogOnRequest.
   console.log(`Graffiticode MCP Server (hosted) running on http://localhost:${PORT}`);
   console.log(`\nEndpoints:`);

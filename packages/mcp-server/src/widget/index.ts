@@ -10,6 +10,7 @@
  * card template, and `matchWidgetUri` keeps classifying them so a stale pointer
  * fails loudly instead of looking like a typo.
  */
+import { installationBrand } from "@graffiticode-app/core/profile/brand";
 import { RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
 import { widgetContentHash } from "./widget-html.js";
 import { framedLanguages } from "./languages.js";
@@ -98,8 +99,8 @@ export function widgetCsp(): { camel: Record<string, string[]>; snake: Record<st
   };
 }
 
-export const WIDGET_DESCRIPTION =
-  "Shows the Graffiticode item itself, interactive where the language supports it. " +
+export const widgetDescription = () =>
+  `Shows the ${installationBrand().name} item itself, interactive where the language supports it. ` +
   "The assistant need not restate its contents; one sentence and the item's link are enough.";
 
 /**
@@ -122,6 +123,6 @@ export function widgetResourceMeta(): Record<string, unknown> {
     // ChatGPT reads this to cut narration that repeats the widget; other hosts
     // ignore it. render_item's directive (tools.ts buildLinkDirective) says the
     // same to the model for hosts that are known to render.
-    "openai/widgetDescription": WIDGET_DESCRIPTION,
+    "openai/widgetDescription": widgetDescription(),
   };
 }

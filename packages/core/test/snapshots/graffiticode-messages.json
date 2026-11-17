@@ -1,0 +1,49 @@
+{
+  "monthly": {
+    "error": "free_plan_item_limit_reached",
+    "message": "The Graffiticode free plan has reached its item limit for this month. Create a free account at graffiticode.org/signup to keep creating items.",
+    "items_used": 5,
+    "items_limit": 5,
+    "signup_url": "https://graffiticode.org/signup?utm_source=free_plan&utm_medium=item_limit"
+  },
+  "scope": {
+    "error": "language_not_in_trial_scope",
+    "message": "L0176 is not available on the Graffiticode free plan. Available without an account: L0180, L0179. Create a free account at graffiticode.org/signup to use every language.",
+    "language": "L0176",
+    "allowed_languages": [
+      "0180",
+      "0179"
+    ],
+    "signup_url": "https://graffiticode.org/signup?utm_source=free_plan&utm_medium=language_scope"
+  },
+  "expired": {
+    "error": "free_plan_item_expired",
+    "message": "This item has expired. Free-plan items are kept for 48 hours unless they're claimed. Create it again, or create a free account at graffiticode.org/signup to keep items permanently.",
+    "signup_url": "https://graffiticode.org/signup?utm_source=free_plan&utm_medium=item_expired"
+  },
+  "daily": {
+    "error": "free_plan_daily_limit_reached",
+    "message": "The Graffiticode free plan has reached its item limit for today and resumes tomorrow UTC. Create a free account at graffiticode.org/signup for uninterrupted access.",
+    "items_limit": 3,
+    "signup_url": "https://graffiticode.org/signup?utm_source=free_plan&utm_medium=daily_pace",
+    "resumes_at": "2026-11-17T00:00:00.000Z"
+  },
+  "sessionInvalid": {
+    "error": "free_plan_session_invalid",
+    "message": "This free-plan session is not recognized. Reconnect to the Graffiticode MCP server to start a new session, or create a free account at graffiticode.org/signup.",
+    "signup_url": "https://graffiticode.org/signup?utm_source=free_plan&utm_medium=invalid_session"
+  },
+  "signup": "https://graffiticode.org/signup?utm_source=free_plan&utm_medium=item_limit",
+  "signupBranded": "https://graffiticode.org/signup?utm_source=free_plan&utm_medium=item_limit&utm_campaign=assessments",
+  "burst": {
+    "error": "free_plan_rate_limit_exceeded",
+    "message": "The Graffiticode free plan allows 20 requests every 60 seconds. Please retry in 7s, or create a free account at graffiticode.org/signup to remove this limit.",
+    "retry_after_seconds": 7,
+    "signup_url": "https://graffiticode.org/signup?utm_source=free_plan&utm_medium=rate_limit"
+  },
+  "systemConnectionWrite": {
+    "headline": "Not saved to the Learnosity item bank",
+    "text": "This is Graffiticode's preview account; it can't write to an item bank. Add your own Learnosity connection in Settings.",
+    "retryable": false
+  }
+}
