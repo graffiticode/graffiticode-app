@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@ethereumjs/util": "^8.0.3",
+    "@graffiticode-app/core": "file:../core",
     "@graffiticode/auth": "^2.1.2",
     "@graffiticode/auth-react": "file:../auth-react",
     "@headlessui/react": "^1.7.16",

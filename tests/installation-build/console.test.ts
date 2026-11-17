@@ -19,7 +19,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const ROOT = new URL("../..", import.meta.url).pathname;
-const SERVER_DIR = join(ROOT, "packages/console/.next/standalone/packages/console");
+// CONSOLE_SERVER_DIR points at another build's standalone server.
+const SERVER_DIR = process.env.CONSOLE_SERVER_DIR ?? join(ROOT, "packages/console/.next/standalone/packages/console");
 const EXAMPLE = join(ROOT, "packages/core/test/fixtures/installation-example");
 
 let auth: http.Server;

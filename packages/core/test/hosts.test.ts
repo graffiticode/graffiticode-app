@@ -130,3 +130,26 @@ test("core's configuration and the resolver always agree on public hosts", () =>
     Object.assign(process.env, Object.fromEntries(Object.entries(saved).filter(([, v]) => v !== undefined)));
   }
 });
+
+test("a server's build-time NEXT_PUBLIC_* values never act as runtime configuration", () => {
+  // On a server, Next inlines a literal process.env.NEXT_PUBLIC_* read at build
+  // time. Simulated here by the process environment holding the build's
+  // values while the runtime environment passed in doesn't.
+  const saved = { api: process.env.NEXT_PUBLIC_GC_API_URL, auth: process.env.NEXT_PUBLIC_GC_AUTH_URL };
+  process.env.NEXT_PUBLIC_GC_API_URL = "https://api.graffiticode.org";
+  process.env.NEXT_PUBLIC_GC_AUTH_URL = "https://auth.graffiticode.org";
+  const p = profile(x => { x.hosts.api = "https://api.example.test"; x.hosts.auth = "https://auth.example.test"; });
+  setInstalledProfile({ profile: p, digest: "build-values" });
+  try {
+    const c = configFromEnv({});
+    assert.equal(c.apiUrl, "https://api.example.test");
+    assert.equal(c.authUrl, "https://auth.example.test");
+    // A variable the server is actually running with is still checked.
+    assert.throws(() => configFromEnv({ NEXT_PUBLIC_GC_API_URL: "https://api.graffiticode.org" }), /contradicts the installation profile/);
+  } finally {
+    setInstalledProfile(null);
+    for (const [k, v] of [["NEXT_PUBLIC_GC_API_URL", saved.api], ["NEXT_PUBLIC_GC_AUTH_URL", saved.auth]] as const) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  }
+});

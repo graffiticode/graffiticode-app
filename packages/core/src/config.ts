@@ -15,15 +15,24 @@ const list = (raw: string | undefined) => (raw ?? "").split(",").map(s => s.trim
 
 export function configFromEnv(env: NodeJS.ProcessEnv = process.env) {
   // Public hosts from the one resolver (profile/hosts.ts), in both modes, so core
-  // and the servers' installationHosts() always agree. The NEXT_PUBLIC_* values
-  // are read here by their literal names and passed in: in the browser, Next
-  // inlines only literal reads, and the resolver reads variables by name.
+  // and the servers' installationHosts() always agree.
+  //
+  // The literal process.env.NEXT_PUBLIC_* reads are the browser's only way to
+  // see those values: Next inlines a literal read at build time. So they're
+  // used in the browser alone. On a server, Next inlines them too, into the
+  // server bundle, and a value baked in at build time isn't the server's
+  // environment: passed to the resolver it would contradict an installation
+  // profile naming other hosts. The server resolver sees only `env`, the
+  // runtime environment, whose variables are still checked against the profile.
   const installed = installedProfile();
-  const hosts = resolveHosts(installed?.profile ?? null, {
-    ...env,
-    NEXT_PUBLIC_GC_API_URL: env.NEXT_PUBLIC_GC_API_URL || process.env.NEXT_PUBLIC_GC_API_URL,
-    NEXT_PUBLIC_GC_AUTH_URL: env.NEXT_PUBLIC_GC_AUTH_URL || process.env.NEXT_PUBLIC_GC_AUTH_URL,
-  });
+  const inBrowser = typeof window !== "undefined";
+  const hosts = resolveHosts(installed?.profile ?? null, inBrowser
+    ? {
+      ...env,
+      NEXT_PUBLIC_GC_API_URL: env.NEXT_PUBLIC_GC_API_URL || process.env.NEXT_PUBLIC_GC_API_URL,
+      NEXT_PUBLIC_GC_AUTH_URL: env.NEXT_PUBLIC_GC_AUTH_URL || process.env.NEXT_PUBLIC_GC_AUTH_URL,
+    }
+    : env);
   const consoleUrl = hosts.console;
   return {
     apiUrl: hosts.api,

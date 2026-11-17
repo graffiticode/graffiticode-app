@@ -29,11 +29,7 @@ test("without a profile, the project is required: there is no built-in one", () 
 // Server source only: browser code uses the Firebase client SDK ("firebase/..."),
 // which belongs to the shared authentication project, not application storage.
 const SERVER_SOURCES = ["packages/core/src", "packages/console/src", "packages/mcp-server/src", "packages/openapi-server/src", "packages/app/src"];
-const ALLOWED = new Set([
-  "packages/core/src/storage.ts",
-  // Part 1b moves the app package onto core's resolver.
-  "packages/app/src/server/db.ts",
-]);
+const ALLOWED = new Set(["packages/core/src/storage.ts"]);
 function sources(dir: string): string[] {
   const out: string[] = [];
   for (const name of readdirSync(join(REPO, dir))) {
