@@ -2,7 +2,15 @@
 // a stable `code`; the `type` URI names it.
 import type { Context } from "hono";
 
+import { profile } from "@graffiticode-app/core/profile/runtime";
+
 export const PROBLEM_BASE = "https://openapi.graffiticode.org/problems/";
+
+// Problem `type` URIs live on the installation's REST host.
+export const problemBase = () => {
+  const host = profile()?.hosts.openapi;
+  return host ? `${host}/problems/` : PROBLEM_BASE;
+};
 
 export type ProblemFields = {
   detail?: string;
@@ -29,7 +37,7 @@ export function problemResponse(c: Context, p: ApiProblem) {
   const { headers = {}, ...rest } = p.fields;
   for (const [k, v] of Object.entries(headers)) c.header(k, v);
   return c.body(JSON.stringify({
-    type: `${PROBLEM_BASE}${p.code}`,
+    type: `${problemBase()}${p.code}`,
     title: p.title,
     status: p.status,
     code: p.code,

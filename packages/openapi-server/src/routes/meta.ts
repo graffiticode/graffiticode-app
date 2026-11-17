@@ -1,11 +1,11 @@
 // The API's own description and docs.
 import type { Hono } from "hono";
-import { asYaml, servedSpec } from "../spec.js";
+import { apiTitle, asYaml, servedSpec } from "../spec.js";
 import { cached, json } from "../http.js";
 
 // Scalar's API reference, loaded from jsDelivr, pointed at this description.
 const docsPage = () => `<!doctype html>
-<html><head><meta charset="utf-8"><title>Graffiticode API</title>
+<html><head><meta charset="utf-8"><title>${apiTitle()}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1"></head>
 <body><script id="api-reference" data-url="./openapi.json"></script>
 <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference@1"></script></body></html>`;

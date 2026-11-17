@@ -17,6 +17,7 @@ import { itemRoutes } from "./routes/items.js";
 import { accountRoutes } from "./routes/account.js";
 import { oauthRoutes } from "./oauth.js";
 import { coreReadiness } from "@graffiticode-app/core/readiness";
+import { installationReceipt } from "@graffiticode-app/core/profile/runtime";
 
 export type Validate = (c: Context, operationId: string) => { path: Record<string, any>; query: Record<string, any>; header: Record<string, any> };
 export type ValidateBody = (raw: string, operationId: string) => any;
@@ -48,7 +49,11 @@ export function createApp({ spec = loadSpec() }: { spec?: any } = {}) {
   // here: Firestore, the generation queue, secrets, free-plan credentials.
   app.get("/health", async (c) => {
     c.header("Cache-Control", "no-store");
-    if (c.req.query("deep") !== "1") return c.json({ status: "ok" });
+    if (c.req.query("deep") !== "1") {
+      // The installation receipt, when a profile is loaded (docs/installations-plan.md).
+      const receipt = installationReceipt();
+      return c.json(receipt ? { status: "ok", installation: receipt } : { status: "ok" });
+    }
     const r = await coreReadiness();
     return c.json({ status: r.ok ? "ok" : "unready", effectiveProtocol: r.effectiveProtocol, minProtocol: r.minProtocol, checks: r.checks }, r.ok ? 200 : 503);
   });

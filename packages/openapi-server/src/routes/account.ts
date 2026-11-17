@@ -11,10 +11,14 @@ import { FREE_PLAN_ITEM_TTL_MS } from "@graffiticode-app/core/lib/free-plan-cont
 import { db } from "@graffiticode-app/core/db";
 import { callerFor } from "../auth.js";
 import { languageId } from "../http.js";
+import { profile } from "@graffiticode-app/core/profile/runtime";
 
 // A workspace token lasts as long as the session token MCP mints (48h).
 const WORKSPACE_TTL_MS = 48 * 60 * 60_000;
 const SIGNUP_URL = "https://graffiticode.org/signup";
+
+// Where a free-plan caller signs up.
+export const signupUrl = () => profile()?.brand.links?.signup ?? SIGNUP_URL;
 
 export function accountRoutes(app: Hono) {
   app.post("/workspaces", async (c) => {
@@ -38,7 +42,7 @@ export function accountRoutes(app: Hono) {
         free_plan: {
           item_ttl_hours: Math.round(FREE_PLAN_ITEM_TTL_MS / 3_600_000),
           languages: freePlanLanguageIds().map(languageId),
-          signup_url: SIGNUP_URL,
+          signup_url: signupUrl(),
         },
       });
     }

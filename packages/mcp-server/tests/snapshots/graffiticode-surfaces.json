@@ -1,0 +1,2184 @@
+{
+  "GET /about": {
+    "status": 200,
+    "type": "text/html; charset=utf-8",
+    "body": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>About — Graffiticode MCP Server</title>\n<style>\n  body { font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif; max-width: 720px; margin: 0 auto; padding: 2rem 1rem; line-height: 1.6; color: #1a1a1a; }\n  h1 { font-size: 1.8rem; margin-bottom: 0.25rem; }\n  h2 { font-size: 1.3rem; margin-top: 2rem; border-bottom: 1px solid #e0e0e0; padding-bottom: 0.3rem; }\n  h3 { font-size: 1.1rem; margin-top: 1.5rem; }\n  ul { padding-left: 1.5rem; }\n  li { margin-bottom: 0.5rem; }\n  a { color: #1a73e8; }\n  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9rem; }\n  pre { background: #f5f5f5; padding: 0.75rem 1rem; border-radius: 6px; overflow-x: auto; }\n  code { background: #f5f5f5; padding: 0.1rem 0.35rem; border-radius: 3px; }\n  pre code { background: none; padding: 0; }\n  .subtitle { color: #555; font-size: 0.95rem; margin-bottom: 2rem; }\n  .endpoint { font-size: 1.05rem; background: #f5f5f5; padding: 0.75rem 1rem; border-radius: 6px; display: inline-block; margin: 0.25rem 0 1rem; }\n</style>\n</head>\n<body>\n<h1>About</h1>\n<p class=\"subtitle\">Graffiticode MCP Server</p>\n\n<h2>What it is</h2>\n<p>Graffiticode MCP is a hosted Model Context Protocol server that lets AI assistants create and edit interactive content through Graffiticode&rsquo;s language family.</p>\n\n<h2>Connect</h2>\n<p>Point any MCP-compatible client at:</p>\n<p class=\"endpoint\"><code>https://mcp.graffiticode.org/mcp</code></p>\n<p>The server speaks the Streamable HTTP transport. A minimal client config looks like:</p>\n<pre><code>{\n  \"mcpServers\": {\n    \"graffiticode\": {\n      \"url\": \"https://mcp.graffiticode.org/mcp\"\n    }\n  }\n}</code></pre>\n<p>Authentication is optional. The server accepts:</p>\n<ul>\n  <li><strong>OAuth 2.1</strong> &mdash; clients that support dynamic registration can complete the standard authorization flow.</li>\n  <li><strong>API key</strong> &mdash; pass a Graffiticode API key as <code>Authorization: Bearer &lt;key&gt;</code>.</li>\n  <li><strong>No auth (free plan)</strong> &mdash; connect without credentials to try the server. Items you create can be transferred into a real Graffiticode account via a one-time claim link returned in the tool response.</li>\n</ul>\n\n<h2>What it can do</h2>\n<p>The server exposes a small, fixed set of language-agnostic tools. The catalog of Graffiticode languages they route to grows over time.</p>\n<ul>\n  <li><code>list_languages</code> &mdash; discover available languages, optionally filtered by keyword (<code>search</code>) or <code>domain</code>.</li>\n  <li><code>get_language_info</code> &mdash; fetch a language&rsquo;s authoring guide, supported item types, and example prompts.</li>\n  <li><code>create_item</code> &mdash; create a new item in a chosen language from a natural-language description.</li>\n  <li><code>update_item</code> &mdash; iteratively edit an existing item. Conversation history is preserved per item.</li>\n  <li><code>render_item</code> &mdash; preferred way to retrieve and display a finished item; returns a compact result and renders it inline in Claude.</li>\n  <li><code>get_item</code> &mdash; retrieve an item&rsquo;s raw code and data by id (for programmatic clients).</li>\n  <li><code>get_spec</code> &mdash; get a platform-neutral English description of an item&rsquo;s content.</li>\n</ul>\n<p>All <code>create_item</code> and <code>update_item</code> requests are natural language &mdash; a language-specific backend handles code generation. Clients should not attempt to write Graffiticode DSL directly.</p>\n<p>Generation takes time, so <code>create_item</code> and <code>update_item</code> return immediately with a status of <code>generating</code>; call <code>render_item</code> to wait for and display the finished result.</p>\n<p>An item&rsquo;s <code>src</code> and <code>data</code> are private to its own language. To reuse one item&rsquo;s content in another language, call <code>get_spec</code> and pass the spec to <code>create_item</code> &mdash; never pass a raw item id or its code across languages.</p>\n\n<h2>Resources</h2>\n<p>Alongside the tools, the server exposes MCP resources:</p>\n<ul>\n  <li><strong>Language user guides</strong> &mdash; <code>graffiticode://language/{id}/user-guide</code>, the full authoring reference for a language.</li>\n  <li><strong>Agent skills</strong> &mdash; <code>graffiticode://skills/&lt;id&gt;</code>, discovered at request time from the public <a href=\"https://github.com/graffiticode/graffiticode-app/tree/main/packages/skills\">graffiticode skills</a>, so new skills appear without a redeploy.</li>\n  <li><strong>Inline widget</strong> &mdash; in Claude (MCP Apps), items render as interactive widgets directly in the chat. In ChatGPT the result is shown as a text summary with an &ldquo;Open in Graffiticode&rdquo; link.</li>\n</ul>\n\n<h2>When to reach for it</h2>\n<p>For human users: when you want an AI assistant to author interactive content that can be embedded, shared, or published.</p>\n<p>For agents: call <code>list_languages</code> when a user&rsquo;s request doesn&rsquo;t match a more specific tool you already have. If a language matches, fetch its info and create an item; if nothing matches, this server is the wrong tool.</p>\n\n<h2>Free plan</h2>\n<p>The no-auth path lets a user try the server before creating an account. Items created this way live in an anonymous session namespace. Once an item is ready, the response includes a <code>view_url</code> for viewing it and a <code>claim_url</code> the user can open to move the item into a real Graffiticode account on first sign-in. Claim links are valid for 24 hours.</p>\n\n<h2>Operator</h2>\n<p>This server is operated by Artcompiler and hosted on Google Cloud Run. Source is available under the MIT license at <a href=\"https://github.com/graffiticode/graffiticode-mcp-server\">github.com/graffiticode/graffiticode-mcp-server</a>.</p>\n\n<h2>Links</h2>\n<ul>\n  <li><a href=\"https://console.graffiticode.org\">Graffiticode console</a> &mdash; manage your account and items</li>\n  <li><a href=\"/privacy\">Privacy policy</a></li>\n  <li><a href=\"/terms\">Terms of service</a></li>\n  <li>Contact: <a href=\"mailto:support@graffiticode.org\">support@graffiticode.org</a></li>\n</ul>\n</body>\n</html>"
+  },
+  "GET /privacy": {
+    "status": 200,
+    "type": "text/html; charset=utf-8",
+    "body": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>Privacy Policy — Graffiticode MCP Server</title>\n<style>\n  body { font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif; max-width: 720px; margin: 0 auto; padding: 2rem 1rem; line-height: 1.6; color: #1a1a1a; }\n  h1 { font-size: 1.8rem; margin-bottom: 0.25rem; }\n  h2 { font-size: 1.3rem; margin-top: 2rem; border-bottom: 1px solid #e0e0e0; padding-bottom: 0.3rem; }\n  h3 { font-size: 1.1rem; margin-top: 1.5rem; }\n  ul { padding-left: 1.5rem; }\n  li { margin-bottom: 0.5rem; }\n  a { color: #1a73e8; }\n  .subtitle { color: #555; font-size: 0.95rem; margin-bottom: 2rem; }\n</style>\n</head>\n<body>\n<h1>Privacy Policy</h1>\n<p class=\"subtitle\">Graffiticode MCP Server &mdash; Effective Date: July 13, 2026</p>\n\n<h2>Overview</h2>\n<p>The Graffiticode MCP Server (&ldquo;the Service&rdquo;) is operated by Artcompiler. This policy describes how the Service collects, uses, and protects information when you connect to it through an MCP-compatible client such as Claude, ChatGPT, or another AI assistant.</p>\n\n<h2>Information We Collect</h2>\n\n<h3>Authentication Credentials</h3>\n<p>The Service supports three ways to connect, and each handles credentials differently:</p>\n<ul>\n  <li><strong>No credentials (free plan)</strong> &mdash; you may connect without signing in. We do not collect any account identity. Your items are scoped to an anonymous session identifier (see <em>Free-plan sessions</em> below).</li>\n  <li><strong>API keys</strong> &mdash; passed as a Bearer token and forwarded to the Graffiticode platform to authenticate the request. API keys are not written to our logs.</li>\n  <li><strong>OAuth 2.1</strong> &mdash; if you authorize through the OAuth flow, we store an OAuth record so your session can be refreshed without asking you to sign in repeatedly. <strong>That record includes the email address of the Google account you authorized with, together with an access token and a refresh token.</strong> It is persisted through the Graffiticode auth service, not merely held in memory.</li>\n</ul>\n\n<h3>Content You Create</h3>\n<p>When you use the Service&rsquo;s content tools (<code>create_item</code>, <code>update_item</code>, <code>render_item</code>, <code>get_item</code>, <code>get_spec</code>), the natural language descriptions you provide and the items you create are sent to the Graffiticode platform and stored there. This includes:</p>\n<ul>\n  <li>Natural language descriptions and modification requests</li>\n  <li>Generated code and compiled output data</li>\n  <li>Conversation history for iterative editing (stored per item)</li>\n  <li>Item metadata (creation and update timestamps, language, name)</li>\n</ul>\n\n<h3>Free-plan Sessions</h3>\n<p>If you connect without credentials, items you create are namespaced to the session identifier your MCP client established. The Service can mint a one-time <em>claim link</em>, valid for 24 hours, that lets you transfer those items into a real Graffiticode account the first time you sign in. The claim link contains a signed token derived from the session identifier &mdash; it carries no personal data. If you never claim them, free-plan items remain associated only with that anonymous session.</p>\n\n<h3>Usage Analytics</h3>\n<p>The Service emits coarse, privacy-preserving analytics events to measure engagement (connections, catalog and documentation reads, tool usage, success rates). These events deliberately exclude personal data:</p>\n<ul>\n  <li>Sessions and tokens appear only as <strong>one-way hashes</strong>, never in raw form.</li>\n  <li>Your prompt text appears only as a <strong>character count</strong> &mdash; never the prompt itself.</li>\n  <li>Location is recorded only as a <strong>coarse country</strong> (and, where available, region) derived at our CDN edge. <strong>We do not record your IP address.</strong></li>\n  <li>We record the <strong>client kind</strong> (the name your MCP client reports, e.g. &ldquo;claude-ai&rdquo;), which identifies software, not you.</li>\n  <li>When your client lists our tools or opens one of our built-in documentation resources, we record that it did so. The only address recorded is one of our own <code>graffiticode://</code> resources; anything else your client requests is not written to our analytics.</li>\n        <li>When you search our language catalog, we record the <strong>length</strong> of your search term and how many languages matched — never the search text itself. We also record which words from a fixed list of our own catalog terms it contained — language ids, published domains, and item types such as &ldquo;quiz&rdquo; or &ldquo;chart&rdquo; — and how many other words it had; those other words are never recorded. A domain filter is recorded only when it matches one we publish; anything else is recorded as <code>(invalid)</code>.</li>\n  <li>We record the <strong>lifecycle status</strong> a call returned (<code>ready</code>, <code>generating</code>, <code>failed</code>) so we can tell a delivered item from one still being generated. It describes the state of your item, not its contents, and anything outside that published set is recorded as <code>(invalid)</code>.</li>\n</ul>\n<p>One caveat, stated plainly: when a request fails we record a truncated backend error message so we can debug it. Error text is not intended to carry your content, but we cannot categorically rule out that a backend message quotes part of an input.</p>\n\n<h3>Server Logs</h3>\n<p>The Service writes operational logs for debugging &mdash; request timestamps, error messages, and diagnostic warnings. Authorization headers are never logged. As noted above, the client IP address is not recorded in our analytics events.</p>\n\n<h2>How We Use Your Information</h2>\n<ul>\n  <li>Authenticate your requests and authorize access to your items</li>\n  <li>Generate, store, and retrieve content you create through the Service</li>\n  <li>Maintain conversation history to support iterative editing of items</li>\n  <li>Debug errors and maintain service reliability</li>\n  <li>Understand aggregate usage so we can improve the Service</li>\n</ul>\n\n<h2>Data Sharing</h2>\n<p>We do not sell your personal information. Data reaches the following parties in the course of running the Service:</p>\n<ul>\n  <li><strong>Graffiticode platform</strong> &mdash; the console and API receive the content you create and the requests you make. This is where code generation happens and where your items live.</li>\n  <li><strong>Google Cloud Platform</strong> &mdash; hosts the Service (Cloud Run) and receives its operational and analytics logs (Cloud Logging).</li>\n  <li><strong>Firebase Authentication (Google)</strong> &mdash; processes authentication tokens. See Google&rsquo;s privacy policy for details.</li>\n  <li><strong>Cloudflare</strong> &mdash; sits in front of the Service as our CDN and edge network, and necessarily handles your connection. Cloudflare is also the source of the coarse country/region signal described above.</li>\n  <li><strong>GitHub</strong> &mdash; the Service fetches its public agent-skill catalog from a public GitHub repository at request time. <strong>No user data is sent to GitHub</strong>; GitHub sees only the Service&rsquo;s own outbound requests.</li>\n  <li><strong>Legal requirements</strong> &mdash; we may disclose information if required by law or legal process.</li>\n</ul>\n\n<h2>Data Retention</h2>\n<ul>\n  <li><strong>Items and content</strong> &mdash; retained as long as your Graffiticode account is active, or until you delete them.</li>\n  <li><strong>OAuth records</strong> &mdash; the stored email, access token, and refresh token persist until the token is revoked or expires. Access tokens are valid for 55 minutes and are rotated on refresh.</li>\n  <li><strong>API keys</strong> &mdash; not stored by the Service; forwarded per request and discarded.</li>\n  <li><strong>Free-plan claim tokens</strong> &mdash; valid for 24 hours, after which the link expires.</li>\n  <li><strong>Server logs</strong> &mdash; retained for up to 90 days for debugging purposes.</li>\n</ul>\n\n<h2>Security</h2>\n<ul>\n  <li>HTTPS/TLS encryption for all data in transit</li>\n  <li>OAuth 2.1 with PKCE (S256) for secure authentication flows</li>\n  <li>Short-lived tokens with automatic refresh and rotation</li>\n  <li>Long-lived API keys are exchanged for short-lived tokens rather than being embedded in render URLs</li>\n  <li>Deployment on Google Cloud Run with managed infrastructure security</li>\n</ul>\n\n<h2>Your Rights</h2>\n<p>You may:</p>\n<ul>\n  <li>Request access to or deletion of your data by contacting us</li>\n  <li>Delete items you&rsquo;ve created through the Graffiticode console at <a href=\"https://console.graffiticode.org\">console.graffiticode.org</a></li>\n  <li>Revoke API keys at any time through your Graffiticode account settings</li>\n  <li>Disconnect the Service from your MCP client at any time, which stops all further data flow</li>\n</ul>\n\n<h2>Changes to This Policy</h2>\n<p>We may update this policy from time to time. Changes will be posted to this page with an updated effective date.</p>\n\n<h2>Contact</h2>\n<p>For questions about this privacy policy or your data, contact:</p>\n<ul>\n  <li>Email: <a href=\"mailto:support@graffiticode.org\">support@graffiticode.org</a></li>\n  <li>GitHub: <a href=\"https://github.com/graffiticode/graffiticode-mcp-server\">github.com/graffiticode/graffiticode-mcp-server</a></li>\n  <li>About this server: <a href=\"/about\">/about</a></li>\n</ul>\n</body>\n</html>"
+  },
+  "GET /terms": {
+    "status": 200,
+    "type": "text/html; charset=utf-8",
+    "body": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>Terms of Service — Graffiticode MCP Server</title>\n<style>\n  body { font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif; max-width: 720px; margin: 0 auto; padding: 2rem 1rem; line-height: 1.6; color: #1a1a1a; }\n  h1 { font-size: 1.8rem; margin-bottom: 0.25rem; }\n  h2 { font-size: 1.3rem; margin-top: 2rem; border-bottom: 1px solid #e0e0e0; padding-bottom: 0.3rem; }\n  ul { padding-left: 1.5rem; }\n  li { margin-bottom: 0.5rem; }\n  a { color: #1a73e8; }\n  .subtitle { color: #555; font-size: 0.95rem; margin-bottom: 2rem; }\n</style>\n</head>\n<body>\n<h1>Terms of Service</h1>\n<p class=\"subtitle\">Graffiticode MCP Server &mdash; Effective Date: July 13, 2026</p>\n\n<h2>Acceptance of Terms</h2>\n<p>By connecting to or using the Graffiticode MCP Server (\"the Service\"), you agree to these Terms of Service. If you do not agree, do not use the Service.</p>\n\n<h2>Description of Service</h2>\n<p>The Service provides a Model Context Protocol (MCP) server that enables AI assistants to create, update, and retrieve interactive content using the Graffiticode platform. The Service routes natural language requests to language-specific backends that generate structured output.</p>\n\n<h2>Account and Authentication</h2>\n<p>Authentication is optional. You may connect without credentials on the free plan, or authenticate with a Graffiticode API key or through the OAuth 2.1 authorization flow to associate your work with an account. If you do authenticate, you are responsible for keeping your credentials secure and for all activity under your account.</p>\n<p>Items created on the free plan are scoped to an anonymous session and can be transferred into an account using a claim link, which is valid for 24 hours. Until claimed, they are not associated with any account and may be removed.</p>\n\n<h2>Acceptable Use</h2>\n<p>You agree not to:</p>\n<ul>\n  <li>Use the Service to generate content that is illegal, harmful, or violates the rights of others</li>\n  <li>Attempt to bypass authentication or access other users' data</li>\n  <li>Overload the Service with excessive requests intended to degrade performance</li>\n  <li>Reverse-engineer, decompile, or attempt to extract the source code of the backend services</li>\n  <li>Use the Service in a way that violates any applicable law or regulation</li>\n</ul>\n\n<h2>Intellectual Property</h2>\n<p><strong>Your Content</strong> &mdash; You retain ownership of the content you create through the Service, including natural language descriptions and the resulting generated items.</p>\n<p><strong>Graffiticode Platform</strong> &mdash; The Service, its APIs, language backends, and underlying technology are owned by Artcompiler. Nothing in these terms grants you rights to the platform's intellectual property beyond the right to use the Service as described here.</p>\n<p><strong>Open Source</strong> &mdash; The MCP server source code is available under the MIT license at <a href=\"https://github.com/graffiticode/graffiticode-mcp-server\">github.com/graffiticode/graffiticode-mcp-server</a>.</p>\n\n<h2>Availability and Changes</h2>\n<p>The Service is provided on an \"as-is\" basis. We may modify, suspend, or discontinue the Service at any time without notice. We may also update these terms from time to time; continued use after changes constitutes acceptance.</p>\n\n<h2>Limitation of Liability</h2>\n<p>To the maximum extent permitted by law, Artcompiler shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising from your use of the Service. The Service is provided without warranties of any kind, express or implied.</p>\n\n<h2>Termination</h2>\n<p>We may suspend or terminate your access to the Service at any time for violation of these terms or for any other reason at our discretion. You may stop using the Service at any time by revoking your API key or disconnecting the MCP server from your client.</p>\n\n<h2>Governing Law</h2>\n<p>These terms are governed by the laws of the State of California, without regard to conflict of law provisions.</p>\n\n<h2>Contact</h2>\n<ul>\n  <li>Email: <a href=\"mailto:support@graffiticode.org\">support@graffiticode.org</a></li>\n  <li>GitHub: <a href=\"https://github.com/graffiticode/graffiticode-mcp-server\">github.com/graffiticode/graffiticode-mcp-server</a></li>\n  <li>About this server: <a href=\"/about\">/about</a></li>\n  <li>Privacy policy: <a href=\"/privacy\">/privacy</a></li>\n</ul>\n</body>\n</html>"
+  },
+  "GET /robots.txt": {
+    "status": 200,
+    "type": "text/plain; charset=utf-8",
+    "body": "# Graffiticode MCP server — https://mcp.graffiticode.org\n#\n# This host is an MCP (Model Context Protocol) endpoint, not a website.\n# Directory and catalogue crawlers are welcome: everything served here is\n# public by design.\n#\n# Machine-readable description of this server and the tools it exposes:\n#   /  ·  /mcp.json  ·  /.well-known/mcp.json\n# Human-readable:\n#   /about  ·  /privacy  ·  /terms\n# The endpoint itself (Streamable HTTP; POST an `initialize` first):\n#   /mcp\n#\n# Please send a User-Agent that names you, ideally with a contact URL —\n# \"example-crawler/1.0 (+https://example.com/bot)\". Clients impersonating\n# another product's User-Agent may be challenged.\n\nUser-agent: *\nAllow: /\nDisallow: /oauth/\n"
+  },
+  "GET /": {
+    "status": 200,
+    "type": "application/json",
+    "body": "{\n  \"mcp_endpoint\": \"https://mcp.graffiticode.org/mcp\",\n  \"site\": \"https://mcp.graffiticode.org\",\n  \"description\": \"Graffiticode is a universal MCP server of smart tools for AI agents and the people who use them. Each tool is one domain language wrapped by a specialized AI; call list_languages to discover what is available.\",\n  \"tools\": [\n    \"create_item\",\n    \"update_item\",\n    \"get_item\",\n    \"render_item\",\n    \"get_spec\",\n    \"list_languages\",\n    \"get_language_info\"\n  ],\n  \"product_url\": \"https://graffiticode.org\",\n  \"console_url\": \"https://console.graffiticode.org\",\n  \"forum_url\": \"https://forum.graffiticode.org\",\n  \"github_url\": \"https://github.com/graffiticode\"\n}"
+  },
+  "GET /mcp.json": {
+    "status": 200,
+    "type": "application/json",
+    "body": "{\n  \"mcp_endpoint\": \"https://mcp.graffiticode.org/mcp\",\n  \"site\": \"https://mcp.graffiticode.org\",\n  \"description\": \"Graffiticode is a universal MCP server of smart tools for AI agents and the people who use them. Each tool is one domain language wrapped by a specialized AI; call list_languages to discover what is available.\",\n  \"tools\": [\n    \"create_item\",\n    \"update_item\",\n    \"get_item\",\n    \"render_item\",\n    \"get_spec\",\n    \"list_languages\",\n    \"get_language_info\"\n  ],\n  \"product_url\": \"https://graffiticode.org\",\n  \"console_url\": \"https://console.graffiticode.org\",\n  \"forum_url\": \"https://forum.graffiticode.org\",\n  \"github_url\": \"https://github.com/graffiticode\"\n}"
+  },
+  "GET /.well-known/mcp.json": {
+    "status": 200,
+    "type": "application/json",
+    "body": "{\n  \"mcp_endpoint\": \"https://mcp.graffiticode.org/mcp\",\n  \"site\": \"https://mcp.graffiticode.org\",\n  \"description\": \"Graffiticode is a universal MCP server of smart tools for AI agents and the people who use them. Each tool is one domain language wrapped by a specialized AI; call list_languages to discover what is available.\",\n  \"tools\": [\n    \"create_item\",\n    \"update_item\",\n    \"get_item\",\n    \"render_item\",\n    \"get_spec\",\n    \"list_languages\",\n    \"get_language_info\"\n  ],\n  \"product_url\": \"https://graffiticode.org\",\n  \"console_url\": \"https://console.graffiticode.org\",\n  \"forum_url\": \"https://forum.graffiticode.org\",\n  \"github_url\": \"https://github.com/graffiticode\"\n}"
+  },
+  "initialize claude-ai": {
+    "serverInfo": {
+      "name": "graffiticode",
+      "version": "1.0.0"
+    },
+    "instructions": "Graffiticode makes interactive content from a plain-English description: quizzes and assessment items, flashcard decks, spreadsheets, charts, surveys, concept webs, and more. When the user asks you to make one of these, make it with Graffiticode rather than writing it out in chat: call create_item(language, description), then render_item(item_id) to show it. Call list_languages to find the language first.\n\nFAST-PATH PATTERNS — minimize your thinking time:\n\n1. PASS-THROUGH: When the user provides explicit content, pass it directly to create_item — no invention needed:\n   \"Create spreadsheet: Rent 1500, Food 400, Total with SUM\" → create_item immediately\n   \"Quiz: Q1 What is 2+2? A)3 B)4 C)5, correct B\" → create_item immediately\n\n2. CLARIFY: When content is vague, ASK the user for specifics rather than inventing:\n   \"Create an invoice\" → Ask: \"What line items and amounts?\"\n   \"Make a quiz on fractions\" → Ask: \"How many questions? What operations?\"\n   Inventing content takes time and may miss what the user wants.\n\n3. INVENT: Only when the user explicitly delegates creativity:\n   \"Surprise me with a quiz on photosynthesis\" → invent\n\nWhen the user's request doesn't match another available tool, check whether Graffiticode has a language that fits. If the catalog already names an obvious fit, call create_item(language, description) DIRECTLY — do not call list_languages() or get_language_info() first. Those two calls cost the user roughly fourteen seconds before any work starts, and for a clear request they add nothing: create_item accepts a best guess and the platform re-routes the request if another language fits better.\n\nCall list_languages(search, domain) only when the catalog does not obviously answer the request — to search by keyword, to narrow by domain (e.g. 'assessments', 'sheets', 'diagrams'), or to confirm what exists before telling the user nothing fits. Call get_language_info(language) only when you need detail the catalog line does not give you: supported item types, example prompts, or scope boundaries for a request you are unsure the language covers.\n\nSome languages are gated: they target a specific vendor or platform and carry a `when_to_use` note saying so. Never pick one unless the user actually named that vendor or platform — matching item types (multiple-choice, cloze, short text) is never sufficient. If no language fits the request, tell the user what Graffiticode does have and ask, rather than settling for the nearest match.\n\nAuthoring stays inside Graffiticode: create_item and update_item never write to an external system. Saving an item to a Learnosity item bank is something the user does in the Graffiticode console, with a Learnosity connection: signed in, at https://console.graffiticode.org/items/<item_id>; on the free plan, through the claim_url (claiming saves a copy under a new id, which the claim screen's Open item button opens) — never ask update_item to \"save\" it.\n\nAll requests to create_item and update_item must be natural language descriptions of what to create or change. A language-specific AI backend handles all code generation. Do not attempt to generate Graffiticode DSL code directly.\n\nWrite those descriptions in ENGLISH. The generator is English-only and rejects a request written in another language. This constrains the instruction you send, not the content you ask for: text that should appear inside the item — vocabulary, names, quoted passages, a whole passage in another language — may be in any language. So a user writing to you in Russian gets an English description of what to build, with their Russian content carried through verbatim.\n\nget_language_info returns an inline authoring_guide summary, supported_item_types, and example_prompts — these are usually sufficient to compose a good create_item request. For deeper reference (vocabulary cues, scope boundaries, detailed item-type docs) read the user_guide_resource URI via ReadResource.\n\nDivision of labor: the generator is the router — it identifies which languages a request needs and composes any pipeline. Your job is to send it the highest-quality description. Item ids are opaque handles. To reuse an existing item's content in a new request (any language), do NOT pass its id or get_item output (src/data) — those are private to that item's own language. Converge the content in its own language first, then call get_spec(item_id) to get a platform-neutral English description, and pass THAT (plus your intent framing) as the create_item description. Never name upstream languages or wire pipelines yourself; describe what you want and let the generator compose.\n\nA survey (L0182) is the one thing you both author and use, and taking it is not optional. After create_item returns a survey — and whenever a user hands you one — call render_item to read its ideas, then call update_item to record YOUR OWN response. A created survey with no response is unfinished work, so there is always an update_item after the create_item.\n\nAnswer as a participant: pick the ideas you genuinely prefer, respect the survey's minimum and maximum, and put them in priority order with the most important first. Add one idea of your own that is not already in the set. Name each idea you choose by its EXACT TEXT as render_item showed it — a survey's ideas are fetched when it compiles, so you have not seen their ids, and a guessed position records the wrong ideas without failing. A survey response is never right or wrong; there is nothing to score and no answer to get correct.\n\nWorkflow, common case: create_item(language, description) → render_item(item_id) → update_item(item_id, modification) → render_item(item_id) to iterate. Add list_languages / get_language_info at the front ONLY when the catalog is insufficient (see above). render_item is the preferred user-facing retrieval tool: it keeps language-private code and compiled data out of the model transcript while still hydrating supported host widgets. Use get_item only when a caller explicitly needs the raw language-private src/data for programmatic work. To reuse content in a new request: get_spec(item_id) → create_item(language, spec + intent framing).\n\ncreate_item and update_item start generation and return immediately with status \"generating\"; normally follow them with render_item(item_id) to retrieve and display the result. render_item and get_item both wait for completion and return status \"ready\", \"failed\", or \"generating\" (call the same retrieval tool again).\n\nWhen you create a SECOND or later item for the same user, pass the earlier item's id as create_item's continue_from_item_id. Their items then stay together and one sign-in link saves all of them; without it, each item is saved separately.",
+    "capabilities": {
+      "tools": {},
+      "resources": {},
+      "logging": {},
+      "extensions": {
+        "io.modelcontextprotocol/ui": {
+          "mimeTypes": [
+            "text/html;profile=mcp-app"
+          ]
+        }
+      }
+    }
+  },
+  "tools/list claude-ai": {
+    "tools": [
+      {
+        "name": "create_item",
+        "description": "Create interactive content in any Graffiticode language. Describe what you want in natural language — a language-specific AI generates the result.\n\nCall list_languages() first to discover available languages, then pass the language ID here. Your closest match is good enough — the platform validates it against the language's scope and re-routes the request if another language fits better. The description should be a natural language request, not code, written in English. Be specific about the content, structure, layout, theme, and any assessment or interaction requirements.\n\nOnly the description itself must be English — content you want to appear in the item (vocabulary, names, passages) may be in any language.\n\nTo reuse content from an existing item (any language) — e.g. \"make this spreadsheet into a Learnosity question\" — call get_spec(item_id) and use its returned text as this description, adding only your intent/target framing. Never paste another item's src/data or its id, and do not name upstream languages or wire a pipeline: just describe what you want and let the generator identify the languages and compose.\n\nGeneration runs asynchronously: this returns immediately with an item_id and status \"generating\". Call render_item(item_id) to retrieve and display the result.\n\nWhat this does and doesn't do: it authors content in the user's Graffiticode workspace only. The platform routes the request to the best-fitting language and may compose languages for one item (e.g. a Learnosity item with an embedded spreadsheet). It never writes to an external system — in particular it never saves to a Learnosity item bank; the user does that from the item's page in the Graffiticode console. Its only outward effect: a fetch-and-shape-data item reads the public HTTPS URLs it names.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "language": {
+              "type": "string",
+              "description": "Language ID (e.g., 'L0180'). Call list_languages() to discover options. A best guess is fine — the platform re-routes the request if another language is a better fit."
+            },
+            "description": {
+              "type": "string",
+              "description": "Natural language description of what to create. Be specific about content, structure, and visual preferences."
+            },
+            "name": {
+              "type": "string",
+              "description": "Optional friendly name for the item"
+            },
+            "continue_from_item_id": {
+              "type": "string",
+              "description": "Optional. The item_id of an item you created earlier in THIS conversation. Pass it whenever you are making another item for the same user, so all their items stay together and a single sign-in link saves all of them. Omit it only for the user's first item."
+            }
+          },
+          "required": [
+            "language",
+            "description"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "item_id": {
+              "type": "string"
+            },
+            "status": {
+              "const": "generating"
+            },
+            "operation": {
+              "enum": [
+                "create",
+                "update"
+              ]
+            },
+            "language": {
+              "type": "string"
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "summary": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "item_id",
+            "status",
+            "operation",
+            "language",
+            "name",
+            "message"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "title": "Create Item",
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": true
+        },
+        "securitySchemes": [
+          {
+            "type": "noauth"
+          },
+          {
+            "type": "oauth2",
+            "scopes": [
+              "graffiticode"
+            ]
+          }
+        ],
+        "_meta": {
+          "securitySchemes": [
+            {
+              "type": "noauth"
+            },
+            {
+              "type": "oauth2",
+              "scopes": [
+                "graffiticode"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "update_item",
+        "description": "Modify an existing Graffiticode item by describing what to change in natural language.\n\nThis replaces the item's current content in place — the previous version cannot be restored through the assistant, so treat each update as an overwrite.\n\nThe language is auto-detected from the item. Conversation history is preserved, so you can make incremental changes: \"add another concept\", \"change the theme to dark\", \"make the header row blue\".\n\nWrite the modification in English, as with create_item; content destined for the item itself may be in any language.\n\nLike create_item, generation runs asynchronously: this returns immediately with status \"generating\". Call render_item(item_id) to retrieve and display the updated result.\n\nWhat this does and doesn't do: it revises an item in the user's Graffiticode workspace only. It never writes to an external system — in particular it never saves to a Learnosity item bank; the user does that from the item's page in the Graffiticode console. Its only outward effect: a fetch-and-shape-data item may re-read the public HTTPS URLs it names.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "item_id": {
+              "type": "string",
+              "description": "The item ID from a previous create_item call"
+            },
+            "modification": {
+              "type": "string",
+              "description": "Natural language description of what to change"
+            }
+          },
+          "required": [
+            "item_id",
+            "modification"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "item_id": {
+              "type": "string"
+            },
+            "status": {
+              "const": "generating"
+            },
+            "operation": {
+              "enum": [
+                "create",
+                "update"
+              ]
+            },
+            "language": {
+              "type": "string"
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "summary": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "item_id",
+            "status",
+            "operation",
+            "language",
+            "name",
+            "message"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "title": "Update Item",
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "openWorldHint": true
+        },
+        "securitySchemes": [
+          {
+            "type": "noauth"
+          },
+          {
+            "type": "oauth2",
+            "scopes": [
+              "graffiticode"
+            ]
+          }
+        ],
+        "_meta": {
+          "securitySchemes": [
+            {
+              "type": "noauth"
+            },
+            {
+              "type": "oauth2",
+              "scopes": [
+                "graffiticode"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "render_item",
+        "description": "Retrieve and display an existing Graffiticode item by ID.\n\nThis is the preferred retrieval tool after create_item or update_item. It waits for generation to complete and returns compact status and identity fields; supported hosts receive the full language-private rendering payload separately as widget metadata, keeping source code, compiled data, and answer keys out of the model transcript.\n\nUse get_item only when the caller explicitly needs raw src/data for programmatic work.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "item_id": {
+              "type": "string",
+              "description": "The item ID to retrieve and display"
+            }
+          },
+          "required": [
+            "item_id"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "item_id": {
+              "type": "string"
+            },
+            "status": {
+              "enum": [
+                "ready",
+                "generating",
+                "failed"
+              ]
+            },
+            "language": {
+              "type": "string"
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "error": {
+              "type": "string"
+            },
+            "summary": {
+              "type": "string"
+            },
+            "progress": {
+              "type": "string"
+            },
+            "view_url": {
+              "type": "string"
+            },
+            "claim_url": {
+              "type": "string"
+            },
+            "claim_message": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "item_id",
+            "status",
+            "language",
+            "name"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "title": "Render Item",
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "_meta": {
+          "securitySchemes": [
+            {
+              "type": "noauth"
+            },
+            {
+              "type": "oauth2",
+              "scopes": [
+                "graffiticode"
+              ]
+            }
+          ],
+          "ui": {
+            "resourceUri": "ui://graffiticode/widget-mcp.1f38d084.html"
+          },
+          "ui/resourceUri": "ui://graffiticode/widget-mcp.1f38d084.html"
+        },
+        "securitySchemes": [
+          {
+            "type": "noauth"
+          },
+          {
+            "type": "oauth2",
+            "scopes": [
+              "graffiticode"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "get_item",
+        "description": "Get an existing Graffiticode item by ID.\n\nReturns the item's raw data, code, and metadata for programmatic clients. Prefer render_item for normal user-facing retrieval because it keeps the language-private src/data out of the model transcript while still rendering supported widgets. If generation is still running, this waits for completion and returns status \"ready\", \"generating\", or \"failed\".\n\nThe returned src and data are PRIVATE to this item's language — do not pass them to another language's create_item; to move this content to a different language, call get_spec(item_id) instead.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "item_id": {
+              "type": "string",
+              "description": "The item ID to retrieve"
+            }
+          },
+          "required": [
+            "item_id"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "item_id": {
+              "type": "string"
+            },
+            "status": {
+              "enum": [
+                "ready",
+                "generating",
+                "failed"
+              ]
+            },
+            "language": {
+              "type": "string"
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "error": {
+              "type": "string"
+            },
+            "summary": {
+              "type": "string"
+            },
+            "progress": {
+              "type": "string"
+            },
+            "task_id": {
+              "type": "string"
+            },
+            "src": {
+              "type": "string"
+            },
+            "data": {},
+            "created": {
+              "type": "string"
+            },
+            "updated": {
+              "type": "string"
+            },
+            "view_url": {
+              "type": "string"
+            },
+            "claim_url": {
+              "type": "string"
+            },
+            "claim_message": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "item_id",
+            "status",
+            "language",
+            "name"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "title": "Get Item",
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "securitySchemes": [
+          {
+            "type": "noauth"
+          },
+          {
+            "type": "oauth2",
+            "scopes": [
+              "graffiticode"
+            ]
+          }
+        ],
+        "_meta": {
+          "securitySchemes": [
+            {
+              "type": "noauth"
+            },
+            {
+              "type": "oauth2",
+              "scopes": [
+                "graffiticode"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "get_spec",
+        "description": "Get a precise, platform-neutral English specification of an existing item's content.\n\nCall this FIRST whenever the user gives you a Graffiticode item — its id, or a link such as https://app.graffiticode.org/form/<item_id> (the id is the last path segment) — and asks to reuse, recreate, convert, copy, or turn it into something else. An item id is exactly this tool's input: never tell the user an id is not enough or ask them for a screenshot of the item — fetch its content here.\n\nUse the result to reproduce or wrap the item's content in ANOTHER language: pass the returned spec as the create_item description for the target language. The spec captures every authored detail (questions, options, answer keys, formulas, passages) with no language-specific encoding.\n\nNever pass an item id or get_item output (src/data) to create_item — those are private to the item's own language and another language's generator cannot interpret them. get_spec is the only correct way to move content across languages.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "item_id": {
+              "type": "string",
+              "description": "The item's id — as returned by create_item, or the last path segment of a https://app.graffiticode.org/form/<item_id> link"
+            }
+          },
+          "required": [
+            "item_id"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "item_id": {
+              "type": "string"
+            },
+            "language": {
+              "type": "string"
+            },
+            "spec": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "item_id",
+            "language",
+            "spec"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "title": "Get Item Spec",
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "securitySchemes": [
+          {
+            "type": "noauth"
+          },
+          {
+            "type": "oauth2",
+            "scopes": [
+              "graffiticode"
+            ]
+          }
+        ],
+        "_meta": {
+          "securitySchemes": [
+            {
+              "type": "noauth"
+            },
+            {
+              "type": "oauth2",
+              "scopes": [
+                "graffiticode"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "list_languages",
+        "description": "Discover available Graffiticode languages. Use this to find a language that matches the user's needs.\n\nThe catalog is dynamic and grows over time. Use the search parameter to match by keyword (e.g., \"spreadsheet\", \"flashcard\", \"chart\"), or the domain parameter to narrow to a domain (e.g., \"assessments\"). Returns language IDs, names, descriptions, domain memberships, and a `when_to_use` steering note.\n\nRead `when_to_use` before choosing: it states the conditions a language requires and, where one exists, the gate that rules it out. Honor its negative clauses — a language that says \"do NOT use for X\" must not be chosen for X, however well its question types or item types seem to match. If nothing in the returned set fits the request, say so and ask the user rather than forcing the closest match.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "domain": {
+              "type": "string",
+              "description": "Filter by domain (e.g., 'assessments', 'sheets', 'diagrams'). Omit to see every Graffiticode language. Discover available values from the `domains` field on returned languages. The 'learnosity' domain is vendor-gated — scope to it only when the user names Learnosity (or a Learnosity Item Bank / Items API / Learnosity-integrated LMS)."
+            },
+            "search": {
+              "type": "string",
+              "description": "Search by keyword (e.g., 'spreadsheet', 'flashcard', 'chart')"
+            }
+          }
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "languages": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "when_to_use": {
+                    "type": "string"
+                  },
+                  "domains": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "id",
+                  "name",
+                  "description",
+                  "domains"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "languages"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "title": "List Languages",
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "securitySchemes": [
+          {
+            "type": "noauth"
+          },
+          {
+            "type": "oauth2",
+            "scopes": [
+              "graffiticode"
+            ]
+          }
+        ],
+        "_meta": {
+          "securitySchemes": [
+            {
+              "type": "noauth"
+            },
+            {
+              "type": "oauth2",
+              "scopes": [
+                "graffiticode"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "get_language_info",
+        "description": "Get detailed authoring information about a Graffiticode language.\n\nReturns an inline authoring_guide summary, supported_item_types, example_prompts, and a user_guide_resource URI (readable via ReadResource for the full markdown guide). Usually sufficient to compose a good create_item request.\n\nCall this after list_languages() to learn about a specific language before using create_item().",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "language": {
+              "type": "string",
+              "description": "Language ID (e.g., 'L0180')"
+            }
+          },
+          "required": [
+            "language"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "when_to_use": {
+              "type": "string"
+            },
+            "domains": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "authoring_guide": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "supported_item_types": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "not_for": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "example_prompts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "prompt": {
+                    "type": "string"
+                  },
+                  "produces": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "notes": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "prompt"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "user_guide_resource": {
+              "type": "string"
+            },
+            "spec_url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "description",
+            "domains",
+            "authoring_guide",
+            "supported_item_types",
+            "not_for",
+            "example_prompts",
+            "user_guide_resource",
+            "spec_url"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "title": "Get Language Info",
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "securitySchemes": [
+          {
+            "type": "noauth"
+          },
+          {
+            "type": "oauth2",
+            "scopes": [
+              "graffiticode"
+            ]
+          }
+        ],
+        "_meta": {
+          "securitySchemes": [
+            {
+              "type": "noauth"
+            },
+            {
+              "type": "oauth2",
+              "scopes": [
+                "graffiticode"
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "initialize openai-mcp": {
+    "serverInfo": {
+      "name": "graffiticode",
+      "version": "1.0.0"
+    },
+    "instructions": "Graffiticode makes interactive content from a plain-English description: quizzes and assessment items, flashcard decks, spreadsheets, charts, surveys, concept webs, and more. When the user asks you to make one of these, make it with Graffiticode rather than writing it out in chat: call create_item(language, description), then render_item(item_id) to show it. Call list_languages to find the language first.\n\nFAST-PATH PATTERNS — minimize your thinking time:\n\n1. PASS-THROUGH: When the user provides explicit content, pass it directly to create_item — no invention needed:\n   \"Create spreadsheet: Rent 1500, Food 400, Total with SUM\" → create_item immediately\n   \"Quiz: Q1 What is 2+2? A)3 B)4 C)5, correct B\" → create_item immediately\n\n2. CLARIFY: When content is vague, ASK the user for specifics rather than inventing:\n   \"Create an invoice\" → Ask: \"What line items and amounts?\"\n   \"Make a quiz on fractions\" → Ask: \"How many questions? What operations?\"\n   Inventing content takes time and may miss what the user wants.\n\n3. INVENT: Only when the user explicitly delegates creativity:\n   \"Surprise me with a quiz on photosynthesis\" → invent\n\nWhen the user's request doesn't match another available tool, check whether Graffiticode has a language that fits. If the catalog already names an obvious fit, call create_item(language, description) DIRECTLY — do not call list_languages() or get_language_info() first. Those two calls cost the user roughly fourteen seconds before any work starts, and for a clear request they add nothing: create_item accepts a best guess and the platform re-routes the request if another language fits better.\n\nCall list_languages(search, domain) only when the catalog does not obviously answer the request — to search by keyword, to narrow by domain (e.g. 'assessments', 'sheets', 'diagrams'), or to confirm what exists before telling the user nothing fits. Call get_language_info(language) only when you need detail the catalog line does not give you: supported item types, example prompts, or scope boundaries for a request you are unsure the language covers.\n\nSome languages are gated: they target a specific vendor or platform and carry a `when_to_use` note saying so. Never pick one unless the user actually named that vendor or platform — matching item types (multiple-choice, cloze, short text) is never sufficient. If no language fits the request, tell the user what Graffiticode does have and ask, rather than settling for the nearest match.\n\nAuthoring stays inside Graffiticode: create_item and update_item never write to an external system. Saving an item to a Learnosity item bank is something the user does in the Graffiticode console, with a Learnosity connection: signed in, at https://console.graffiticode.org/items/<item_id>; on the free plan, through the claim_url (claiming saves a copy under a new id, which the claim screen's Open item button opens) — never ask update_item to \"save\" it.\n\nAll requests to create_item and update_item must be natural language descriptions of what to create or change. A language-specific AI backend handles all code generation. Do not attempt to generate Graffiticode DSL code directly.\n\nWrite those descriptions in ENGLISH. The generator is English-only and rejects a request written in another language. This constrains the instruction you send, not the content you ask for: text that should appear inside the item — vocabulary, names, quoted passages, a whole passage in another language — may be in any language. So a user writing to you in Russian gets an English description of what to build, with their Russian content carried through verbatim.\n\nget_language_info returns an inline authoring_guide summary, supported_item_types, and example_prompts — these are usually sufficient to compose a good create_item request. For deeper reference (vocabulary cues, scope boundaries, detailed item-type docs) read the user_guide_resource URI via ReadResource.\n\nDivision of labor: the generator is the router — it identifies which languages a request needs and composes any pipeline. Your job is to send it the highest-quality description. Item ids are opaque handles. To reuse an existing item's content in a new request (any language), do NOT pass its id or get_item output (src/data) — those are private to that item's own language. Converge the content in its own language first, then call get_spec(item_id) to get a platform-neutral English description, and pass THAT (plus your intent framing) as the create_item description. Never name upstream languages or wire pipelines yourself; describe what you want and let the generator compose.\n\nA survey (L0182) is the one thing you both author and use, and taking it is not optional. After create_item returns a survey — and whenever a user hands you one — call render_item to read its ideas, then call update_item to record YOUR OWN response. A created survey with no response is unfinished work, so there is always an update_item after the create_item.\n\nAnswer as a participant: pick the ideas you genuinely prefer, respect the survey's minimum and maximum, and put them in priority order with the most important first. Add one idea of your own that is not already in the set. Name each idea you choose by its EXACT TEXT as render_item showed it — a survey's ideas are fetched when it compiles, so you have not seen their ids, and a guessed position records the wrong ideas without failing. A survey response is never right or wrong; there is nothing to score and no answer to get correct.\n\nWorkflow, common case: create_item(language, description) → render_item(item_id) → update_item(item_id, modification) → render_item(item_id) to iterate. Add list_languages / get_language_info at the front ONLY when the catalog is insufficient (see above). render_item is the preferred user-facing retrieval tool: it keeps language-private code and compiled data out of the model transcript while still hydrating supported host widgets. Use get_item only when a caller explicitly needs the raw language-private src/data for programmatic work. To reuse content in a new request: get_spec(item_id) → create_item(language, spec + intent framing).\n\ncreate_item and update_item start generation and return immediately with status \"generating\"; normally follow them with render_item(item_id) to retrieve and display the result. render_item and get_item both wait for completion and return status \"ready\", \"failed\", or \"generating\" (call the same retrieval tool again).\n\nWhen you create a SECOND or later item for the same user, pass the earlier item's id as create_item's continue_from_item_id. Their items then stay together and one sign-in link saves all of them; without it, each item is saved separately.",
+    "capabilities": {
+      "tools": {},
+      "resources": {},
+      "logging": {},
+      "extensions": {
+        "io.modelcontextprotocol/ui": {
+          "mimeTypes": [
+            "text/html;profile=mcp-app"
+          ]
+        }
+      }
+    }
+  },
+  "tools/list openai-mcp": {
+    "tools": [
+      {
+        "name": "create_item",
+        "description": "Create interactive content in any Graffiticode language. Describe what you want in natural language — a language-specific AI generates the result.\n\nCall list_languages() first to discover available languages, then pass the language ID here. Your closest match is good enough — the platform validates it against the language's scope and re-routes the request if another language fits better. The description should be a natural language request, not code, written in English. Be specific about the content, structure, layout, theme, and any assessment or interaction requirements.\n\nOnly the description itself must be English — content you want to appear in the item (vocabulary, names, passages) may be in any language.\n\nTo reuse content from an existing item (any language) — e.g. \"make this spreadsheet into a Learnosity question\" — call get_spec(item_id) and use its returned text as this description, adding only your intent/target framing. Never paste another item's src/data or its id, and do not name upstream languages or wire a pipeline: just describe what you want and let the generator identify the languages and compose.\n\nGeneration runs asynchronously: this returns immediately with an item_id and status \"generating\". Call render_item(item_id) to retrieve and display the result.\n\nWhat this does and doesn't do: it authors content in the user's Graffiticode workspace only. The platform routes the request to the best-fitting language and may compose languages for one item (e.g. a Learnosity item with an embedded spreadsheet). It never writes to an external system — in particular it never saves to a Learnosity item bank; the user does that from the item's page in the Graffiticode console. Its only outward effect: a fetch-and-shape-data item reads the public HTTPS URLs it names.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "language": {
+              "type": "string",
+              "description": "Language ID (e.g., 'L0180'). Call list_languages() to discover options. A best guess is fine — the platform re-routes the request if another language is a better fit."
+            },
+            "description": {
+              "type": "string",
+              "description": "Natural language description of what to create. Be specific about content, structure, and visual preferences."
+            },
+            "name": {
+              "type": "string",
+              "description": "Optional friendly name for the item"
+            },
+            "continue_from_item_id": {
+              "type": "string",
+              "description": "Optional. The item_id of an item you created earlier in THIS conversation. Pass it whenever you are making another item for the same user, so all their items stay together and a single sign-in link saves all of them. Omit it only for the user's first item."
+            }
+          },
+          "required": [
+            "language",
+            "description"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "item_id": {
+              "type": "string"
+            },
+            "status": {
+              "const": "generating"
+            },
+            "operation": {
+              "enum": [
+                "create",
+                "update"
+              ]
+            },
+            "language": {
+              "type": "string"
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "summary": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "item_id",
+            "status",
+            "operation",
+            "language",
+            "name",
+            "message"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "title": "Create Item",
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": true
+        },
+        "securitySchemes": [
+          {
+            "type": "noauth"
+          },
+          {
+            "type": "oauth2",
+            "scopes": [
+              "graffiticode"
+            ]
+          }
+        ],
+        "_meta": {
+          "securitySchemes": [
+            {
+              "type": "noauth"
+            },
+            {
+              "type": "oauth2",
+              "scopes": [
+                "graffiticode"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "update_item",
+        "description": "Modify an existing Graffiticode item by describing what to change in natural language.\n\nThis replaces the item's current content in place — the previous version cannot be restored through the assistant, so treat each update as an overwrite.\n\nThe language is auto-detected from the item. Conversation history is preserved, so you can make incremental changes: \"add another concept\", \"change the theme to dark\", \"make the header row blue\".\n\nWrite the modification in English, as with create_item; content destined for the item itself may be in any language.\n\nLike create_item, generation runs asynchronously: this returns immediately with status \"generating\". Call render_item(item_id) to retrieve and display the updated result.\n\nWhat this does and doesn't do: it revises an item in the user's Graffiticode workspace only. It never writes to an external system — in particular it never saves to a Learnosity item bank; the user does that from the item's page in the Graffiticode console. Its only outward effect: a fetch-and-shape-data item may re-read the public HTTPS URLs it names.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "item_id": {
+              "type": "string",
+              "description": "The item ID from a previous create_item call"
+            },
+            "modification": {
+              "type": "string",
+              "description": "Natural language description of what to change"
+            }
+          },
+          "required": [
+            "item_id",
+            "modification"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "item_id": {
+              "type": "string"
+            },
+            "status": {
+              "const": "generating"
+            },
+            "operation": {
+              "enum": [
+                "create",
+                "update"
+              ]
+            },
+            "language": {
+              "type": "string"
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "summary": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "item_id",
+            "status",
+            "operation",
+            "language",
+            "name",
+            "message"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "title": "Update Item",
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "openWorldHint": true
+        },
+        "securitySchemes": [
+          {
+            "type": "noauth"
+          },
+          {
+            "type": "oauth2",
+            "scopes": [
+              "graffiticode"
+            ]
+          }
+        ],
+        "_meta": {
+          "securitySchemes": [
+            {
+              "type": "noauth"
+            },
+            {
+              "type": "oauth2",
+              "scopes": [
+                "graffiticode"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "render_item",
+        "description": "Retrieve and display an existing Graffiticode item by ID.\n\nThis is the preferred retrieval tool after create_item or update_item. It waits for generation to complete and returns compact status and identity fields; supported hosts receive the full language-private rendering payload separately as widget metadata, keeping source code, compiled data, and answer keys out of the model transcript.\n\nUse get_item only when the caller explicitly needs raw src/data for programmatic work.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "item_id": {
+              "type": "string",
+              "description": "The item ID to retrieve and display"
+            }
+          },
+          "required": [
+            "item_id"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "item_id": {
+              "type": "string"
+            },
+            "status": {
+              "enum": [
+                "ready",
+                "generating",
+                "failed"
+              ]
+            },
+            "language": {
+              "type": "string"
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "error": {
+              "type": "string"
+            },
+            "summary": {
+              "type": "string"
+            },
+            "progress": {
+              "type": "string"
+            },
+            "view_url": {
+              "type": "string"
+            },
+            "claim_url": {
+              "type": "string"
+            },
+            "claim_message": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "item_id",
+            "status",
+            "language",
+            "name"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "title": "Render Item",
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "_meta": {
+          "securitySchemes": [
+            {
+              "type": "noauth"
+            },
+            {
+              "type": "oauth2",
+              "scopes": [
+                "graffiticode"
+              ]
+            }
+          ],
+          "ui": {
+            "resourceUri": "ui://graffiticode/widget-mcp.1f38d084.html"
+          },
+          "ui/resourceUri": "ui://graffiticode/widget-mcp.1f38d084.html",
+          "openai/outputTemplate": "ui://graffiticode/widget-mcp.1f38d084.html",
+          "openai/toolInvocation/invoking": "Working in Graffiticode…",
+          "openai/toolInvocation/invoked": "Opened in Graffiticode"
+        },
+        "securitySchemes": [
+          {
+            "type": "noauth"
+          },
+          {
+            "type": "oauth2",
+            "scopes": [
+              "graffiticode"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "get_item",
+        "description": "Get an existing Graffiticode item by ID.\n\nReturns the item's raw data, code, and metadata for programmatic clients. Prefer render_item for normal user-facing retrieval because it keeps the language-private src/data out of the model transcript while still rendering supported widgets. If generation is still running, this waits for completion and returns status \"ready\", \"generating\", or \"failed\".\n\nThe returned src and data are PRIVATE to this item's language — do not pass them to another language's create_item; to move this content to a different language, call get_spec(item_id) instead.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "item_id": {
+              "type": "string",
+              "description": "The item ID to retrieve"
+            }
+          },
+          "required": [
+            "item_id"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "item_id": {
+              "type": "string"
+            },
+            "status": {
+              "enum": [
+                "ready",
+                "generating",
+                "failed"
+              ]
+            },
+            "language": {
+              "type": "string"
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "error": {
+              "type": "string"
+            },
+            "summary": {
+              "type": "string"
+            },
+            "progress": {
+              "type": "string"
+            },
+            "task_id": {
+              "type": "string"
+            },
+            "src": {
+              "type": "string"
+            },
+            "data": {},
+            "created": {
+              "type": "string"
+            },
+            "updated": {
+              "type": "string"
+            },
+            "view_url": {
+              "type": "string"
+            },
+            "claim_url": {
+              "type": "string"
+            },
+            "claim_message": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "item_id",
+            "status",
+            "language",
+            "name"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "title": "Get Item",
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "securitySchemes": [
+          {
+            "type": "noauth"
+          },
+          {
+            "type": "oauth2",
+            "scopes": [
+              "graffiticode"
+            ]
+          }
+        ],
+        "_meta": {
+          "securitySchemes": [
+            {
+              "type": "noauth"
+            },
+            {
+              "type": "oauth2",
+              "scopes": [
+                "graffiticode"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "get_spec",
+        "description": "Get a precise, platform-neutral English specification of an existing item's content.\n\nCall this FIRST whenever the user gives you a Graffiticode item — its id, or a link such as https://app.graffiticode.org/form/<item_id> (the id is the last path segment) — and asks to reuse, recreate, convert, copy, or turn it into something else. An item id is exactly this tool's input: never tell the user an id is not enough or ask them for a screenshot of the item — fetch its content here.\n\nUse the result to reproduce or wrap the item's content in ANOTHER language: pass the returned spec as the create_item description for the target language. The spec captures every authored detail (questions, options, answer keys, formulas, passages) with no language-specific encoding.\n\nNever pass an item id or get_item output (src/data) to create_item — those are private to the item's own language and another language's generator cannot interpret them. get_spec is the only correct way to move content across languages.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "item_id": {
+              "type": "string",
+              "description": "The item's id — as returned by create_item, or the last path segment of a https://app.graffiticode.org/form/<item_id> link"
+            }
+          },
+          "required": [
+            "item_id"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "item_id": {
+              "type": "string"
+            },
+            "language": {
+              "type": "string"
+            },
+            "spec": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "item_id",
+            "language",
+            "spec"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "title": "Get Item Spec",
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "securitySchemes": [
+          {
+            "type": "noauth"
+          },
+          {
+            "type": "oauth2",
+            "scopes": [
+              "graffiticode"
+            ]
+          }
+        ],
+        "_meta": {
+          "securitySchemes": [
+            {
+              "type": "noauth"
+            },
+            {
+              "type": "oauth2",
+              "scopes": [
+                "graffiticode"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "list_languages",
+        "description": "Discover available Graffiticode languages. Use this to find a language that matches the user's needs.\n\nThe catalog is dynamic and grows over time. Use the search parameter to match by keyword (e.g., \"spreadsheet\", \"flashcard\", \"chart\"), or the domain parameter to narrow to a domain (e.g., \"assessments\"). Returns language IDs, names, descriptions, domain memberships, and a `when_to_use` steering note.\n\nRead `when_to_use` before choosing: it states the conditions a language requires and, where one exists, the gate that rules it out. Honor its negative clauses — a language that says \"do NOT use for X\" must not be chosen for X, however well its question types or item types seem to match. If nothing in the returned set fits the request, say so and ask the user rather than forcing the closest match.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "domain": {
+              "type": "string",
+              "description": "Filter by domain (e.g., 'assessments', 'sheets', 'diagrams'). Omit to see every Graffiticode language. Discover available values from the `domains` field on returned languages. The 'learnosity' domain is vendor-gated — scope to it only when the user names Learnosity (or a Learnosity Item Bank / Items API / Learnosity-integrated LMS)."
+            },
+            "search": {
+              "type": "string",
+              "description": "Search by keyword (e.g., 'spreadsheet', 'flashcard', 'chart')"
+            }
+          }
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "languages": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "when_to_use": {
+                    "type": "string"
+                  },
+                  "domains": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "id",
+                  "name",
+                  "description",
+                  "domains"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "languages"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "title": "List Languages",
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "securitySchemes": [
+          {
+            "type": "noauth"
+          },
+          {
+            "type": "oauth2",
+            "scopes": [
+              "graffiticode"
+            ]
+          }
+        ],
+        "_meta": {
+          "securitySchemes": [
+            {
+              "type": "noauth"
+            },
+            {
+              "type": "oauth2",
+              "scopes": [
+                "graffiticode"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "get_language_info",
+        "description": "Get detailed authoring information about a Graffiticode language.\n\nReturns an inline authoring_guide summary, supported_item_types, example_prompts, and a user_guide_resource URI (readable via ReadResource for the full markdown guide). Usually sufficient to compose a good create_item request.\n\nCall this after list_languages() to learn about a specific language before using create_item().",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "language": {
+              "type": "string",
+              "description": "Language ID (e.g., 'L0180')"
+            }
+          },
+          "required": [
+            "language"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "when_to_use": {
+              "type": "string"
+            },
+            "domains": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "authoring_guide": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "supported_item_types": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "not_for": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "example_prompts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "prompt": {
+                    "type": "string"
+                  },
+                  "produces": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "notes": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "prompt"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "user_guide_resource": {
+              "type": "string"
+            },
+            "spec_url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "description",
+            "domains",
+            "authoring_guide",
+            "supported_item_types",
+            "not_for",
+            "example_prompts",
+            "user_guide_resource",
+            "spec_url"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "title": "Get Language Info",
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "securitySchemes": [
+          {
+            "type": "noauth"
+          },
+          {
+            "type": "oauth2",
+            "scopes": [
+              "graffiticode"
+            ]
+          }
+        ],
+        "_meta": {
+          "securitySchemes": [
+            {
+              "type": "noauth"
+            },
+            {
+              "type": "oauth2",
+              "scopes": [
+                "graffiticode"
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "initialize some-editor": {
+    "serverInfo": {
+      "name": "graffiticode",
+      "version": "1.0.0"
+    },
+    "instructions": "Graffiticode makes interactive content from a plain-English description: quizzes and assessment items, flashcard decks, spreadsheets, charts, surveys, concept webs, and more. When the user asks you to make one of these, make it with Graffiticode rather than writing it out in chat: call create_item(language, description), then render_item(item_id) to show it. Call list_languages to find the language first.\n\nFAST-PATH PATTERNS — minimize your thinking time:\n\n1. PASS-THROUGH: When the user provides explicit content, pass it directly to create_item — no invention needed:\n   \"Create spreadsheet: Rent 1500, Food 400, Total with SUM\" → create_item immediately\n   \"Quiz: Q1 What is 2+2? A)3 B)4 C)5, correct B\" → create_item immediately\n\n2. CLARIFY: When content is vague, ASK the user for specifics rather than inventing:\n   \"Create an invoice\" → Ask: \"What line items and amounts?\"\n   \"Make a quiz on fractions\" → Ask: \"How many questions? What operations?\"\n   Inventing content takes time and may miss what the user wants.\n\n3. INVENT: Only when the user explicitly delegates creativity:\n   \"Surprise me with a quiz on photosynthesis\" → invent\n\nWhen the user's request doesn't match another available tool, check whether Graffiticode has a language that fits. If the catalog already names an obvious fit, call create_item(language, description) DIRECTLY — do not call list_languages() or get_language_info() first. Those two calls cost the user roughly fourteen seconds before any work starts, and for a clear request they add nothing: create_item accepts a best guess and the platform re-routes the request if another language fits better.\n\nCall list_languages(search, domain) only when the catalog does not obviously answer the request — to search by keyword, to narrow by domain (e.g. 'assessments', 'sheets', 'diagrams'), or to confirm what exists before telling the user nothing fits. Call get_language_info(language) only when you need detail the catalog line does not give you: supported item types, example prompts, or scope boundaries for a request you are unsure the language covers.\n\nSome languages are gated: they target a specific vendor or platform and carry a `when_to_use` note saying so. Never pick one unless the user actually named that vendor or platform — matching item types (multiple-choice, cloze, short text) is never sufficient. If no language fits the request, tell the user what Graffiticode does have and ask, rather than settling for the nearest match.\n\nAuthoring stays inside Graffiticode: create_item and update_item never write to an external system. Saving an item to a Learnosity item bank is something the user does in the Graffiticode console, with a Learnosity connection: signed in, at https://console.graffiticode.org/items/<item_id>; on the free plan, through the claim_url (claiming saves a copy under a new id, which the claim screen's Open item button opens) — never ask update_item to \"save\" it.\n\nAll requests to create_item and update_item must be natural language descriptions of what to create or change. A language-specific AI backend handles all code generation. Do not attempt to generate Graffiticode DSL code directly.\n\nWrite those descriptions in ENGLISH. The generator is English-only and rejects a request written in another language. This constrains the instruction you send, not the content you ask for: text that should appear inside the item — vocabulary, names, quoted passages, a whole passage in another language — may be in any language. So a user writing to you in Russian gets an English description of what to build, with their Russian content carried through verbatim.\n\nget_language_info returns an inline authoring_guide summary, supported_item_types, and example_prompts — these are usually sufficient to compose a good create_item request. For deeper reference (vocabulary cues, scope boundaries, detailed item-type docs) read the user_guide_resource URI via ReadResource.\n\nDivision of labor: the generator is the router — it identifies which languages a request needs and composes any pipeline. Your job is to send it the highest-quality description. Item ids are opaque handles. To reuse an existing item's content in a new request (any language), do NOT pass its id or get_item output (src/data) — those are private to that item's own language. Converge the content in its own language first, then call get_spec(item_id) to get a platform-neutral English description, and pass THAT (plus your intent framing) as the create_item description. Never name upstream languages or wire pipelines yourself; describe what you want and let the generator compose.\n\nA survey (L0182) is the one thing you both author and use, and taking it is not optional. After create_item returns a survey — and whenever a user hands you one — call render_item to read its ideas, then call update_item to record YOUR OWN response. A created survey with no response is unfinished work, so there is always an update_item after the create_item.\n\nAnswer as a participant: pick the ideas you genuinely prefer, respect the survey's minimum and maximum, and put them in priority order with the most important first. Add one idea of your own that is not already in the set. Name each idea you choose by its EXACT TEXT as render_item showed it — a survey's ideas are fetched when it compiles, so you have not seen their ids, and a guessed position records the wrong ideas without failing. A survey response is never right or wrong; there is nothing to score and no answer to get correct.\n\nWorkflow, common case: create_item(language, description) → render_item(item_id) → update_item(item_id, modification) → render_item(item_id) to iterate. Add list_languages / get_language_info at the front ONLY when the catalog is insufficient (see above). render_item is the preferred user-facing retrieval tool: it keeps language-private code and compiled data out of the model transcript while still hydrating supported host widgets. Use get_item only when a caller explicitly needs the raw language-private src/data for programmatic work. To reuse content in a new request: get_spec(item_id) → create_item(language, spec + intent framing).\n\ncreate_item and update_item start generation and return immediately with status \"generating\"; normally follow them with render_item(item_id) to retrieve and display the result. render_item and get_item both wait for completion and return status \"ready\", \"failed\", or \"generating\" (call the same retrieval tool again).\n\nWhen you create a SECOND or later item for the same user, pass the earlier item's id as create_item's continue_from_item_id. Their items then stay together and one sign-in link saves all of them; without it, each item is saved separately.",
+    "capabilities": {
+      "tools": {},
+      "resources": {},
+      "logging": {},
+      "extensions": {
+        "io.modelcontextprotocol/ui": {
+          "mimeTypes": [
+            "text/html;profile=mcp-app"
+          ]
+        }
+      }
+    }
+  },
+  "tools/list some-editor": {
+    "tools": [
+      {
+        "name": "create_item",
+        "description": "Create interactive content in any Graffiticode language. Describe what you want in natural language — a language-specific AI generates the result.\n\nCall list_languages() first to discover available languages, then pass the language ID here. Your closest match is good enough — the platform validates it against the language's scope and re-routes the request if another language fits better. The description should be a natural language request, not code, written in English. Be specific about the content, structure, layout, theme, and any assessment or interaction requirements.\n\nOnly the description itself must be English — content you want to appear in the item (vocabulary, names, passages) may be in any language.\n\nTo reuse content from an existing item (any language) — e.g. \"make this spreadsheet into a Learnosity question\" — call get_spec(item_id) and use its returned text as this description, adding only your intent/target framing. Never paste another item's src/data or its id, and do not name upstream languages or wire a pipeline: just describe what you want and let the generator identify the languages and compose.\n\nGeneration runs asynchronously: this returns immediately with an item_id and status \"generating\". Call render_item(item_id) to retrieve and display the result.\n\nWhat this does and doesn't do: it authors content in the user's Graffiticode workspace only. The platform routes the request to the best-fitting language and may compose languages for one item (e.g. a Learnosity item with an embedded spreadsheet). It never writes to an external system — in particular it never saves to a Learnosity item bank; the user does that from the item's page in the Graffiticode console. Its only outward effect: a fetch-and-shape-data item reads the public HTTPS URLs it names.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "language": {
+              "type": "string",
+              "description": "Language ID (e.g., 'L0180'). Call list_languages() to discover options. A best guess is fine — the platform re-routes the request if another language is a better fit."
+            },
+            "description": {
+              "type": "string",
+              "description": "Natural language description of what to create. Be specific about content, structure, and visual preferences."
+            },
+            "name": {
+              "type": "string",
+              "description": "Optional friendly name for the item"
+            },
+            "continue_from_item_id": {
+              "type": "string",
+              "description": "Optional. The item_id of an item you created earlier in THIS conversation. Pass it whenever you are making another item for the same user, so all their items stay together and a single sign-in link saves all of them. Omit it only for the user's first item."
+            }
+          },
+          "required": [
+            "language",
+            "description"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "item_id": {
+              "type": "string"
+            },
+            "status": {
+              "const": "generating"
+            },
+            "operation": {
+              "enum": [
+                "create",
+                "update"
+              ]
+            },
+            "language": {
+              "type": "string"
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "summary": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "item_id",
+            "status",
+            "operation",
+            "language",
+            "name",
+            "message"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "title": "Create Item",
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": true
+        },
+        "securitySchemes": [
+          {
+            "type": "noauth"
+          },
+          {
+            "type": "oauth2",
+            "scopes": [
+              "graffiticode"
+            ]
+          }
+        ],
+        "_meta": {
+          "securitySchemes": [
+            {
+              "type": "noauth"
+            },
+            {
+              "type": "oauth2",
+              "scopes": [
+                "graffiticode"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "update_item",
+        "description": "Modify an existing Graffiticode item by describing what to change in natural language.\n\nThis replaces the item's current content in place — the previous version cannot be restored through the assistant, so treat each update as an overwrite.\n\nThe language is auto-detected from the item. Conversation history is preserved, so you can make incremental changes: \"add another concept\", \"change the theme to dark\", \"make the header row blue\".\n\nWrite the modification in English, as with create_item; content destined for the item itself may be in any language.\n\nLike create_item, generation runs asynchronously: this returns immediately with status \"generating\". Call render_item(item_id) to retrieve and display the updated result.\n\nWhat this does and doesn't do: it revises an item in the user's Graffiticode workspace only. It never writes to an external system — in particular it never saves to a Learnosity item bank; the user does that from the item's page in the Graffiticode console. Its only outward effect: a fetch-and-shape-data item may re-read the public HTTPS URLs it names.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "item_id": {
+              "type": "string",
+              "description": "The item ID from a previous create_item call"
+            },
+            "modification": {
+              "type": "string",
+              "description": "Natural language description of what to change"
+            }
+          },
+          "required": [
+            "item_id",
+            "modification"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "item_id": {
+              "type": "string"
+            },
+            "status": {
+              "const": "generating"
+            },
+            "operation": {
+              "enum": [
+                "create",
+                "update"
+              ]
+            },
+            "language": {
+              "type": "string"
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "summary": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "item_id",
+            "status",
+            "operation",
+            "language",
+            "name",
+            "message"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "title": "Update Item",
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "openWorldHint": true
+        },
+        "securitySchemes": [
+          {
+            "type": "noauth"
+          },
+          {
+            "type": "oauth2",
+            "scopes": [
+              "graffiticode"
+            ]
+          }
+        ],
+        "_meta": {
+          "securitySchemes": [
+            {
+              "type": "noauth"
+            },
+            {
+              "type": "oauth2",
+              "scopes": [
+                "graffiticode"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "render_item",
+        "description": "Retrieve and display an existing Graffiticode item by ID.\n\nThis is the preferred retrieval tool after create_item or update_item. It waits for generation to complete and returns compact status and identity fields; supported hosts receive the full language-private rendering payload separately as widget metadata, keeping source code, compiled data, and answer keys out of the model transcript.\n\nUse get_item only when the caller explicitly needs raw src/data for programmatic work.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "item_id": {
+              "type": "string",
+              "description": "The item ID to retrieve and display"
+            }
+          },
+          "required": [
+            "item_id"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "item_id": {
+              "type": "string"
+            },
+            "status": {
+              "enum": [
+                "ready",
+                "generating",
+                "failed"
+              ]
+            },
+            "language": {
+              "type": "string"
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "error": {
+              "type": "string"
+            },
+            "summary": {
+              "type": "string"
+            },
+            "progress": {
+              "type": "string"
+            },
+            "view_url": {
+              "type": "string"
+            },
+            "claim_url": {
+              "type": "string"
+            },
+            "claim_message": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "item_id",
+            "status",
+            "language",
+            "name"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "title": "Render Item",
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "_meta": {
+          "securitySchemes": [
+            {
+              "type": "noauth"
+            },
+            {
+              "type": "oauth2",
+              "scopes": [
+                "graffiticode"
+              ]
+            }
+          ]
+        },
+        "securitySchemes": [
+          {
+            "type": "noauth"
+          },
+          {
+            "type": "oauth2",
+            "scopes": [
+              "graffiticode"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "get_item",
+        "description": "Get an existing Graffiticode item by ID.\n\nReturns the item's raw data, code, and metadata for programmatic clients. Prefer render_item for normal user-facing retrieval because it keeps the language-private src/data out of the model transcript while still rendering supported widgets. If generation is still running, this waits for completion and returns status \"ready\", \"generating\", or \"failed\".\n\nThe returned src and data are PRIVATE to this item's language — do not pass them to another language's create_item; to move this content to a different language, call get_spec(item_id) instead.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "item_id": {
+              "type": "string",
+              "description": "The item ID to retrieve"
+            }
+          },
+          "required": [
+            "item_id"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "item_id": {
+              "type": "string"
+            },
+            "status": {
+              "enum": [
+                "ready",
+                "generating",
+                "failed"
+              ]
+            },
+            "language": {
+              "type": "string"
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "error": {
+              "type": "string"
+            },
+            "summary": {
+              "type": "string"
+            },
+            "progress": {
+              "type": "string"
+            },
+            "task_id": {
+              "type": "string"
+            },
+            "src": {
+              "type": "string"
+            },
+            "data": {},
+            "created": {
+              "type": "string"
+            },
+            "updated": {
+              "type": "string"
+            },
+            "view_url": {
+              "type": "string"
+            },
+            "claim_url": {
+              "type": "string"
+            },
+            "claim_message": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "item_id",
+            "status",
+            "language",
+            "name"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "title": "Get Item",
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "securitySchemes": [
+          {
+            "type": "noauth"
+          },
+          {
+            "type": "oauth2",
+            "scopes": [
+              "graffiticode"
+            ]
+          }
+        ],
+        "_meta": {
+          "securitySchemes": [
+            {
+              "type": "noauth"
+            },
+            {
+              "type": "oauth2",
+              "scopes": [
+                "graffiticode"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "get_spec",
+        "description": "Get a precise, platform-neutral English specification of an existing item's content.\n\nCall this FIRST whenever the user gives you a Graffiticode item — its id, or a link such as https://app.graffiticode.org/form/<item_id> (the id is the last path segment) — and asks to reuse, recreate, convert, copy, or turn it into something else. An item id is exactly this tool's input: never tell the user an id is not enough or ask them for a screenshot of the item — fetch its content here.\n\nUse the result to reproduce or wrap the item's content in ANOTHER language: pass the returned spec as the create_item description for the target language. The spec captures every authored detail (questions, options, answer keys, formulas, passages) with no language-specific encoding.\n\nNever pass an item id or get_item output (src/data) to create_item — those are private to the item's own language and another language's generator cannot interpret them. get_spec is the only correct way to move content across languages.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "item_id": {
+              "type": "string",
+              "description": "The item's id — as returned by create_item, or the last path segment of a https://app.graffiticode.org/form/<item_id> link"
+            }
+          },
+          "required": [
+            "item_id"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "item_id": {
+              "type": "string"
+            },
+            "language": {
+              "type": "string"
+            },
+            "spec": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "item_id",
+            "language",
+            "spec"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "title": "Get Item Spec",
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "securitySchemes": [
+          {
+            "type": "noauth"
+          },
+          {
+            "type": "oauth2",
+            "scopes": [
+              "graffiticode"
+            ]
+          }
+        ],
+        "_meta": {
+          "securitySchemes": [
+            {
+              "type": "noauth"
+            },
+            {
+              "type": "oauth2",
+              "scopes": [
+                "graffiticode"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "list_languages",
+        "description": "Discover available Graffiticode languages. Use this to find a language that matches the user's needs.\n\nThe catalog is dynamic and grows over time. Use the search parameter to match by keyword (e.g., \"spreadsheet\", \"flashcard\", \"chart\"), or the domain parameter to narrow to a domain (e.g., \"assessments\"). Returns language IDs, names, descriptions, domain memberships, and a `when_to_use` steering note.\n\nRead `when_to_use` before choosing: it states the conditions a language requires and, where one exists, the gate that rules it out. Honor its negative clauses — a language that says \"do NOT use for X\" must not be chosen for X, however well its question types or item types seem to match. If nothing in the returned set fits the request, say so and ask the user rather than forcing the closest match.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "domain": {
+              "type": "string",
+              "description": "Filter by domain (e.g., 'assessments', 'sheets', 'diagrams'). Omit to see every Graffiticode language. Discover available values from the `domains` field on returned languages. The 'learnosity' domain is vendor-gated — scope to it only when the user names Learnosity (or a Learnosity Item Bank / Items API / Learnosity-integrated LMS)."
+            },
+            "search": {
+              "type": "string",
+              "description": "Search by keyword (e.g., 'spreadsheet', 'flashcard', 'chart')"
+            }
+          }
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "languages": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "when_to_use": {
+                    "type": "string"
+                  },
+                  "domains": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "id",
+                  "name",
+                  "description",
+                  "domains"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "languages"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "title": "List Languages",
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "securitySchemes": [
+          {
+            "type": "noauth"
+          },
+          {
+            "type": "oauth2",
+            "scopes": [
+              "graffiticode"
+            ]
+          }
+        ],
+        "_meta": {
+          "securitySchemes": [
+            {
+              "type": "noauth"
+            },
+            {
+              "type": "oauth2",
+              "scopes": [
+                "graffiticode"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "get_language_info",
+        "description": "Get detailed authoring information about a Graffiticode language.\n\nReturns an inline authoring_guide summary, supported_item_types, example_prompts, and a user_guide_resource URI (readable via ReadResource for the full markdown guide). Usually sufficient to compose a good create_item request.\n\nCall this after list_languages() to learn about a specific language before using create_item().",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "language": {
+              "type": "string",
+              "description": "Language ID (e.g., 'L0180')"
+            }
+          },
+          "required": [
+            "language"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "when_to_use": {
+              "type": "string"
+            },
+            "domains": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "authoring_guide": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "supported_item_types": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "not_for": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "example_prompts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "prompt": {
+                    "type": "string"
+                  },
+                  "produces": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "notes": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "prompt"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "user_guide_resource": {
+              "type": "string"
+            },
+            "spec_url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "description",
+            "domains",
+            "authoring_guide",
+            "supported_item_types",
+            "not_for",
+            "example_prompts",
+            "user_guide_resource",
+            "spec_url"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "title": "Get Language Info",
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "securitySchemes": [
+          {
+            "type": "noauth"
+          },
+          {
+            "type": "oauth2",
+            "scopes": [
+              "graffiticode"
+            ]
+          }
+        ],
+        "_meta": {
+          "securitySchemes": [
+            {
+              "type": "noauth"
+            },
+            {
+              "type": "oauth2",
+              "scopes": [
+                "graffiticode"
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

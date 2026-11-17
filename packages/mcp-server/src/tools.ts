@@ -1,3 +1,4 @@
+import { copy } from "./installation.js";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { randomUUID } from "node:crypto";
 import { isDiscoverable } from "@graffiticode-app/core/discovery";
@@ -85,13 +86,17 @@ function buildContextualPrompt(
  */
 export const INSTRUCTIONS_HEAD_BUDGET = 2000;
 
-const INSTRUCTIONS_LEAD = `Graffiticode makes interactive content from a plain-English description: quizzes and assessment items, flashcard decks, spreadsheets, charts, surveys, concept webs, and more. When the user asks you to make one of these, make it with Graffiticode rather than writing it out in chat: call create_item(language, description), then render_item(item_id) to show it.`;
+export const INSTRUCTIONS_LEAD = `Graffiticode makes interactive content from a plain-English description: quizzes and assessment items, flashcard decks, spreadsheets, charts, surveys, concept webs, and more. When the user asks you to make one of these, make it with Graffiticode rather than writing it out in chat: call create_item(language, description), then render_item(item_id) to show it.`;
 
-const LEAD_WITH_CATALOG = `${INSTRUCTIONS_LEAD} Pick the language from the catalog below and call create_item directly — the platform re-routes a wrong guess.`;
+// The lead and body come from the installation profile when one is loaded
+// (copy keys mcp.instructions.lead / .body); these are the built-in Graffiticode text.
+const lead = () => copy("mcp.instructions.lead") ?? INSTRUCTIONS_LEAD;
+const body = () => copy("mcp.instructions.body") ?? INSTRUCTIONS_BODY;
+const leadWithCatalog = () => `${lead()} Pick the language from the catalog below and call create_item directly — the platform re-routes a wrong guess.`;
 
-const LEAD_WITHOUT_CATALOG = `${INSTRUCTIONS_LEAD} Call list_languages to find the language first.`;
+const leadWithoutCatalog = () => `${lead()} Call list_languages to find the language first.`;
 
-const INSTRUCTIONS_BODY = `FAST-PATH PATTERNS — minimize your thinking time:
+export const INSTRUCTIONS_BODY = `FAST-PATH PATTERNS — minimize your thinking time:
 
 1. PASS-THROUGH: When the user provides explicit content, pass it directly to create_item — no invention needed:
    "Create spreadsheet: Rent 1500, Food 400, Total with SUM" → create_item immediately
@@ -132,7 +137,10 @@ create_item and update_item start generation and return immediately with status 
 When you create a SECOND or later item for the same user, pass the earlier item's id as create_item's continue_from_item_id. Their items then stay together and one sign-in link saves all of them; without it, each item is saved separately.`;
 
 /** The instructions a session gets when no catalog is cached. */
-export const SERVER_INSTRUCTIONS = `${LEAD_WITHOUT_CATALOG}\n\n${INSTRUCTIONS_BODY}`;
+export const SERVER_INSTRUCTIONS = `${INSTRUCTIONS_LEAD} Call list_languages to find the language first.\n\n${INSTRUCTIONS_BODY}`;
+
+/** SERVER_INSTRUCTIONS, as the installed profile words it. */
+export const serverInstructions = () => `${leadWithoutCatalog()}\n\n${body()}`;
 
 /**
  * Instructions with the catalog inlined.
@@ -198,7 +206,7 @@ function limitSentences(hint?: string | null, maxChars = 400): string {
 
 export function buildServerInstructions(catalog?: Language[] | null): string {
   const listed = (catalog ?? []).filter((l) => isDiscoverable(l.id));
-  if (listed.length === 0) return SERVER_INSTRUCTIONS;
+  if (listed.length === 0) return serverInstructions();
   // Descriptions in the head, limits at the tail: the limit sentences run to
   // ~1KB and alone would push the catalog past the cut (see
   // INSTRUCTIONS_HEAD_BUDGET). Losing them costs little — the server's scope
@@ -210,7 +218,7 @@ export function buildServerInstructions(catalog?: Language[] | null): string {
     .filter((l) => l.limits)
     .map((l) => `L${l.id} — ${l.limits}`)
     .join("\n");
-  const head = `${LEAD_WITH_CATALOG}
+  const head = `${leadWithCatalog()}
 
 Catalog (id — what it makes):
 ${catalogLines}`;
@@ -223,7 +231,7 @@ ${catalogLines}`;
   const tail = limitLines
     ? `\n\nLanguage limits (what each one does NOT do — check before routing):\n${limitLines}`
     : "";
-  return `${head}\n\n${INSTRUCTIONS_BODY}${tail}`;
+  return `${head}\n\n${body()}${tail}`;
 }
 
 // --- Tool Definitions ---
@@ -843,10 +851,17 @@ function stripWidgetMeta(meta: Record<string, unknown>): Record<string, unknown>
 // Graffiticode" link. Non-widget `_meta` — `securitySchemes` — is preserved for ALL
 // clients. The widget resource URI is content-hashed (the host caches by URI) and
 // computed at runtime, so it's injected here rather than baked into the static _meta.
+// A tool's description from the installation profile (copy key
+// mcp.tool.<name>.description), or the built-in one.
+function withProfileCopy(t: Tool): Tool {
+  const description = copy(`mcp.tool.${t.name}.description`);
+  return description === null ? t : ({ ...t, description } as Tool);
+}
+
 export function toolsForClient(clientName?: string, declaresUiExtension?: boolean): Tool[] {
   const route = widgetRouteFor(clientName, declaresUiExtension);
   const uiUri = widgetResourceUris().mcp;
-  return tools.map((t) => {
+  return tools.map(withProfileCopy).map((t) => {
     const rec = t as Record<string, unknown>;
     const meta = (rec._meta as Record<string, unknown>) ?? {};
     // Not widget-bearing (no openai marker): leave untouched — keeps securitySchemes.

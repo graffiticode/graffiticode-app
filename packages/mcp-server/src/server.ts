@@ -26,6 +26,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { handleIntrospect } from "./oauth/introspection.js";
 import { coreReadiness } from "@graffiticode-app/core/readiness";
 import { coreBackendEnabled } from "./core-backend.js";
+import { copy, document, loadInstallation, profile } from "./installation.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
   CallToolRequestSchema,
@@ -499,13 +500,34 @@ const MCP_DISCOVERY = {
   github_url: "https://github.com/graffiticode",
 };
 
+// The discovery document. With an installation profile it is built from the
+// profile; the key order and the item tools' order match MCP_DISCOVERY, so the
+// Graffiticode profile reproduces it byte for byte.
+const ITEM_TOOL_NAMES = MCP_DISCOVERY.tools;
+
+function mcpDiscovery() {
+  const p = profile();
+  if (!p) return MCP_DISCOVERY;
+  const itemsPath = p.surfaces.mcp.find(m => m.families.includes("items"))?.path ?? "/mcp";
+  return {
+    mcp_endpoint: `${p.hosts.mcp}${itemsPath}`,
+    site: p.hosts.mcp,
+    description: copy("mcp.discovery.description") ?? "",
+    tools: ITEM_TOOL_NAMES,
+    product_url: p.brand.links?.product,
+    console_url: p.hosts.console,
+    forum_url: p.brand.links?.forum,
+    github_url: p.brand.links?.source,
+  };
+}
+
 function handleMcpDiscovery(res: ServerResponse): void {
   res.writeHead(200, {
     "Content-Type": "application/json",
     "Access-Control-Allow-Origin": "*",
     "Cache-Control": "public, max-age=300",
   });
-  res.end(JSON.stringify(MCP_DISCOVERY, null, 2));
+  res.end(JSON.stringify(mcpDiscovery(), null, 2));
 }
 
 function extractBearerToken(req: IncomingMessage): string | null {
@@ -584,7 +606,7 @@ function createMcpServer(authProvider: AuthProvider, sessionMeta: SessionMeta = 
   let sessionStartLogged = false;
   const server = new Server(
     {
-      name: "graffiticode",
+      name: profile()?.installation.id ?? "graffiticode",
       version: "1.0.0",
     },
     {
@@ -1125,7 +1147,9 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       return;
     }
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ status: "ok" }));
+    // The installation receipt, when a profile is loaded (until gc-deploy
+    // records it with the release; docs/installations-plan.md).
+    res.end(JSON.stringify(installationReceipt ? { status: "ok", installation: installationReceipt } : { status: "ok" }));
     return;
   }
 
@@ -1143,28 +1167,28 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       "Content-Type": "text/plain; charset=utf-8",
       "Cache-Control": "public, max-age=86400",
     });
-    res.end(ROBOTS_TXT);
+    res.end(copy("mcp.robots") ?? ROBOTS_TXT);
     return;
   }
 
   // About
   if (url.pathname === "/about") {
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    res.end(ABOUT_HTML);
+    res.end(document("about") ?? ABOUT_HTML);
     return;
   }
 
   // Privacy policy
   if (url.pathname === "/privacy") {
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    res.end(PRIVACY_HTML);
+    res.end(document("privacy") ?? PRIVACY_HTML);
     return;
   }
 
   // Terms of service
   if (url.pathname === "/terms") {
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    res.end(TERMS_HTML);
+    res.end(document("terms") ?? TERMS_HTML);
     return;
   }
 
@@ -1566,6 +1590,11 @@ const httpServer = createServer((req, res) => {
     res.end(JSON.stringify({ error: "internal_error" }));
   });
 });
+
+// The installation profile (PROFILE_DIR), loaded and validated before the
+// first request. An invalid profile stops the start.
+const installationReceipt = loadInstallation();
+if (installationReceipt) console.log(`[installation] ${JSON.stringify(installationReceipt)}`);
 
 httpServer.listen(PORT, () => {
   // The catalog is warmed by the first request, not here — see warmCatalogOnRequest.
