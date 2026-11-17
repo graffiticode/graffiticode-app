@@ -235,12 +235,30 @@ export const profileSchema = {
     },
     // Copy templates by key (server instructions, tool descriptions, ...), as files.
     copy: { type: "object", additionalProperties: file },
+    // Commercial terms per plan. Plans, their tiers and Stripe wiring are code
+    // (core/src/lib/plans-config.ts); a profile may only state each plan's
+    // terms, and, until different terms are enabled in a release, only the
+    // terms the code already has (profile/validate.ts).
     billing: {
       type: "object",
       additionalProperties: false,
       properties: {
-        // Plan shapes are fixed when billing moves out of code (P2).
-        plans: { type: "array", items: { type: "object" } },
+        plans: {
+          type: "object",
+          propertyNames: { enum: ["demo", "starter", "pro", "teams", "platinum"] },
+          additionalProperties: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              displayName: text,
+              basePriceMonthly: { type: "number", minimum: 0 },
+              basePriceAnnual: { type: "number", minimum: 0 },
+              includedItems: { type: "integer", minimum: 0 },
+              overageRatePerItem: { type: "number", minimum: 0 },
+              defaultCapUsd: { type: "number", minimum: 0 },
+            },
+          },
+        },
       },
     },
     freePlan: {
@@ -324,7 +342,12 @@ export type Profile = {
     supportUrl: string;
   };
   copy?: Record<string, string>;
-  billing?: { plans?: Record<string, unknown>[] };
+  billing?: {
+    plans?: Partial<Record<"demo" | "starter" | "pro" | "teams" | "platinum", {
+      displayName?: string; basePriceMonthly?: number; basePriceAnnual?: number;
+      includedItems?: number; overageRatePerItem?: number; defaultCapUsd?: number;
+    }>>;
+  };
   freePlan?: { enabled: boolean; itemTtlHours?: number; languages?: string[] };
   csp?: { mode: "report-only" | "enforce" };
 };

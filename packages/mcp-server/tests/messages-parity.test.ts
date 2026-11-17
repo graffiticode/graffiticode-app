@@ -78,3 +78,18 @@ test("the MCP signup link keeps the installation's own query and fragment", asyn
   loadInstallation({ PROFILE_DIR: dir });
   assert.equal(defaultSignupUrl(), "https://example.test/signup?tenant=classroom&utm_source=free_plan&utm_medium=mcp#start");
 });
+
+test("the claim message states the installation's item lifetime", async () => {
+  const { buildClaimFields } = await import("../src/tools.js");
+  const { cpSync, mkdtempSync, readFileSync: read, writeFileSync: write } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const dir = mkdtempSync(`${tmpdir()}/profile-`);
+  cpSync(EXAMPLE, dir, { recursive: true });
+  const p = JSON.parse(read(`${dir}/profile.json`, "utf8"));
+  p.freePlan = { enabled: true, itemTtlHours: 72 };
+  write(`${dir}/profile.json`, JSON.stringify(p));
+  loadInstallation({ PROFILE_DIR: dir });
+  const fields = buildClaimFields({ type: "freePlan", sessionId: "s" } as any, "tok", "claude-code")!;
+  assert.match(fields.claim_message, /^This item is deleted 72 hours after its last edit\./);
+  assert.match(fields.claim_url, /^https:\/\/console\.example\.test\/claim\?token=tok/);
+});

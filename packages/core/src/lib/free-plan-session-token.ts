@@ -23,7 +23,7 @@ import { SignJWT, jwtVerify } from "jose";
  * - Algorithm: HS256
  * - Secret:    FREE_PLAN_NAMESPACE_SALT (UTF-8 bytes)
  * - Audience:  "graffiticode-session"
- * - Expiry:    48h, matching FREE_PLAN_ITEM_TTL_MS — a workspace token should
+ * - Expiry:    48h, the default free-plan item lifetime (freePlanItemTtlMs()); an installation that keeps items longer still expires its session tokens at 48h — a workspace token should
  *              never outlive the items it addresses.
  *
  * Capability note: holding one of these is equivalent to holding the workspace —

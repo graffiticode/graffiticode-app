@@ -4,7 +4,7 @@ import { getApiTask } from "./lib/api.js";
 import { generateCodeForRequest } from "./lib/code-generation/generate-for-request.js";
 import { postTask } from "./lib/task-api.js";
 import { backfillTokenUsageItemId } from "./lib/token-usage-service.js";
-import { FREE_PLAN_ITEM_TTL_MS } from "./lib/free-plan-context.js";
+import { freePlanItemTtlMs } from "./lib/free-plan-context.js";
 import { adoptWorkspace } from "./lib/workspace-adoption.js";
 import { emitEvent, actor } from "./lib/funnel-events.js";
 import { buildItemExpiredError } from "./lib/free-plan-quota.js";
@@ -423,7 +423,7 @@ export async function updateItem({
     }
     if (auth.freePlan) {
       const ttlBase = updates.updated || itemData.updated || Date.now();
-      updates.expiresAt = ttlBase + FREE_PLAN_ITEM_TTL_MS;
+      updates.expiresAt = ttlBase + freePlanItemTtlMs();
     }
     // Under generation protocol v2 a save's connection write is an outbox
     // intent, committed with the content and carried out right after

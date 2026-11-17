@@ -1,3 +1,4 @@
+import { installedProfile } from "../profile/current.js";
 import { displayUrl, installationBrand, signupUrlWith } from "../profile/brand.js";
 import crypto from "crypto";
 import { getCredentialsForApiKey, type ApiKeyCredentials } from "./api-credentials.js";
@@ -5,7 +6,32 @@ import { looksLikeSessionToken, verifySessionToken } from "./free-plan-session-t
 
 export const FREE_PLAN_SESSION_HEADER = "x-free-plan-session";
 
-export const FREE_PLAN_ITEM_TTL_MS = 48 * 60 * 60 * 1000;
+// How long an unclaimed free-plan item is kept: the profile's
+// freePlan.itemTtlHours, or 48 hours. Read at use time, never captured.
+const DEFAULT_FREE_PLAN_ITEM_TTL_HOURS = 48;
+export function freePlanItemTtlMs(): number {
+  const hours = installedProfile()?.profile.freePlan?.itemTtlHours ?? DEFAULT_FREE_PLAN_ITEM_TTL_HOURS;
+  return hours * 60 * 60 * 1000;
+}
+export const freePlanItemTtlHours = () => Math.round(freePlanItemTtlMs() / 3_600_000);
+
+// Whether anonymous use is allowed. Without a profile, as today: yes. A
+// profile must say so (freePlan.enabled): a free plan is anonymous access, so
+// an installation that doesn't mention one doesn't have one.
+export function freePlanEnabled(): boolean {
+  const installed = installedProfile();
+  return installed ? installed.profile.freePlan?.enabled === true : true;
+}
+
+// The refusal for a free-plan request when the installation has no free plan.
+export function buildFreePlanDisabledError(): FreePlanError {
+  const b = installationBrand();
+  return new FreePlanError("free_plan_disabled", 403, {
+    error: "free_plan_disabled",
+    message: `${b.name} requires an account. Sign in, or create a free account at ${displayUrl(b.signupUrl)}.`,
+    signup_url: buildSignupUrl("free_plan_disabled"),
+  });
+}
 
 export type FreePlanContext = {
   freePlan: true;

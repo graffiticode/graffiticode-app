@@ -3,7 +3,7 @@
 import { createClient } from "@graffiticode/auth/client";
 import { coreConfig } from "./config.js";
 import { getCredentialsForApiKey } from "./lib/api-credentials.js";
-import { getFreePlanCredentials, isFreePlanRequest } from "./lib/free-plan-context.js";
+import { buildFreePlanDisabledError, freePlanEnabled, getFreePlanCredentials, isFreePlanRequest } from "./lib/free-plan-context.js";
 import { checkBurstLimit, BURST } from "./lib/free-plan-throttle.js";
 
 // The auth service client, created on first use from the configured URL (and
@@ -45,6 +45,7 @@ export type RequestCredentials = {
 };
 
 export async function resolveAuth(ctx: RequestCredentials): Promise<Principal> {
+  if (ctx.freePlan && !freePlanEnabled()) throw buildFreePlanDisabledError();
   if (ctx.freePlan) {
     const { uid, idToken } = await getFreePlanCredentials();
     // A fresh object per request — resolvers may rebind sessionNamespace onto it
@@ -70,6 +71,8 @@ export async function resolveAuth(ctx: RequestCredentials): Promise<Principal> {
 // signed sessions are required) or a rate-limit rejection.
 export async function admitRequest(req: { headers: Record<string, unknown> }) {
   const freePlan = await isFreePlanRequest(req as any);
+  // An installation without a free plan refuses anonymous requests outright.
+  if (freePlan.freePlan && !freePlanEnabled()) throw buildFreePlanDisabledError();
   if (freePlan.freePlan) {
     await checkBurstLimit(freePlan.sessionNamespace, BURST.API);
   }

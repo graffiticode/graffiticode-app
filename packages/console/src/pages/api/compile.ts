@@ -3,7 +3,7 @@ import bent from "bent";
 import { getBaseUrlForApi } from "@graffiticode-app/core/lib/api";
 import { client as authClient } from "../../lib/auth";
 import { getCredentialsForApiKey } from "@graffiticode-app/core/lib/api-credentials";
-import { getFreePlanCredentials, isFreePlanRequest } from "@graffiticode-app/core/lib/free-plan-context";
+import { buildFreePlanDisabledError, freePlanEnabled, getFreePlanCredentials, isFreePlanRequest } from "@graffiticode-app/core/lib/free-plan-context";
 import { checkBurstLimit, BURST } from "@graffiticode-app/core/lib/free-plan-throttle";
 import { withInstallation } from "../../lib/with-installation";
 
@@ -24,6 +24,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   let freePlan: Awaited<ReturnType<typeof isFreePlanRequest>>;
   try {
     freePlan = await isFreePlanRequest(req);
+    // An installation without a free plan refuses anonymous compiles, before
+    // any burst accounting or trial-credential lookup.
+    if (freePlan.freePlan && !freePlanEnabled()) throw buildFreePlanDisabledError();
     // This proxy reaches a compiler service, and until now nothing bounded how
     // often an anonymous caller could do that.
     if (freePlan.freePlan) {

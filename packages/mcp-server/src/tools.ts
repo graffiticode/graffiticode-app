@@ -3,7 +3,7 @@ import { copy } from "./installation.js";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { randomUUID } from "node:crypto";
 import { isDiscoverable } from "@graffiticode-app/core/discovery";
-import { FREE_PLAN_ITEM_TTL_MS } from "@graffiticode-app/core/lib/free-plan-context";
+import { freePlanItemTtlHours } from "@graffiticode-app/core/lib/free-plan-context";
 import {
   getData,
   getItemWithTask as apiGetItemWithTask,
@@ -943,7 +943,8 @@ function buildViewUrl(itemId: string, claimToken?: string | null): string {
 // Only the console knows the effective workspace, so only the console can mint
 // this. That also retires the copy of the HS256 signing parameters this repo was
 // keeping in sync with the console's by hand.
-const FREE_PLAN_TTL_HOURS = Math.round(FREE_PLAN_ITEM_TTL_MS / 3_600_000);
+// Read at use time: the installation sets it (freePlan.itemTtlHours).
+const freePlanTtlHours = () => freePlanItemTtlHours();
 
 /**
  * Appended to `message` (the agent-facing directive) whenever there is a
@@ -1011,7 +1012,7 @@ export function buildClaimFields(
     // items vanish two days after their last edit — the person most worth
     // converting is the one losing the most, and nothing told them.
     claim_message:
-      `This item is deleted ${FREE_PLAN_TTL_HOURS} hours after its last edit. ` +
+      `This item is deleted ${freePlanTtlHours()} hours after its last edit. ` +
       `To keep it permanently, [sign in to save it](${claim_url}).\n` +
       reconnectHint(host),
   };

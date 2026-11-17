@@ -1,3 +1,4 @@
+import { freePlanItemTtlHours } from "./free-plan-context.js";
 import { displayUrl, installationBrand } from "../profile/brand.js";
 import { getFirestore } from "../utils/db/index.js";
 import { FreePlanError, buildSignupUrl } from "./free-plan-context.js";
@@ -178,7 +179,7 @@ export function buildItemExpiredError(): FreePlanError {
   return new FreePlanError("free_plan_item_expired", 410, {
     error: "free_plan_item_expired",
     message:
-      "This item has expired. Free-plan items are kept for 48 hours unless they're claimed. " +
+      `This item has expired. Free-plan items are kept for ${freePlanItemTtlHours()} hours unless they're claimed. ` +
       `Create it again, or create a free account at ${displayUrl(b.signupUrl)} to keep items permanently.`,
     signup_url: buildSignupUrl("item_expired"),
   });

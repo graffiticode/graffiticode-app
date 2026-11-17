@@ -10,6 +10,7 @@ import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import { capability, capabilityRefusal, EXECUTION_READY } from "../capabilities.js";
 import { platformLanguageById } from "../lib/languages.js";
+import { COMMERCIAL_TERMS_CONFIGURABLE, PLANS } from "../lib/plans-config.js";
 import { SURFACE_FAMILIES, type SurfaceFamily } from "../surfaces.js";
 import { profileSchema, SUPPORTED_PROFILE_VERSIONS, type Profile } from "./schema.js";
 
@@ -123,6 +124,18 @@ export function validateProfile(raw: unknown, opts: ValidateOptions = {}): { ok:
       if (!platformLanguageById(l)) problems.push({ path, message: `unknown language L${l}` });
       else if (catalog && path !== "/catalog/languages" && !catalog.has(l)) {
         problems.push({ path, message: `L${l} isn't offered by this installation (catalog.languages)` });
+      }
+    }
+  }
+
+  // Commercial terms. Until a release can show and charge different terms
+  // consistently (COMMERCIAL_TERMS_CONFIGURABLE), a profile may only restate
+  // the code's.
+  for (const [id, terms] of Object.entries(p.billing?.plans ?? {})) {
+    for (const [field, value] of Object.entries(terms ?? {})) {
+      const current = (PLANS as any)[id]?.[field];
+      if (!COMMERCIAL_TERMS_CONFIGURABLE && value !== current) {
+        problems.push({ path: `/billing/plans/${id}/${field}`, message: `different commercial terms aren't enabled in this release (the pricing display and Stripe's prices must agree first); ${id}.${field} is ${JSON.stringify(current)}` });
       }
     }
   }

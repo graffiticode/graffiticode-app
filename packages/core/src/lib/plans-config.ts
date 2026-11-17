@@ -16,6 +16,7 @@
 //   demo -> "Bronze", pro -> "Silver", teams -> "Gold", platinum -> "Platinum".
 // `starter` is discontinued but retained in the type/lookup for legacy data.
 
+import { installedProfile } from "../profile/current.js";
 export type PlanId = 'demo' | 'starter' | 'pro' | 'teams' | 'platinum';
 export type BillingInterval = 'monthly' | 'annual';
 
@@ -152,6 +153,41 @@ export const PLANS: Record<PlanId, PlanConfig> = {
 export const DEFAULT_PLAN: PlanId = 'demo';
 
 /**
+ * The commercial terms an installation's profile may restate per plan
+ * (billing.plans). Everything else about a plan (its tier, hard cap and
+ * Stripe price env names) is code.
+ */
+export const COMMERCIAL_TERMS = ['displayName', 'basePriceMonthly', 'basePriceAnnual', 'includedItems', 'overageRatePerItem', 'defaultCapUsd'] as const;
+
+/**
+ * Whether an installation may set terms that differ from PLANS. Off until the
+ * console's pricing display follows the installation (plan P3) and Stripe's
+ * configured prices are checked against it: checkout, quota enforcement, the
+ * advertised prices and Stripe must agree. The profile validator refuses
+ * different terms while this is false.
+ */
+export const COMMERCIAL_TERMS_CONFIGURABLE = false;
+
+let plansMemo: { digest: string; plans: Record<PlanId, PlanConfig> } | null = null;
+
+/**
+ * The plans this installation sells: PLANS, with the installed profile's
+ * commercial terms applied. Read at use time, never captured.
+ */
+export function plans(): Record<PlanId, PlanConfig> {
+  const installed = installedProfile();
+  const overrides = installed?.profile.billing?.plans;
+  if (!installed || !overrides) return PLANS;
+  if (plansMemo?.digest === installed.digest) return plansMemo.plans;
+  const out = { ...PLANS };
+  for (const [id, terms] of Object.entries(overrides) as [PlanId, Partial<PlanConfig>][]) {
+    if (out[id]) out[id] = { ...out[id], ...terms };
+  }
+  plansMemo = { digest: installed.digest, plans: out };
+  return out;
+}
+
+/**
  * Anonymous free-plan (MCP trial) limits.
  *
  * Deliberately NOT a PLANS entry: a trial is not a PlanId, has no Stripe
@@ -177,7 +213,8 @@ export function trialItemRevisionLimit(): number {
 }
 
 export function getPlan(id: string | undefined | null): PlanConfig {
-  return PLANS[(id as PlanId)] ?? PLANS[DEFAULT_PLAN];
+  const all = plans();
+  return all[(id as PlanId)] ?? all[DEFAULT_PLAN];
 }
 
 /** Items included in the base fee for a plan (0 for unknown). */
@@ -333,28 +370,29 @@ export function isHardCappedFor(
 }
 
 export function isUpgrade(from: PlanId, to: PlanId): boolean {
-  return PLANS[to].tier > PLANS[from].tier;
+  return plans()[to].tier > plans()[from].tier;
 }
 
 export function isDowngrade(from: PlanId, to: PlanId): boolean {
-  return PLANS[to].tier < PLANS[from].tier;
+  return plans()[to].tier < plans()[from].tier;
 }
 
 /** Resolve a Stripe base price id (from env) for a plan + interval. */
 export function stripeBasePriceId(id: PlanId, interval: BillingInterval): string | undefined {
-  const env = interval === 'annual' ? PLANS[id].stripe.baseAnnualPriceIdEnv : PLANS[id].stripe.baseMonthlyPriceIdEnv;
+  const plan = plans()[id];
+  const env = interval === 'annual' ? plan.stripe.baseAnnualPriceIdEnv : plan.stripe.baseMonthlyPriceIdEnv;
   return env ? process.env[env] : undefined;
 }
 
 /** Resolve the Stripe metered (overage) price id (from env) for a plan. */
 export function stripeMeterPriceId(id: PlanId): string | undefined {
-  const env = PLANS[id].stripe.meterPriceIdEnv;
+  const env = plans()[id].stripe.meterPriceIdEnv;
   return env ? process.env[env] : undefined;
 }
 
 /** Stripe Billing Meter event name a plan reports item usage against. */
 export function stripeMeterEventName(id: PlanId): string | undefined {
-  return PLANS[id].stripe.meterEventName;
+  return plans()[id].stripe.meterEventName;
 }
 
 /**
@@ -363,7 +401,7 @@ export function stripeMeterEventName(id: PlanId): string | undefined {
  */
 export function priceIdToPlan(priceId: string | undefined | null): PlanId | undefined {
   if (!priceId) return undefined;
-  for (const plan of Object.values(PLANS)) {
+  for (const plan of Object.values(plans())) {
     if (plan.stripe.baseMonthlyPriceIdEnv && process.env[plan.stripe.baseMonthlyPriceIdEnv] === priceId) return plan.id;
     if (plan.stripe.baseAnnualPriceIdEnv && process.env[plan.stripe.baseAnnualPriceIdEnv] === priceId) return plan.id;
   }
