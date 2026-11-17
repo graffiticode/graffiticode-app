@@ -1,8 +1,9 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getFirestore } from '@graffiticode-app/core/utils/db/index';
 import { requireUser } from '../../../lib/api-auth';
+import { withInstallation } from "../../../lib/with-installation";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const auth = await requireUser(req);
   if (!auth) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -70,3 +71,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
+
+export default withInstallation(handler);

@@ -10,11 +10,20 @@ import { renderTemplate, stripTrailingNewline } from "./template.js";
 import type { Profile } from "./schema.js";
 import { resolveHosts, type InstallationHosts } from "./hosts.js";
 import { setCoreConfig } from "../config.js";
+import { resolve as resolvePath } from "node:path";
 
-let loaded: LoadedProfile | null = null;
-let rendered = new Map<string, string>();
-let receipt: ReturnType<typeof profileReceipt> | null = null;
-let hostsMemo: InstallationHosts | null = null;
+// Process-wide state (see current.ts): every module instance of core in the
+// process shares the one loaded installation.
+type RuntimeState = {
+  loaded: LoadedProfile | null;
+  rendered: Map<string, string>;
+  receipt: ReturnType<typeof profileReceipt> | null;
+  hostsMemo: InstallationHosts | null;
+  // The directory the profile was loaded from: pinned for the process's life.
+  pinnedDir: string | null;
+};
+const STATE = Symbol.for("graffiticode-app.installation-runtime");
+const state = ((globalThis as any)[STATE] ??= { loaded: null, rendered: new Map(), receipt: null, hostsMemo: null, pinnedDir: null }) as RuntimeState;
 
 export function loadInstallation(env: NodeJS.ProcessEnv = process.env) {
   if (!env.PROFILE_DIR) {
@@ -24,6 +33,7 @@ export function loadInstallation(env: NodeJS.ProcessEnv = process.env) {
     return null;
   }
   const l = loadProfile(env.PROFILE_DIR);
+  state.pinnedDir = resolvePath(env.PROFILE_DIR);
   // Resolved once, after loading: a contradicting environment variable or an
   // inconsistent resource stops the start (profile/hosts.ts).
   const hosts = resolveHosts(l.profile, env);
@@ -31,55 +41,77 @@ export function loadInstallation(env: NodeJS.ProcessEnv = process.env) {
   for (const [key, file] of Object.entries(l.profile.copy ?? {})) {
     copy.set(key, renderTemplate(key, l.readText(file), l.profile));
   }
-  loaded = l;
-  rendered = copy;
-  hostsMemo = hosts;
+  state.loaded = l;
+  state.rendered = copy;
+  state.hostsMemo = hosts;
   setInstalledProfile({ profile: l.profile, digest: l.digest });
   // Core's configuration reads hosts from the installed profile; rebuild it.
   setCoreConfig(null);
-  receipt = profileReceipt(l, { appVersion: env.K_REVISION || env.APP_VERSION || "dev", profileRepo: env.PROFILE_REPO, profileRef: env.PROFILE_REF });
-  return receipt;
+  state.receipt = profileReceipt(l, { appVersion: env.K_REVISION || env.APP_VERSION || "dev", profileRepo: env.PROFILE_REPO, profileRef: env.PROFILE_REF });
+  return state.receipt;
 }
 
 // What this process reports about the profile it runs with, or null.
 export function installationReceipt() {
-  return receipt;
+  return state.receipt;
 }
 
 // For tests.
 export function resetInstallation() {
-  loaded = null;
-  rendered = new Map();
-  receipt = null;
-  hostsMemo = null;
+  state.loaded = null;
+  state.rendered = new Map();
+  state.receipt = null;
+  state.hostsMemo = null;
+  state.pinnedDir = null;
   setInstalledProfile(null);
   setCoreConfig(null);
 }
 
 export function profile(): Profile | null {
-  return loaded?.profile ?? null;
+  return state.loaded?.profile ?? null;
 }
 
 // A rendered copy template, or null when there's no profile or no such key.
 export function copy(key: string): string | null {
-  return rendered.get(key) ?? null;
+  return state.rendered.get(key) ?? null;
 }
 
 // A profile file's bytes (an asset), or null without a profile.
 export function profileFile(relativePath: string): Uint8Array | null {
-  return loaded ? loaded.readBytes(relativePath) : null;
+  return state.loaded ? state.loaded.readBytes(relativePath) : null;
 }
 
 // A legal or about document, verbatim (one trailing newline removed).
 export function document(kind: "privacy" | "terms" | "about"): string | null {
-  const file = loaded?.profile.brand.legal[kind];
-  return file ? stripTrailingNewline(loaded!.readText(file)) : null;
+  const file = state.loaded?.profile.brand.legal[kind];
+  return file ? stripTrailingNewline(state.loaded!.readText(file)) : null;
 }
 
 // Where this installation lives: public hosts and OAuth resources, resolved at
 // use time. With a profile they're fixed at load; without one they follow the
 // environment, read on each call (profile/hosts.ts).
 export function installationHosts(env: NodeJS.ProcessEnv = process.env): InstallationHosts {
-  if (loaded) return (hostsMemo ??= resolveHosts(loaded.profile, env));
+  if (state.loaded) return (state.hostsMemo ??= resolveHosts(state.loaded.profile, env));
   return resolveHosts(null, env);
+}
+
+// Idempotent initialization, for entry points that can't rely on startup
+// having run in their module instance (a server bundle, a worker). With
+// PROFILE_DIR set: loads the profile once and reuses it for the process's
+// life, never re-reading files; a different PROFILE_DIR later is an error. A
+// failed load throws, so the caller fails closed. Without PROFILE_DIR: checks
+// the environment's hosts and returns null.
+export function ensureInstallation(env: NodeJS.ProcessEnv = process.env) {
+  const dir = env.PROFILE_DIR;
+  if (!dir) {
+    if (!state.loaded) resolveHosts(null, env);
+    return null;
+  }
+  if (state.loaded) {
+    if (state.pinnedDir !== resolvePath(dir)) {
+      throw new Error(`The installation was loaded from ${state.pinnedDir}; PROFILE_DIR is now ${dir}. Restart to change installations.`);
+    }
+    return state.receipt;
+  }
+  return loadInstallation(env);
 }

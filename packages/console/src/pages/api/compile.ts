@@ -5,8 +5,9 @@ import { client as authClient } from "../../lib/auth";
 import { getCredentialsForApiKey } from "@graffiticode-app/core/lib/api-credentials";
 import { getFreePlanCredentials, isFreePlanRequest } from "@graffiticode-app/core/lib/free-plan-context";
 import { checkBurstLimit, BURST } from "@graffiticode-app/core/lib/free-plan-throttle";
+import { withInstallation } from "../../lib/with-installation";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Free-Plan-Session");
@@ -94,3 +95,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.status(status).json(body);
   }
 }
+
+export default withInstallation(handler);

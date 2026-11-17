@@ -3,12 +3,13 @@ import { getFirestore } from '@graffiticode-app/core/utils/db/index';
 import { getPlan, overageDollarsToItems, defaultOverageCapUsd, payAsYouGoEnabled, DEFAULT_PLAN } from '@graffiticode-app/core/lib/plans-config';
 import { emitEvent, actor } from '@graffiticode-app/core/lib/funnel-events';
 import { requireUser } from '../../../lib/api-auth';
+import { withInstallation } from "../../../lib/with-installation";
 
 // Set (or clear) a customer's overage spend cap. The client sends a dollar
 // budget; we store it as a number of items using the plan's per-item rate. A
 // null/absent limit means unlimited overage (billed in arrears via the meter) —
 // except on Bronze, where it resets to the plan's default cap.
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -110,3 +111,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
+
+export default withInstallation(handler);

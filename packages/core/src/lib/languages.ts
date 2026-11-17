@@ -378,6 +378,15 @@ export function isLanguageOffered(id: string | undefined | null, installed: For 
   return !offered || offered.has(norm(id));
 }
 
+/**
+ * A platform language by id, whatever any installation's policy: what code
+ * defines. For validating profiles, which mustn't depend on an installed one.
+ */
+export function platformLanguageById(id: string): Language | undefined {
+  const normalized = id.replace(/^L/i, "").padStart(4, "0");
+  return PLATFORM_LANGUAGES.find(l => l.id === normalized);
+}
+
 export function findLanguageById(id: string): Language | undefined {
   const normalized = id.replace(/^L/i, "").padStart(4, "0");
   return catalog().all.find(l => l.id === normalized);

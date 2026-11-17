@@ -4,6 +4,7 @@ import { getFirestore } from '@graffiticode-app/core/utils/db/index';
 import { STRIPE_API_VERSION, stripeBasePriceId, stripeMeterPriceId, getPlan, defaultOverageCapUsd, type PlanId, type BillingInterval } from '@graffiticode-app/core/lib/plans-config';
 import { emitEvent, actor } from '@graffiticode-app/core/lib/funnel-events';
 import { requireUser } from '../../../lib/api-auth';
+import { withInstallation } from "../../../lib/with-installation";
 
 // Initialize Stripe only if secret key is available
 let stripe: Stripe | null = null;
@@ -13,7 +14,7 @@ if (process.env.STRIPE_SECRET_KEY) {
   });
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -243,3 +244,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
+
+export default withInstallation(handler);

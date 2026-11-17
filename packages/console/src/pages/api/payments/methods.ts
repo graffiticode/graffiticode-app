@@ -4,6 +4,7 @@ import { STRIPE_API_VERSION } from '@graffiticode-app/core/lib/plans-config';
 import { getFirestore } from '@graffiticode-app/core/utils/db/index';
 import { requireUser } from '../../../lib/api-auth';
 import { normalizeName } from '../../../lib/account-lookup';
+import { withInstallation } from "../../../lib/with-installation";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
   apiVersion: STRIPE_API_VERSION,
@@ -19,7 +20,7 @@ interface PaymentMethod {
   created: string;
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const auth = await requireUser(req);
     if (!auth) {
@@ -338,3 +339,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
+
+export default withInstallation(handler);

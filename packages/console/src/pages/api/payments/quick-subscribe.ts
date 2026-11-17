@@ -19,6 +19,7 @@ import { emitPlanChanged, hashUid } from '@graffiticode-app/core/lib/funnel-even
 import { getFirestore } from '@graffiticode-app/core/utils/db/index';
 import * as admin from 'firebase-admin';
 import { requireUser } from '../../../lib/api-auth';
+import { withInstallation } from "../../../lib/with-installation";
 
 // Initialize Stripe only if secret key is available
 let stripe: Stripe | null = null;
@@ -36,7 +37,7 @@ function splitItems(sub: Stripe.Subscription) {
   return { base, metered };
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -353,3 +354,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
+
+export default withInstallation(handler);

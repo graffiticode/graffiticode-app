@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { generateCodeForRequest } from "@graffiticode-app/core/lib/code-generation/generate-for-request";
 import { admitRequest, resolveAuth } from "@graffiticode-app/core/auth";
 import { respondWithKeepalive } from "../../lib/keepalive-json";
+import { withInstallation } from "../../lib/with-installation";
 
 // The console's code generation, as the GraphQL `generateCode` mutation does it, over a response
 // that survives Cloudflare's 100 s limit (see lib/keepalive-json.ts). A long L0187 brief ran 3+
@@ -10,7 +11,7 @@ import { respondWithKeepalive } from "../../lib/keepalive-json";
 // editor handle the answer exactly as before.
 export const config = { api: { responseLimit: false } };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     res.status(405).json({ error: "method_not_allowed" });
@@ -65,3 +66,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }),
   );
 }
+
+export default withInstallation(handler);

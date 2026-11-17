@@ -9,7 +9,7 @@
 import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import { capability, capabilityRefusal, EXECUTION_READY } from "../capabilities.js";
-import { findLanguageById } from "../lib/languages.js";
+import { platformLanguageById } from "../lib/languages.js";
 import { SURFACE_FAMILIES, type SurfaceFamily } from "../surfaces.js";
 import { profileSchema, SUPPORTED_PROFILE_VERSIONS, type Profile } from "./schema.js";
 
@@ -120,7 +120,7 @@ export function validateProfile(raw: unknown, opts: ValidateOptions = {}): { ok:
   for (const [path, ids] of lists) {
     for (const raw of ids ?? []) {
       const l = normLang(raw);
-      if (!findLanguageById(l)) problems.push({ path, message: `unknown language L${l}` });
+      if (!platformLanguageById(l)) problems.push({ path, message: `unknown language L${l}` });
       else if (catalog && path !== "/catalog/languages" && !catalog.has(l)) {
         problems.push({ path, message: `L${l} isn't offered by this installation (catalog.languages)` });
       }

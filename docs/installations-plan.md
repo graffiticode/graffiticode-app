@@ -75,18 +75,25 @@ Two surveys this session found:
   - the free-plan allowlist (`freePlan.languages`: absent means every offered language, an explicit `[]` means none).
 
   Brands are recognized platform-wide, so a request or search naming a vendor the installation doesn't offer is refused rather than routed to a generic language. Sponsorship never changes deprecation.
+
+  **Completion note (amended).** The catalog slice's worker-side enforcement, the router refusing an unavailable vendor, runs in the console's generation worker. It is complete only from the console-loading gate below on: before that, only the MCP and REST processes loaded the profile.
+- **Console server loading (prerequisite, verified on its own before billing settings).** The console's server, its API routes and its generation worker all load the installation:
+  - **Initialized before any policy work.** `instrumentation.ts` `register()` loads and validates the profile at startup with a Node-only dynamic import, and exits on failure. API and worker entry points that do policy work are wrapped in an idempotent guard (`console/src/lib/with-installation.ts`).
+  - **Fail closed, pinned.** With `PROFILE_DIR` set, reading the profile before it is installed throws (`core/src/profile/current.ts`), so no route falls back to built-in policy; a guarded route that can't load it answers 503. The profile is pinned for the server's life: re-initialization reuses it, and a different `PROFILE_DIR` is an error. Installation state is process-wide (on `globalThis`), because the console's build inlines core into its chunks and module instances aren't guaranteed to be shared.
+  - **Read at use time.** Profile-dependent constants (`PLANS`, the free-plan item lifetime) become accessors in the billing slice, and their callers are checked for values captured earlier.
+  - **Gate (`npm run test:installation-build`):** one production build, started with no profile and with two distinct profiles: each server's startup log and `/api/health` receipt, the GraphQL route's catalog search, `/api/generate`'s router refusal of an unavailable vendor (the worker's generation path), the queue worker route's installation header, and an invalid profile stopping the start.
 - Replace the literals in, among others:
   - `mcp-server/src/tools.ts` and `server.ts`;
   - `openapi-server/openapi.yaml` and `problems.ts`;
-  - `console/src/pages/_document.tsx`, `components/layout.tsx` and `lib/utils.ts`;
-  - `app/src/lib/attribution.ts`, `free-plan-*.ts`, `plans-config.ts`.
+  - `free-plan-*.ts` and `plans-config.ts`.
+
+  Console and app metadata moved to P3 (see there): both are Next.js builds whose pages are prerendered at build time, so their metadata can only follow a runtime profile through P3's browser configuration.
 - Generate the static discovery files (`app/public/llms.txt`, `.well-known/mcp.json`, `skills/plugin.meta.json`) from the profile.
 - Leave wire identifiers alone: `Graffiticode-Workspace` headers, the `graffiticode://` and `ui://graffiticode` URIs, storage keys, `@graffiticode/*` package names, and the DSL name in code-generation prompts.
 - **Parity gate.** Snapshot tests taken before and after extraction must match byte for byte:
   - MCP `tools/list` and instructions;
   - the HTML pages and discovery JSON;
-  - the OpenAPI document;
-  - console and app metadata.
+  - the OpenAPI document.
 
   `eval:routing` must also be unchanged. **Pending gate:** it makes paid model calls and hasn't been run for P2. Its script (`packages/mcp-server/scripts/eval-routing.ts`) must also load the selected profile (`PROFILE_DIR`) before it can check profile-specific routing; until then it measures the built-in installation only.
 
@@ -100,6 +107,11 @@ Two surveys this session found:
   - Privy app id, Stripe publishable key, hosts and brand.
 
   This removes those `NEXT_PUBLIC_*` values from the build. `/config` never carries security policy.
+- **Console and app metadata follow `/config` in the browser** (moved from P2). The console has no `_app.getInitialProps` and no page uses `getServerSideProps`, so Next prerenders every page, `_document` included, at build time; the app package is prerendered the same way. Metadata can't come from a profile loaded at server start without rendering per request, and branding alone doesn't justify that cost. So:
+  - **One owner for titles and descriptions.** After `/config` loads, a single client component sets the document title and the meta description, and keeps them right across client-side navigation. `_document` and per-page `next/head` stop setting competing descriptions; the host-sniffing `getTitle()` (`console/src/lib/utils.ts`) goes away.
+  - **Fixed asset URLs, runtime assets.** `/favicon.png`, `/logo.png` and the app's icons keep their URLs, so the initial HTML is unchanged. A `beforeFiles` rewrite routes each to a handler that serves the installed profile's asset, falling back to today's file when no profile is installed.
+  - **Pricing display follows `/config` here too** (`console/src/utils/plans.ts`). Until it does, installations must not activate different commercial terms: checkout, quota enforcement, the advertised prices and Stripe's configured prices must agree.
+  - **Default metadata in the initial HTML is accepted.** Crawlers and link previews see the build's defaults. If a public page later needs accurate link previews, that page renders per request (`getServerSideProps`); the console as a whole doesn't.
 - **Security headers are set by the server from the loaded profile**, on every document response, independent of `/config`:
   - **Console and app:** the CSP and related headers are set from Next.js middleware per request, with sources derived from `profile.hosts`. The static CSP in `console/next.config.mjs` goes away.
     - **Extraction keeps today's mode.** The console currently sends `Content-Security-Policy-Report-Only` (`next.config.mjs:53`). P3 keeps report-only and keeps every source it lists today, including the third-party sources that sign-in, payments and rendering rely on: Privy, Stripe, the auth host, the L0176 frame host.
@@ -230,7 +242,8 @@ Two surveys this session found:
   - the console and app render brand and hosts from `/config` with no `NEXT_PUBLIC_*` brand values;
   - the Graffiticode console's CSP header after extraction matches today's byte for byte: still `Content-Security-Policy-Report-Only`, with the same sources;
   - document responses carry the CSP header in the mode the profile sets, built from the profile's hosts. This is asserted on the actual response headers of the console, the app and the MCP HTML pages, for both test profiles. `/config` contains no CSP;
-  - the bootstrap script, dry-run against a scratch project.
+  - the bootstrap script, dry-run against a scratch project;
+  - **console and app metadata, with two profiles against one build, plus no profile:** after `/config` loads, the document title and meta description are each installation's, and stay correct after client-side navigation, with exactly one meta description in the document; `/favicon.png` and `/logo.png` (and the app's icons) return each profile's asset bytes and content type, and today's files with no profile; the initial HTML is byte-identical across the three.
 - **P4:**
   - a job keeps its pinned definition after the profile changes;
   - after a skill is deselected:

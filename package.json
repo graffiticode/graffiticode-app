@@ -26,7 +26,8 @@
     "test:baseline": "npm run build:core && npx --yes firebase-tools@15.32.0 emulators:exec --config tests/baseline/firebase.json --only firestore --project demo-baseline \"cd packages/console && tsx --test --test-concurrency=1 ../../tests/baseline/*.test.ts\"",
     "build:core": "npm run build -w packages/core",
     "build:openapi": "npm run build -w packages/openapi-server",
-    "profile": "tsx packages/core/src/profile/cli.ts"
+    "profile": "tsx packages/core/src/profile/cli.ts",
+    "test:installation-build": "npm run build:console && npx --yes firebase-tools@15.32.0 emulators:exec --config tests/baseline/firebase.json --only firestore --project demo-installation \"tsx --test --test-concurrency=1 tests/installation-build/*.test.ts\""
   },
   "devDependencies": {
     "@graffiticode/deploy": "file:vendor/graffiticode-deploy-0.1.0.tgz"

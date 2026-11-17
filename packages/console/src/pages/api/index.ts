@@ -69,6 +69,7 @@ import { FreePlanError, getFreePlanCredentials } from "@graffiticode-app/core/li
 import { admitRequest, authenticate, resolveAuth } from "@graffiticode-app/core/auth";
 import { startGeneration } from "@graffiticode-app/core/generation";
 import { readItemData } from "@graffiticode-app/core/tasks";
+import { withInstallation } from "../../lib/with-installation";
 
 // Policy errors surface as their reason only ("not-owner", "unavailable", …).
 async function viaPolicy<T>(fn: () => Promise<T>): Promise<T> {
@@ -940,7 +941,7 @@ function readClientHints(req): {
   };
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader(
@@ -1001,3 +1002,5 @@ export default async function handler(req, res) {
     sendResult(result, res);
   }
 }
+
+export default withInstallation(handler);
