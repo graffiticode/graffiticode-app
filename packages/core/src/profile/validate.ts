@@ -10,6 +10,7 @@ import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import { capability, capabilityRefusal, EXECUTION_READY } from "../capabilities.js";
 import { findLanguageById } from "../lib/languages.js";
+import { SURFACE_FAMILIES, type SurfaceFamily } from "../surfaces.js";
 import { profileSchema, SUPPORTED_PROFILE_VERSIONS, type Profile } from "./schema.js";
 
 export type ProfileProblem = { path: string; message: string };
@@ -126,7 +127,21 @@ export function validateProfile(raw: unknown, opts: ValidateOptions = {}): { ok:
     }
   }
 
-  // Surfaces.
+  // Surfaces. This release serves each available family at one fixed path, and
+  // always serves the item tools there: a profile must say so, and can't move
+  // them, or discovery would advertise an endpoint the server doesn't answer.
+  const items = SURFACE_FAMILIES.items;
+  if (!p.surfaces.mcp.some(m => m.path === items.path && m.families.includes("items"))) {
+    problems.push({ path: "/surfaces/mcp", message: `this release serves the item tools at ${items.path}; select the "items" family there` });
+  }
+  p.surfaces.mcp.forEach((m, i) => {
+    for (const f of m.families as SurfaceFamily[]) {
+      const family = SURFACE_FAMILIES[f];
+      if (family.available && m.path !== family.path) {
+        problems.push({ path: `/surfaces/mcp/${i}/path`, message: `this release serves the ${f} family only at ${family.path}, not ${m.path}` });
+      }
+    }
+  });
   const paths = new Set<string>();
   p.surfaces.mcp.forEach((m, i) => {
     const at = `/surfaces/mcp/${i}`;

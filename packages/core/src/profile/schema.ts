@@ -217,6 +217,22 @@ export const profileSchema = {
         rest: { type: "object", additionalProperties: false, properties: { enabled: { type: "boolean" } } },
       },
     },
+    // An agent-app listing (the OpenAI plugin): its fixed fields. The prose is
+    // copy (listing.longDescription, listing.defaultPrompts).
+    listing: {
+      type: "object",
+      additionalProperties: false,
+      required: ["pluginName", "displayName", "shortDescription", "category", "author", "supportUrl"],
+      properties: {
+        // The id the app directory assigned.
+        pluginName: { type: "string", minLength: 1, maxLength: 64 },
+        displayName: { type: "string", minLength: 1, maxLength: 30 },
+        shortDescription: { type: "string", minLength: 1, maxLength: 30 },
+        category: { enum: ["Productivity", "Education", "Developer Tools", "Business", "Creative", "Lifestyle", "Research"] },
+        author: { type: "object", additionalProperties: false, required: ["name", "url"], properties: { name: text, url } },
+        supportUrl: url,
+      },
+    },
     // Copy templates by key (server instructions, tool descriptions, ...), as files.
     copy: { type: "object", additionalProperties: file },
     billing: {
@@ -298,6 +314,14 @@ export type Profile = {
     mcp: { path: string; families: ("items" | "services")[]; services?: string[] }[];
     a2a?: { enabled?: boolean };
     rest?: { enabled?: boolean };
+  };
+  listing?: {
+    pluginName: string;
+    displayName: string;
+    shortDescription: string;
+    category: string;
+    author: { name: string; url: string };
+    supportUrl: string;
   };
   copy?: Record<string, string>;
   billing?: { plans?: Record<string, unknown>[] };

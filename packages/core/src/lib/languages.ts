@@ -1,5 +1,5 @@
 import { getLanguageScope, getLanguageServerDoc } from "./language-server-client.js";
-import { installedProfile } from "../profile/current.js";
+import { installedProfile, type InstalledProfile } from "../profile/current.js";
 
 export interface Language {
   id: string;
@@ -324,7 +324,13 @@ export const LANGUAGES: Language[] = PLATFORM_LANGUAGES.map(sponsoredStatus);
 const norm = (id: string) => String(id).replace(/^L/i, "").padStart(4, "0");
 
 type Catalog = { all: Language[]; offered: Set<string> | null };
-let memo: { digest: string; catalog: Catalog } | null = null;
+// Keyed by profile digest, so callers working with different installations at
+// once (discovery generation) never see each other's policy.
+const memo = new Map<string, Catalog>();
+
+// The installation a catalog function answers for: the process's installed
+// profile unless the caller names one (or null for the built-in catalog).
+type For = InstalledProfile | null;
 
 /**
  * The catalog this process serves. Without an installation profile, the
@@ -332,10 +338,10 @@ let memo: { digest: string; catalog: Catalog } | null = null;
  * policy: which are offered, hidden, open to the free plan and sponsored. The
  * profile never changes what a language is or does.
  */
-function catalog(): Catalog {
-  const installed = installedProfile();
+function catalog(installed: For = installedProfile()): Catalog {
   if (!installed) return { all: LANGUAGES, offered: null };
-  if (memo?.digest === installed.digest) return memo.catalog;
+  const cached = memo.get(installed.digest);
+  if (cached) return cached;
   const c = installed.profile.catalog ?? {};
   const set = (ids?: string[]) => new Set((ids ?? []).map(norm));
   const hidden = set(c.hidden);
@@ -356,7 +362,8 @@ function catalog(): Catalog {
     return sponsoredStatus(out);
   });
   const catalogResult = { all, offered: c.languages ? set(c.languages) : null };
-  memo = { digest: installed.digest, catalog: catalogResult };
+  if (memo.size > 16) memo.clear();
+  memo.set(installed.digest, catalogResult);
   return catalogResult;
 }
 
@@ -365,9 +372,9 @@ function catalog(): Catalog {
  * lets new items be made in it. Without a profile, every language. A language
  * that isn't offered still resolves by id, so existing items keep working.
  */
-export function isLanguageOffered(id: string | undefined | null): boolean {
+export function isLanguageOffered(id: string | undefined | null, installed: For = installedProfile()): boolean {
   if (!id) return false;
-  const { offered } = catalog();
+  const { offered } = catalog(installed);
   return !offered || offered.has(norm(id));
 }
 
@@ -376,8 +383,8 @@ export function findLanguageById(id: string): Language | undefined {
   return catalog().all.find(l => l.id === normalized);
 }
 
-export function selectLanguages(domain?: string): Language[] {
-  const offered = catalog().all.filter(l => isLanguageOffered(l.id));
+export function selectLanguages(domain?: string, installed: For = installedProfile()): Language[] {
+  const offered = catalog(installed).all.filter(l => isLanguageOffered(l.id, installed));
   if (!domain) return offered;
   const d = domain.toLowerCase();
   return offered.filter(lang => lang.domains.includes(d));
@@ -410,7 +417,7 @@ export function selectLanguages(domain?: string): Language[] {
  * NOT come through here at all — getLanguageInfo() in pages/api/languages.ts does
  * its own fetch for one language, which is where remote docs belong.
  */
-export async function listLanguages({ search, domain, enrich = false }: { search?: string; domain?: string; enrich?: boolean }): Promise<Language[]> {
+export async function listLanguages({ search, domain, enrich = false, installed = installedProfile() }: { search?: string; domain?: string; enrich?: boolean; installed?: For }): Promise<Language[]> {
   // `hidden` is applied here rather than in selectLanguages() so the console's own
   // picker keeps showing these while the catalog stops offering them. See the field.
   //
@@ -422,7 +429,7 @@ export async function listLanguages({ search, domain, enrich = false }: { search
   // a language whose own routingHint says "prefer L0179" has no business appearing as
   // a candidate for a new request, in list_languages or in the planner's catalog
   // (language-router.ts builds that from this same function).
-  let results = selectLanguages(domain)
+  let results = selectLanguages(domain, installed)
     .filter(lang => !lang.hidden)
     .filter(lang => lang.status !== "Deprecated");
 
@@ -451,7 +458,7 @@ export async function listLanguages({ search, domain, enrich = false }: { search
 
   // A search naming a vendor this installation doesn't offer finds nothing,
   // rather than the generic language nearest its item types.
-  if (search && unavailableBrandsNamed(search).length) return [];
+  if (search && unavailableBrandsNamed(search, installed).length) return [];
 
   if (search) {
     const searchLower = search.toLowerCase();
@@ -508,15 +515,15 @@ function namesBrandOf(text: string, lang: Language): boolean {
  * material: a get_spec'd Learnosity item converted to flashcards names Learnosity below the
  * blank line, and that is content, not intent.
  */
-export function brandedLanguageIds(text: string): string[] {
-  return platformBrandedLanguages(text).filter(l => isLanguageOffered(l.id)).map(l => l.id);
+export function brandedLanguageIds(text: string, installed: For = installedProfile()): string[] {
+  return platformBrandedLanguages(text, installed).filter(l => isLanguageOffered(l.id, installed)).map(l => l.id);
 }
 
 // Brands are recognized across the platform, whatever the installation offers:
 // naming a vendor is a routing fact even where its languages aren't available.
 // The same set as always: no internal, hidden or deprecated language.
-function platformBrandedLanguages(text: string): Language[] {
-  return catalog().all
+function platformBrandedLanguages(text: string, installed: For): Language[] {
+  return catalog(installed).all
     .filter(l => !l.internal && !l.hidden && l.status !== "Deprecated")
     .filter(l => namesBrandOf(text, l));
 }
@@ -528,9 +535,9 @@ function platformBrandedLanguages(text: string): Language[] {
  * a plain quiz language is offered). Empty without a profile: every language
  * is offered.
  */
-export function unavailableBrandsNamed(text: string): string[] {
-  const named = platformBrandedLanguages(text);
-  if (named.length === 0 || named.some(l => isLanguageOffered(l.id))) return [];
+export function unavailableBrandsNamed(text: string, installed: For = installedProfile()): string[] {
+  const named = platformBrandedLanguages(text, installed);
+  if (named.length === 0 || named.some(l => isLanguageOffered(l.id, installed))) return [];
   const terms = new Set<string>();
   for (const l of named) {
     for (const term of brandTerms(l)) if (namesBrandOf(text, { ...l, brands: [term], gatedBy: [] })) terms.add(term);

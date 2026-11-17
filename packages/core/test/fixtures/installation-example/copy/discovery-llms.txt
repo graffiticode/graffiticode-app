@@ -1,0 +1,7 @@
+# {{brand.name}} — the {{brand.name}} viewer
+
+Items are made through the {{brand.name}} MCP server:
+
+  {{discovery.mcpEndpoint}}
+
+MCP tools available: {{discovery.itemTools}}.

@@ -25,8 +25,9 @@ export type LoadedProfile = {
   dir: string;
   // sha256 over the canonical manifest of every file (profileDigest).
   digest: string;
-  // Reads a file the profile references, as text.
+  // Reads a file the profile references, as text or bytes.
   readText(relativePath: string): string;
+  readBytes(relativePath: string): Uint8Array;
 };
 
 // A version-control directory is not part of the profile: it is never hashed
@@ -100,6 +101,11 @@ export function loadProfile(dir: string, opts: { executionReady?: boolean } = {}
       const real = inside(root, files, rel);
       if (!real) throw new Error(`Profile file not found: ${rel}`);
       return readFileSync(real, "utf8");
+    },
+    readBytes(rel: string) {
+      const real = inside(root, files, rel);
+      if (!real) throw new Error(`Profile file not found: ${rel}`);
+      return readFileSync(real);
     },
   };
 }

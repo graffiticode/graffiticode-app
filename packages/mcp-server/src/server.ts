@@ -23,6 +23,7 @@
  */
 
 import { installationBrand } from "@graffiticode-app/core/profile/brand";
+import { SURFACE_FAMILIES } from "@graffiticode-app/core/surfaces";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { handleIntrospect } from "./oauth/introspection.js";
 import { coreReadiness } from "@graffiticode-app/core/readiness";
@@ -503,13 +504,16 @@ const MCP_DISCOVERY = {
 // The discovery document. With an installation profile it is built from the
 // profile; the key order and the item tools' order match MCP_DISCOVERY, so the
 // Graffiticode profile reproduces it byte for byte.
-const ITEM_TOOL_NAMES = MCP_DISCOVERY.tools;
+// The item tools, as the release's surface registry lists them.
+const ITEM_TOOL_NAMES = [...SURFACE_FAMILIES.items.tools];
 
 function mcpDiscovery() {
   const p = profile();
   // Without a profile, the endpoint follows MCP_SERVER_URL as before.
   if (!p) return { ...MCP_DISCOVERY, mcp_endpoint: installationHosts().mcpResource, site: installationHosts().mcp };
-  const itemsPath = p.surfaces.mcp.find(m => m.families.includes("items"))?.path ?? "/mcp";
+  // Where this release serves the item tools; the profile validator requires
+  // the profile to select them there.
+  const itemsPath = SURFACE_FAMILIES.items.path!;
   return {
     mcp_endpoint: `${p.hosts.mcp}${itemsPath}`,
     site: p.hosts.mcp,

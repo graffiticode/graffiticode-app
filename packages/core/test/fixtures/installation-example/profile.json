@@ -1,12 +1,32 @@
 {
   "profileVersion": 1,
-  "installation": { "id": "example", "production": false, "project": "example-installation" },
+  "installation": {
+    "id": "example",
+    "production": false,
+    "project": "example-installation"
+  },
   "brand": {
     "name": "Example",
-    "operator": { "name": "Example Inc.", "url": "https://example.test" },
-    "assets": { "logo": "assets/logo.svg", "favicon": "assets/favicon.ico" },
-    "legal": { "privacy": "legal/privacy.html", "terms": "legal/terms.html", "about": "legal/about.html" },
-    "links": { "product": "https://example.test", "forum": "https://forum.example.test", "source": "https://example.test/source", "signup": "https://example.test/signup" }
+    "operator": {
+      "name": "Example Inc.",
+      "url": "https://example.test"
+    },
+    "assets": {
+      "logo": "assets/logo.svg",
+      "favicon": "assets/favicon.ico",
+      "icon": "assets/icon.png"
+    },
+    "legal": {
+      "privacy": "legal/privacy.html",
+      "terms": "legal/terms.html",
+      "about": "legal/about.html"
+    },
+    "links": {
+      "product": "https://example.test",
+      "forum": "https://forum.example.test",
+      "source": "https://example.test/source",
+      "signup": "https://example.test/signup"
+    }
   },
   "hosts": {
     "console": "https://console.example.test",
@@ -19,9 +39,35 @@
   },
   "auth": {
     "issuer": "https://mcp.example.test",
-    "resources": { "mcp": "https://mcp.example.test/mcp", "openapi": "https://api.example.test/v1" }
+    "resources": {
+      "mcp": "https://mcp.example.test/mcp",
+      "openapi": "https://api.example.test/v1"
+    }
   },
-  "surfaces": { "mcp": [{ "path": "/mcp", "families": ["items"] }], "rest": { "enabled": true } },
+  "surfaces": {
+    "mcp": [
+      {
+        "path": "/mcp",
+        "families": [
+          "items"
+        ]
+      }
+    ],
+    "rest": {
+      "enabled": true
+    }
+  },
+  "listing": {
+    "pluginName": "app-example",
+    "displayName": "Example",
+    "shortDescription": "Quizzes and more",
+    "category": "Education",
+    "author": {
+      "name": "Example Inc.",
+      "url": "https://example.test"
+    },
+    "supportUrl": "https://forum.example.test/support"
+  },
   "copy": {
     "mcp.robots": "copy/mcp-robots.txt",
     "mcp.discovery.description": "copy/mcp-discovery-description.txt",
@@ -31,8 +77,17 @@
     "openapi.info.title": "copy/openapi-info-title.txt",
     "openapi.info.summary": "copy/openapi-info-summary.txt",
     "openapi.info.description": "copy/openapi-info-description.md",
-    "openapi.oauth2.description": "copy/openapi-oauth2-description.md"
+    "openapi.oauth2.description": "copy/openapi-oauth2-description.md",
+    "discovery.llms": "copy/discovery-llms.txt",
+    "discovery.app.description": "copy/discovery-app-description.txt",
+    "listing.longDescription": "copy/listing-long-description.md",
+    "listing.defaultPrompts": "copy/listing-default-prompts.txt"
   },
-  "freePlan": { "enabled": true, "itemTtlHours": 48 },
-  "csp": { "mode": "report-only" }
+  "freePlan": {
+    "enabled": true,
+    "itemTtlHours": 48
+  },
+  "csp": {
+    "mode": "report-only"
+  }
 }

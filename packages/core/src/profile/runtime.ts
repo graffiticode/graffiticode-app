@@ -65,6 +65,11 @@ export function copy(key: string): string | null {
   return rendered.get(key) ?? null;
 }
 
+// A profile file's bytes (an asset), or null without a profile.
+export function profileFile(relativePath: string): Uint8Array | null {
+  return loaded ? loaded.readBytes(relativePath) : null;
+}
+
 // A legal or about document, verbatim (one trailing newline removed).
 export function document(kind: "privacy" | "terms" | "about"): string | null {
   const file = loaded?.profile.brand.legal[kind];
