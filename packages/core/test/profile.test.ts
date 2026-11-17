@@ -214,3 +214,14 @@ test("validateProfile works without file access, for tools that only check struc
   const raw = JSON.parse(readFileSync(join(FIXTURE, "profile.json"), "utf8"));
   assert.equal(validateProfile(raw).ok, true);
 });
+
+test("catalog policy names only known languages, and only offered ones", () => {
+  const problems = problemsOf(profileDir(p => {
+    p.catalog = { languages: ["0176", "0178", "9999"], hidden: ["0180"], sponsors: { "0184": { name: "S" } } };
+    p.freePlan = { enabled: true, languages: ["0179"] };
+  }));
+  assert.ok(has(problems, "/catalog/languages", /unknown language L9999/), JSON.stringify(problems));
+  assert.ok(has(problems, "/catalog/hidden", /L0180 isn't offered/));
+  assert.ok(has(problems, "/catalog/sponsors", /L0184 isn't offered/));
+  assert.ok(has(problems, "/freePlan/languages", /L0179 isn't offered/));
+});

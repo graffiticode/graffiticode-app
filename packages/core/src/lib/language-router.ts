@@ -1,6 +1,6 @@
 import axios from "axios";
 import { CLAUDE_MODELS } from "./code-generation-service.js";
-import { listLanguages, findLanguageById, brandedLanguageIds, positiveSentences } from "./languages.js";
+import { listLanguages, findLanguageById, brandedLanguageIds, positiveSentences, unavailableBrandsNamed } from "./languages.js";
 import { recordTokenUsage } from "./token-usage-service.js";
 import {
   type RequestBudget,
@@ -305,6 +305,13 @@ export async function classifyAndRoute({
   // the ASK names a brand, the verdict is confined to the languages that carry it: judged
   // against one of them (the client's pick if it is one), rerouted only among them, and refused
   // when none fits — a "<Brand> concept web" is refused, never quietly handed to L0169.
+  // A brand this installation doesn't offer: refused outright, before (and
+  // regardless of) the classifier, so its fail-open can't land the request in
+  // a generic language.
+  const unavailable = unavailableBrandsNamed(askText);
+  if (unavailable.length) {
+    return { inScope: false, routedLang: null, reason: `request names ${unavailable.join(", ")}, which this installation doesn't offer` };
+  }
   const branded = brandedLanguageIds(askText);
   const evalLang = branded.length && !branded.includes(currentLang) ? branded[0] : currentLang;
   // In brand mode the question changes. A scope's out_of_scope clauses exist to keep

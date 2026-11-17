@@ -1,4 +1,5 @@
 import { getLanguageScope, getLanguageServerDoc } from "./language-server-client.js";
+import { installedProfile } from "../profile/current.js";
 
 export interface Language {
   id: string;
@@ -128,7 +129,11 @@ export interface Language {
   sponsorUid?: string;
 }
 
-export const LANGUAGES: Language[] = ([
+// The platform's languages, as code defines them. Their policy fields (hidden,
+// freePlan, sponsor*) are Graffiticode's built-in policy, used when no
+// installation profile is installed; a profile's catalog replaces them (see
+// catalog() below).
+const PLATFORM_LANGUAGES: Language[] = ([
   // Self-composition (L0000 → L0000) is an internal test edge for the `data use` machinery:
   // resolveUpstreams, the fence, splitRequest, upstream generation, chaining, schema
   // validation and the atomic fallback, with no second language in the loop. L0000's
@@ -305,19 +310,77 @@ export const LANGUAGES: Language[] = ([
   // validates it. Listed since 2026-10-31, when the FigJam plugin learned to draw positioned
   // boards (L0187 phase 7) and FIGJAM_V1 was frozen; L0186 stays for boards placed by coordinates.
   { id: "0187", name: "L0187", description: "Declarative FigJam boards", routingHint: "FigJam whiteboards described by what they contain, never by coordinates: sticky notes, text-bearing shapes (square, rounded rectangle, ellipse, diamond, parallelogram, predefined process, document, database), text, titled sections and invisible groups, arranged as rows, columns, grids or flows, and labelled connectors (dashed, thick, arrowheads, return paths, self-loops), on one or more pages. The compiler lays out, routes and checks the board. Retros, kanban boards, workshop pages, comparisons, process and decision flows, small system diagrams. Boards placed by explicit coordinates are L0186; concept maps that learners complete are L0183; charts are L0184.", keywords: ["figjam", "whiteboard", "sticky notes", "flowchart", "retro", "kanban", "diagram", "auto layout"], brands: ["figjam"], domains: [], status: "Beta" },
-] as Language[])
-  // A sponsored language's status is always "Sponsored", whatever its entry says.
-  .map(l => l.sponsor ? { ...l, status: "Sponsored" } : l);
+] as Language[]);
+
+// A sponsored language shows "Sponsored" as its status, unless it's deprecated:
+// deprecation is a fact about the language, sponsorship only who pays, and
+// routing, listing and brand recognition drop deprecated languages by status.
+const sponsoredStatus = (l: Language): Language =>
+  (l.sponsor && l.status !== "Deprecated" ? { ...l, status: "Sponsored" } : l);
+
+/** The built-in catalog: the platform's languages under Graffiticode's own policy. */
+export const LANGUAGES: Language[] = PLATFORM_LANGUAGES.map(sponsoredStatus);
+
+const norm = (id: string) => String(id).replace(/^L/i, "").padStart(4, "0");
+
+type Catalog = { all: Language[]; offered: Set<string> | null };
+let memo: { digest: string; catalog: Catalog } | null = null;
+
+/**
+ * The catalog this process serves. Without an installation profile, the
+ * built-in one. With a profile, the platform's languages under the profile's
+ * policy: which are offered, hidden, open to the free plan and sponsored. The
+ * profile never changes what a language is or does.
+ */
+function catalog(): Catalog {
+  const installed = installedProfile();
+  if (!installed) return { all: LANGUAGES, offered: null };
+  if (memo?.digest === installed.digest) return memo.catalog;
+  const c = installed.profile.catalog ?? {};
+  const set = (ids?: string[]) => new Set((ids ?? []).map(norm));
+  const hidden = set(c.hidden);
+  const freePlan = set(installed.profile.freePlan?.languages);
+  const sponsors = Object.fromEntries(Object.entries(c.sponsors ?? {}).map(([id, s]) => [norm(id), s]));
+  const all = PLATFORM_LANGUAGES.map((l): Language => {
+    const { hidden: _h, freePlan: _f, sponsor: _s, sponsorUrl: _u, sponsorUid: _d, ...rest } = l;
+    const s = sponsors[l.id];
+    const out: Language = { ...rest };
+    if (out.status === "Sponsored") delete out.status;
+    if (hidden.has(l.id)) out.hidden = true;
+    if (freePlan.has(l.id)) out.freePlan = true;
+    if (s) {
+      out.sponsor = s.name;
+      if (s.url) out.sponsorUrl = s.url;
+      if (s.uid) out.sponsorUid = s.uid;
+    }
+    return sponsoredStatus(out);
+  });
+  const catalogResult = { all, offered: c.languages ? set(c.languages) : null };
+  memo = { digest: installed.digest, catalog: catalogResult };
+  return catalogResult;
+}
+
+/**
+ * Whether this installation offers a language: lists it, discovers it and
+ * lets new items be made in it. Without a profile, every language. A language
+ * that isn't offered still resolves by id, so existing items keep working.
+ */
+export function isLanguageOffered(id: string | undefined | null): boolean {
+  if (!id) return false;
+  const { offered } = catalog();
+  return !offered || offered.has(norm(id));
+}
 
 export function findLanguageById(id: string): Language | undefined {
   const normalized = id.replace(/^L/i, "").padStart(4, "0");
-  return LANGUAGES.find(l => l.id === normalized);
+  return catalog().all.find(l => l.id === normalized);
 }
 
 export function selectLanguages(domain?: string): Language[] {
-  if (!domain) return LANGUAGES;
+  const offered = catalog().all.filter(l => isLanguageOffered(l.id));
+  if (!domain) return offered;
   const d = domain.toLowerCase();
-  return LANGUAGES.filter(lang => lang.domains.includes(d));
+  return offered.filter(lang => lang.domains.includes(d));
 }
 
 /**
@@ -386,6 +449,10 @@ export async function listLanguages({ search, domain, enrich = false }: { search
     })
   );
 
+  // A search naming a vendor this installation doesn't offer finds nothing,
+  // rather than the generic language nearest its item types.
+  if (search && unavailableBrandsNamed(search).length) return [];
+
   if (search) {
     const searchLower = search.toLowerCase();
     const domainLower = (domain || "").toLowerCase();
@@ -442,10 +509,33 @@ function namesBrandOf(text: string, lang: Language): boolean {
  * blank line, and that is content, not intent.
  */
 export function brandedLanguageIds(text: string): string[] {
-  return LANGUAGES
+  return platformBrandedLanguages(text).filter(l => isLanguageOffered(l.id)).map(l => l.id);
+}
+
+// Brands are recognized across the platform, whatever the installation offers:
+// naming a vendor is a routing fact even where its languages aren't available.
+// The same set as always: no internal, hidden or deprecated language.
+function platformBrandedLanguages(text: string): Language[] {
+  return catalog().all
     .filter(l => !l.internal && !l.hidden && l.status !== "Deprecated")
-    .filter(l => namesBrandOf(text, l))
-    .map(l => l.id);
+    .filter(l => namesBrandOf(text, l));
+}
+
+/**
+ * The brand terms the text names whose languages this installation doesn't
+ * offer, when it offers none that carry them. A request naming one is
+ * refused, never handed to a generic language ("a Learnosity quiz" where only
+ * a plain quiz language is offered). Empty without a profile: every language
+ * is offered.
+ */
+export function unavailableBrandsNamed(text: string): string[] {
+  const named = platformBrandedLanguages(text);
+  if (named.length === 0 || named.some(l => isLanguageOffered(l.id))) return [];
+  const terms = new Set<string>();
+  for (const l of named) {
+    for (const term of brandTerms(l)) if (namesBrandOf(text, { ...l, brands: [term], gatedBy: [] })) terms.add(term);
+  }
+  return [...terms];
 }
 
 /** Ranked-search result ceiling. See the cap note in listLanguages(). */
@@ -560,11 +650,30 @@ function scoreLanguage(lang: Language, tokens: string[]): number {
 }
 
 /**
- * Language ids inside the anonymous free-plan scope, or an empty array when the
- * allowlist is inert (nothing marked) — see `freePlan` on the Language type.
+ * Language ids inside a restricted free-plan scope; an empty array when the
+ * scope is unrestricted, and also when it is restricted to nothing. Callers that
+ * decide must use freePlanScope() or isLanguageInFreePlanScope().
  */
 export function freePlanLanguageIds(): string[] {
-  return LANGUAGES.filter(l => l.freePlan).map(l => l.id);
+  return freePlanScope().ids;
+}
+
+/**
+ * The anonymous free plan's language scope. `restricted: false` means every
+ * language this installation offers. With a profile, `freePlan.languages`
+ * decides: absent is unrestricted, and an explicit list (even an empty one) is
+ * exactly the allowed set. Without a profile, the code's flags, inert while
+ * none is marked.
+ */
+export function freePlanScope(): { restricted: boolean; ids: string[] } {
+  const installed = installedProfile();
+  if (installed) {
+    const list = installed.profile.freePlan?.languages;
+    if (list === undefined) return { restricted: false, ids: [] };
+    return { restricted: true, ids: [...new Set(list.map(norm))].filter(id => isLanguageOffered(id)) };
+  }
+  const ids = catalog().all.filter(l => l.freePlan).map(l => l.id);
+  return { restricted: ids.length > 0, ids };
 }
 
 /**
@@ -575,8 +684,8 @@ export function freePlanLanguageIds(): string[] {
  * becomes a strict allowlist.
  */
 export function isLanguageInFreePlanScope(lang: string | undefined | null): boolean {
-  const allowed = freePlanLanguageIds();
-  if (allowed.length === 0) return true;
+  const { restricted, ids: allowed } = freePlanScope();
+  if (!restricted) return true;
   if (!lang) return false;
   // Callers pass either "0166" or "L0166".
   const id = String(lang).replace(/^L/i, "");
@@ -588,7 +697,7 @@ export function isLanguageInFreePlanScope(lang: string | undefined | null): bool
  * Language type. Empty when no sponsorship is running, which is the default.
  */
 export function sponsoredLanguageIds(): string[] {
-  return LANGUAGES.filter(l => l.sponsor).map(l => l.id);
+  return catalog().all.filter(l => l.sponsor).map(l => l.id);
 }
 
 /**
@@ -611,12 +720,12 @@ export function languageSponsor(lang: string | undefined | null): string | null 
   if (!lang) return null;
   // Callers pass either "0166" or "L0166".
   const id = String(lang).replace(/^L/i, "");
-  return LANGUAGES.find(l => l.id === id)?.sponsor ?? null;
+  return catalog().all.find(l => l.id === id)?.sponsor ?? null;
 }
 
 /** The account a sponsored language's items are debited from, or null when we absorb them. */
 export function languageSponsorUid(lang: string | undefined | null): string | null {
   if (!lang) return null;
   const id = String(lang).replace(/^L/i, "");
-  return LANGUAGES.find(l => l.id === id)?.sponsorUid ?? null;
+  return catalog().all.find(l => l.id === id)?.sponsorUid ?? null;
 }

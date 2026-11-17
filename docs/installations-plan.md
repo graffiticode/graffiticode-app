@@ -49,7 +49,7 @@ Two surveys this session found:
   - `brand`: names, operator, assets, legal docs;
   - `hosts`: every public origin, plus the language-server pattern;
   - `auth`: authorization server issuer and the installation's resource ids;
-  - `catalog`: enabled languages, gating text, discovery policy;
+  - `catalog`: the installation's policy over the platform's languages: which are offered, hidden and discoverable, and who sponsors them (the free-plan allowlist is `freePlan.languages`);
   - `services`: service definitions that reference capability ids;
   - `surfaces`: which MCP endpoints and tool families, A2A on or off, REST;
   - `copy`: templates for instructions and tool descriptions;
@@ -64,7 +64,17 @@ Two surveys this session found:
 ### P2. Extract Graffiticode as the first profile, with no behavior change
 - Create the external profile repo, for example `graffiticode/installation-graffiticode`. It contains:
   - today's copy: `SERVER_INSTRUCTIONS`, tool descriptions, privacy, terms and about pages, `MCP_DISCOVERY`, OpenAPI `info`;
-  - today's hosts, the catalog data from `core/src/lib/languages.ts` / `discovery.ts` / `connectable.ts`, and the assets.
+  - today's hosts and assets;
+  - today's catalog *policy*, not the catalog entries.
+
+  **Catalog boundary (decided).** What a language is stays in code: its description, routing hint, keywords, vendor gate and brands, composition permissions, internal and deprecated status, and the provider it writes to (`core/src/lib/languages.ts`, `connectable.ts`). An installation's profile only decides, over those languages:
+  - which are offered (listed, discoverable, creatable; others still resolve by id for existing items);
+  - which are hidden;
+  - the discovery floor and its exceptions;
+  - sponsors;
+  - the free-plan allowlist (`freePlan.languages`: absent means every offered language, an explicit `[]` means none).
+
+  Brands are recognized platform-wide, so a request or search naming a vendor the installation doesn't offer is refused rather than routed to a generic language. Sponsorship never changes deprecation.
 - Replace the literals in, among others:
   - `mcp-server/src/tools.ts` and `server.ts`;
   - `openapi-server/openapi.yaml` and `problems.ts`;
@@ -78,7 +88,7 @@ Two surveys this session found:
   - the OpenAPI document;
   - console and app metadata.
 
-  `eval:routing` must also be unchanged.
+  `eval:routing` must also be unchanged. **Pending gate:** it makes paid model calls and hasn't been run for P2. Its script (`packages/mcp-server/scripts/eval-routing.ts`) must also load the selected profile (`PROFILE_DIR`) before it can check profile-specific routing; until then it measures the built-in installation only.
 
 ### P3. Installation isolation (`graffiticode-app`)
 - **All Firestore access goes through `core/src/db.ts`.**
@@ -213,7 +223,7 @@ Two surveys this session found:
   - references an unknown capability;
   - marks an unfinished capability implemented;
   - selects a writing capability early.
-- **P2:** the parity snapshots match; the full baseline (178), `core`, `mcp-server` and `openapi-server` suites and `eval:routing` all pass unchanged.
+- **P2:** the parity snapshots match; the full baseline, `core`, `mcp-server` and `openapi-server` suites pass unchanged. `eval:routing` is a pending gate (see P2): run it, with the eval script loading the selected profile, before the first production profile deployment.
 - **P3:**
   - a test (or lint rule) that only `core/src/db.ts` creates a Firestore handle;
   - startup fails without a project;
@@ -289,3 +299,5 @@ Commits and merges happen only when you ask.
 - **gc-deploy release receipt (before the first production profile deployment).** P1 provides `profileReceipt()` (`packages/core/src/profile/load.ts`), but gc-deploy is vendored here (`vendor/graffiticode-deploy-0.1.0.tgz`). Its own repo needs to fetch the profile at a pinned ref, run `npm run profile -- validate`, mount it as `PROFILE_DIR`, and record `{appVersion, profileRepo, profileRef, profileDigest}` in the release receipt. Until then, services report the receipt from `/health`.
 - **External profile repos.** P2 builds the Graffiticode profile locally; `graffiticode/installation-graffiticode` is created later.
 - **Before deploying the hosts slice, check each live service's environment.** Host resolution (`packages/core/src/profile/hosts.ts`) now treats two variables naming the same host differently as a startup error, even without a profile (for example `CONSOLE_URL` and `GRAFFITICODE_CONSOLE_BASE_URL`, or `MCP_SERVER_URL` and `MCP_OAUTH_URL`). `deploy.json` is consistent, but variables set out of band on the Cloud Run services aren't visible from the repo: compare `gcloud run services describe <svc> --format='value(spec.template.spec.containers[0].env)'` for mcp, openapi and console against those pairs first.
+- **Routing eval (pending gate).** `npm run eval:routing` makes paid model calls and hasn't been run for P2. Before the first production profile deployment: teach `packages/mcp-server/scripts/eval-routing.ts` to load the selected profile (`PROFILE_DIR`, through `loadInstallation`), then run it for the Graffiticode profile, and for any installation that restricts its catalog.
+- **Free-plan scope in REST `/me`.** `free_plan.languages` publishes `freePlanLanguageIds()`, where `[]` means unrestricted. A profile with an explicit empty allowlist now refuses every anonymous create, but `/me` can't say so; add an explicit field (for example `languages_restricted`) when the billing and free-plan slice lands.

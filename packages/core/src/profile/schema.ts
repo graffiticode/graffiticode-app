@@ -21,6 +21,7 @@ const url = { type: "string", pattern: "^https?://\\S+$" } as const;
 const file = { type: "string", pattern: "^(?!/)(?!.*(^|/)\\.\\.(/|$))[^\\s\\\\]+$" } as const;
 const text = { type: "string", minLength: 1 } as const;
 const strings = { type: "array", items: text } as const;
+const langIds = { type: "array", uniqueItems: true, items: { type: "string", pattern: "^L?[0-9]{4}$" } } as const;
 
 const deliverableKind = { enum: ["content", "integration_recipe", "data_plan", "operation_result"] } as const;
 const deliveryState = { enum: ["prepared", "previewed", "saved", "planned", "exported", "applied"] } as const;
@@ -110,15 +111,40 @@ export const profileSchema = {
         },
       },
     },
+    // What this installation decides about the platform's languages. What a
+    // language does (its description, routing, gates, composition) is the
+    // platform's and stays in code; a profile selects and sets policy.
     catalog: {
       type: "object",
       additionalProperties: false,
       properties: {
-        // Language ids this installation offers ("0176" or "L0176").
-        languages: { type: "array", items: { type: "string", pattern: "^L?[0-9]{4}$" } },
-        // Per-language entries; their shape is fixed when the catalog moves
-        // out of code (P2).
-        entries: { type: "object" },
+        // The languages offered: listed, discoverable and creatable. Absent:
+        // every platform language. Existing items in other languages still work.
+        languages: langIds,
+        // Withheld from the catalog listing and the router's candidates, but
+        // still usable by id.
+        hidden: langIds,
+        // Which offered languages list_languages, the REST catalog and the MCP
+        // instructions show: those numbered minLanguage and up, plus include,
+        // minus exclude. Absent: every offered language.
+        discovery: {
+          type: "object",
+          additionalProperties: false,
+          required: ["minLanguage"],
+          properties: { minLanguage: { type: "integer", minimum: 0 }, include: langIds, exclude: langIds },
+        },
+        // Who pays for a language's items: free to the customer, and debited to
+        // the sponsor's account when uid is set.
+        sponsors: {
+          type: "object",
+          propertyNames: { pattern: "^L?[0-9]{4}$" },
+          additionalProperties: {
+            type: "object",
+            additionalProperties: false,
+            required: ["name"],
+            properties: { name: text, url, uid: { type: "string", minLength: 1 } },
+          },
+        },
       },
     },
     services: {
@@ -205,7 +231,12 @@ export const profileSchema = {
       type: "object",
       additionalProperties: false,
       required: ["enabled"],
-      properties: { enabled: { type: "boolean" }, itemTtlHours: { type: "integer", minimum: 1 } },
+      properties: {
+        enabled: { type: "boolean" },
+        itemTtlHours: { type: "integer", minimum: 1 },
+        // The languages an anonymous caller may create. Absent: every offered language.
+        languages: langIds,
+      },
     },
     csp: {
       type: "object",
@@ -256,7 +287,12 @@ export type Profile = {
     openapi?: string; widgetAssets?: string; languageServer?: string;
   };
   auth: { issuer: string; resources: { mcp: string; openapi?: string } };
-  catalog?: { languages?: string[]; entries?: Record<string, unknown> };
+  catalog?: {
+    languages?: string[];
+    hidden?: string[];
+    discovery?: { minLanguage: number; include?: string[]; exclude?: string[] };
+    sponsors?: Record<string, { name: string; url?: string; uid?: string }>;
+  };
   services?: ProfileService[];
   surfaces: {
     mcp: { path: string; families: ("items" | "services")[]; services?: string[] }[];
@@ -265,6 +301,6 @@ export type Profile = {
   };
   copy?: Record<string, string>;
   billing?: { plans?: Record<string, unknown>[] };
-  freePlan?: { enabled: boolean; itemTtlHours?: number };
+  freePlan?: { enabled: boolean; itemTtlHours?: number; languages?: string[] };
   csp?: { mode: "report-only" | "enforce" };
 };

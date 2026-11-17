@@ -9,6 +9,7 @@
 import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import { capability, capabilityRefusal, EXECUTION_READY } from "../capabilities.js";
+import { findLanguageById } from "../lib/languages.js";
 import { profileSchema, SUPPORTED_PROFILE_VERSIONS, type Profile } from "./schema.js";
 
 export type ProfileProblem = { path: string; message: string };
@@ -104,6 +105,26 @@ export function validateProfile(raw: unknown, opts: ValidateOptions = {}): { ok:
       }
     });
   });
+
+  // Catalog policy: every id must be a language this release knows, and every
+  // policy must be about a language the installation offers.
+  const lists: [string, string[] | undefined][] = [
+    ["/catalog/languages", p.catalog?.languages],
+    ["/catalog/hidden", p.catalog?.hidden],
+    ["/catalog/discovery/include", p.catalog?.discovery?.include],
+    ["/catalog/discovery/exclude", p.catalog?.discovery?.exclude],
+    ["/catalog/sponsors", Object.keys(p.catalog?.sponsors ?? {})],
+    ["/freePlan/languages", p.freePlan?.languages],
+  ];
+  for (const [path, ids] of lists) {
+    for (const raw of ids ?? []) {
+      const l = normLang(raw);
+      if (!findLanguageById(l)) problems.push({ path, message: `unknown language L${l}` });
+      else if (catalog && path !== "/catalog/languages" && !catalog.has(l)) {
+        problems.push({ path, message: `L${l} isn't offered by this installation (catalog.languages)` });
+      }
+    }
+  }
 
   // Surfaces.
   const paths = new Set<string>();
