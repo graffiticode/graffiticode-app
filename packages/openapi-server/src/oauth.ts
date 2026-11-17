@@ -3,6 +3,7 @@
 // (RFC 7662 introspection), authenticating with its own Cloud Run identity, so
 // it never holds the internal key that reads the token store. Answers are
 // cached briefly, by token hash.
+import { installationHosts } from "@graffiticode-app/core/profile/runtime";
 import { createHash } from "node:crypto";
 import type { Hono } from "hono";
 import { identityToken } from "@graffiticode-app/core/act-as";
@@ -11,7 +12,8 @@ import { publicBase } from "./spec.js";
 
 const PREFIX = "gcmcp_at_";
 const CACHE_MS = 30_000;
-export const authorizationServer = () => (process.env.MCP_OAUTH_URL || "https://mcp.graffiticode.org").replace(/\/$/, "");
+// The issuer (core/src/profile/hosts.ts: MCP_OAUTH_URL, or the profile).
+export const authorizationServer = () => installationHosts().issuer;
 
 export const isOAuthToken = (bearer: string) => bearer.startsWith(PREFIX);
 

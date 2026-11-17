@@ -16,7 +16,7 @@ process.env.WIDGET_ASSET_ORIGIN = PROOF;
 
 const { widgetAssetOrigin, widgetCsp, generateWidgetHtml } = await import("../src/widget/index.js");
 const { handleAuthServerMetadata, handleProtectedResourceMetadata } = await import("../src/oauth/handlers.js");
-const { INTROSPECTION_AUDIENCE } = await import("../src/oauth/introspection.js");
+const { introspectionAudience } = await import("../src/oauth/introspection.js");
 
 /** Calls a metadata handler with a fake response and returns the JSON it sent. */
 function metadata(handler: (req: never, res: never) => void): Record<string, unknown> {
@@ -45,5 +45,5 @@ test("the OAuth metadata stays production's", () => {
   const pr = metadata(handleProtectedResourceMetadata);
   assert.equal(pr.resource, "https://mcp.graffiticode.org/mcp");
   assert.deepEqual(pr.authorization_servers, ["https://mcp.graffiticode.org"]);
-  assert.equal(INTROSPECTION_AUDIENCE, "https://mcp.graffiticode.org/oauth/introspect");
+  assert.equal(introspectionAudience(), "https://mcp.graffiticode.org/oauth/introspect");
 });

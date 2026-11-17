@@ -14,10 +14,11 @@
 // exactly as this server does for MCP requests.
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { createRemoteJWKSet, jwtVerify } from "jose";
-import { isOAuthAccessToken, OPENAPI_RESOURCE, resolveOAuthAccessToken } from "./handlers.js";
+import { isOAuthAccessToken, openapiResource, resolveOAuthAccessToken } from "./handlers.js";
+import { installationHosts } from "@graffiticode-app/core/profile/runtime";
 
-const MCP_SERVER_URL = process.env.MCP_SERVER_URL || "https://mcp.graffiticode.org";
-export const INTROSPECTION_AUDIENCE = `${MCP_SERVER_URL}/oauth/introspect`;
+// The audience a caller's identity token must name: this endpoint on the issuer.
+export const introspectionAudience = () => `${installationHosts().issuer}/oauth/introspect`;
 const MAX_BODY_BYTES = 8 * 1024;
 
 export const introspectionCallers = () =>
@@ -44,7 +45,7 @@ export async function introspect({ authorization, token, verify = googleVerifier
   const identity = /^Bearer\s+(.+)$/i.exec(authorization ?? "")?.[1];
   let caller: string | undefined;
   try {
-    const claims = identity ? await verify(identity, INTROSPECTION_AUDIENCE) : null;
+    const claims = identity ? await verify(identity, introspectionAudience()) : null;
     if (claims?.email && claims.email_verified === true) caller = claims.email;
   } catch {
     caller = undefined;
@@ -54,11 +55,11 @@ export async function introspect({ authorization, token, verify = googleVerifier
     return { status: 401, body: { error: "invalid_client" } };
   }
   if (!token || !isOAuthAccessToken(token)) return { status: 200, body: { active: false } };
-  const resolved = await resolve(token, OPENAPI_RESOURCE, true);
+  const resolved = await resolve(token, openapiResource(), true);
   if (resolved.status !== "valid") return { status: 200, body: { active: false } };
   return {
     status: 200,
-    body: { active: true, token_type: "Bearer", scope: "graffiticode", aud: OPENAPI_RESOURCE, gc_firebase_token: resolved.firebaseToken },
+    body: { active: true, token_type: "Bearer", scope: "graffiticode", aud: openapiResource(), gc_firebase_token: resolved.firebaseToken },
   };
 }
 

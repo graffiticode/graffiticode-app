@@ -2,6 +2,7 @@
  * OAuth 2.1 Endpoint Handlers for MCP Server
  */
 
+import { installationHosts } from "@graffiticode-app/core/profile/runtime";
 import type { IncomingMessage, ServerResponse } from "http";
 import { oauthStore } from "./firestore-store.js";
 import { verifyPKCE, generateRandomString } from "./pkce.js";
@@ -18,9 +19,11 @@ import type {
   OAuthError,
 } from "./types.js";
 
-// Environment configuration
-const MCP_SERVER_URL = process.env.MCP_SERVER_URL || "https://mcp.graffiticode.org";
-const CONSOLE_URL = process.env.CONSOLE_URL || "https://console.graffiticode.org";
+// Where this installation lives, resolved at use time (core/src/profile/hosts.ts).
+// The issuer serves the authorization endpoints; the resources are what tokens
+// are bound to. Until the plan's P5 they are on one server, and the resolver
+// checks that they agree.
+const hosts = () => installationHosts();
 const FIREBASE_API_KEY = "AIzaSyAoVuUNi8ElnS7cn6wc3D8XExML-URLw0I";
 
 // Token expiration (55 minutes to match Firebase token lifetime with buffer)
@@ -30,10 +33,10 @@ const TOKEN_EXPIRES_IN = 55 * 60;
 // MCP server, and the Graffiticode REST API, which validates its tokens through
 // /oauth/introspect (oauth/introspection.ts). A token is bound to the one it was
 // authorized for.
-const RESOURCE = `${MCP_SERVER_URL}/mcp`;
-export const OPENAPI_RESOURCE = (process.env.OPENAPI_RESOURCE || "https://openapi.graffiticode.org/v1").replace(/\/$/, "");
-const ALLOWED_RESOURCES = [RESOURCE, OPENAPI_RESOURCE];
-export const isAllowedResource = (resource: string) => ALLOWED_RESOURCES.includes(resource);
+const mcpResource = () => hosts().mcpResource;
+export const openapiResource = () => hosts().openapiResource;
+const allowedResources = () => [mcpResource(), openapiResource()];
+export const isAllowedResource = (resource: string) => allowedResources().includes(resource);
 // The single scope we grant. Requests may only ask for this (or nothing).
 const SUPPORTED_SCOPE = "graffiticode";
 
@@ -76,7 +79,7 @@ function reasonDescription(reason: OAuthInvalidReason): string {
  * point ChatGPT at protected-resource metadata to trigger reauthorization.
  */
 export function buildWwwAuthenticate(reason: OAuthInvalidReason): string {
-  const metadataUrl = `${MCP_SERVER_URL}/.well-known/oauth-protected-resource`;
+  const metadataUrl = `${hosts().mcp}/.well-known/oauth-protected-resource`;
   return `Bearer resource_metadata="${metadataUrl}", error="invalid_token", error_description="${reasonDescription(reason)}"`;
 }
 
@@ -174,8 +177,8 @@ export function handleProtectedResourceMetadata(
   res: ServerResponse
 ): void {
   const metadata: ProtectedResourceMetadata = {
-    resource: `${MCP_SERVER_URL}/mcp`,
-    authorization_servers: [MCP_SERVER_URL],
+    resource: mcpResource(),
+    authorization_servers: [hosts().issuer],
   };
   sendJson(res, 200, metadata);
 }
@@ -189,10 +192,10 @@ export function handleAuthServerMetadata(
   res: ServerResponse
 ): void {
   const metadata: AuthorizationServerMetadata = {
-    issuer: MCP_SERVER_URL,
-    authorization_endpoint: `${MCP_SERVER_URL}/oauth/authorize`,
-    token_endpoint: `${MCP_SERVER_URL}/oauth/token`,
-    registration_endpoint: `${MCP_SERVER_URL}/oauth/register`,
+    issuer: hosts().issuer,
+    authorization_endpoint: `${hosts().issuer}/oauth/authorize`,
+    token_endpoint: `${hosts().issuer}/oauth/token`,
+    registration_endpoint: `${hosts().issuer}/oauth/register`,
     response_types_supported: ["code"],
     grant_types_supported: ["authorization_code", "refresh_token"],
     code_challenge_methods_supported: ["S256"],
@@ -294,7 +297,7 @@ export async function handleAuthorize(
   const state = params.get("state");
   const codeChallenge = params.get("code_challenge");
   const codeChallengeMethod = params.get("code_challenge_method");
-  const resource = params.get("resource") || RESOURCE;
+  const resource = params.get("resource") || mcpResource();
 
   // Validate required parameters
   if (!clientId) {
@@ -336,7 +339,7 @@ export async function handleAuthorize(
   // The resource (audience) must be one we issue for. OpenAI flows the resource
   // through authorization; anything else is a misconfigured/hostile client.
   if (!isAllowedResource(resource)) {
-    sendError(res, 400, { error: "invalid_target", error_description: `resource must be one of ${ALLOWED_RESOURCES.join(", ")}` });
+    sendError(res, 400, { error: "invalid_target", error_description: `resource must be one of ${allowedResources().join(", ")}` });
     return;
   }
 
@@ -375,8 +378,8 @@ export async function handleAuthorize(
   await oauthStore.savePendingAuth(pending);
 
   // Build consent page URL
-  const consentUrl = new URL("/oauth/consent", CONSOLE_URL);
-  consentUrl.searchParams.set("callback_url", `${MCP_SERVER_URL}/oauth/callback`);
+  const consentUrl = new URL("/oauth/consent", hosts().console);
+  consentUrl.searchParams.set("callback_url", `${hosts().issuer}/oauth/callback`);
   consentUrl.searchParams.set("state", internalState);
   consentUrl.searchParams.set("app_name", client.client_name || "MCP Client");
 
@@ -943,7 +946,7 @@ export function evaluateTokenValidity(
 
 export async function resolveOAuthAccessToken(
   accessToken: string,
-  expectedResource: string = RESOURCE,
+  expectedResource: string = mcpResource(),
   strictResource = false,
 ): Promise<OAuthResolution> {
   const tokenEntry = await oauthStore.getTokenByAccessToken(accessToken);

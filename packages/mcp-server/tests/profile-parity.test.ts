@@ -4,9 +4,11 @@
 // before extraction:
 //   - without PROFILE_DIR (the built-in behavior, unchanged until gc-deploy
 //     mounts profiles), and
-//   - with the Graffiticode profile installed (PROFILE_DIR), when that profile
-//     directory is available locally. Until its repo exists it lives beside
-//     this one (GRAFFITICODE_PROFILE_DIR, default ../installation-graffiticode).
+//   - with the Graffiticode profile installed (PROFILE_DIR): an integration
+//     gate that runs only when GRAFFITICODE_PROFILE_DIR names that profile.
+// The checks that a profile is actually what the surfaces read, and that an
+// invalid profile or template stops the start, always run, against the
+// committed example installation (core/test/fixtures/installation-example).
 // Re-record only for an intended change: UPDATE_PARITY_SNAPSHOTS=1.
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -15,7 +17,8 @@ import { resolve } from "node:path";
 import test from "node:test";
 
 const SNAPSHOT = new URL("./snapshots/graffiticode-surfaces.json", import.meta.url).pathname;
-const PROFILE = resolve(process.env.GRAFFITICODE_PROFILE_DIR ?? new URL("../../../../installation-graffiticode", import.meta.url).pathname);
+const PROFILE = process.env.GRAFFITICODE_PROFILE_DIR ? resolve(process.env.GRAFFITICODE_PROFILE_DIR) : null;
+const EXAMPLE = new URL("../../core/test/fixtures/installation-example", import.meta.url).pathname;
 
 const PAGES = ["/about", "/privacy", "/terms", "/robots.txt", "/", "/mcp.json", "/.well-known/mcp.json"];
 // One client per widget route (widgetRouteFor): mcp-apps, openai, none.
@@ -90,46 +93,59 @@ test("without a profile, every Graffiticode surface is unchanged", async () => {
   assert.deepEqual(now, JSON.parse(readFileSync(SNAPSHOT, "utf8")));
 });
 
-test("with the Graffiticode profile installed, every surface is byte-identical", { skip: !existsSync(`${PROFILE}/profile.json`) && `no Graffiticode profile at ${PROFILE}` }, async () => {
+test("with the Graffiticode profile installed, every surface is byte-identical", { skip: !PROFILE && "integration gate: set GRAFFITICODE_PROFILE_DIR to the Graffiticode profile" }, async () => {
+  assert.ok(existsSync(`${PROFILE}/profile.json`), `no profile at ${PROFILE}`);
   const now = await surfaces({ PROFILE_DIR: PROFILE });
   const expected = JSON.parse(readFileSync(SNAPSHOT, "utf8"));
   for (const key of Object.keys(expected)) assert.deepEqual(now[key], expected[key], key);
 });
 
-test("the profile is what the surfaces read: a different profile changes them", { skip: !existsSync(`${PROFILE}/profile.json`) && `no Graffiticode profile at ${PROFILE}` }, async () => {
-  const { cpSync, mkdtempSync } = await import("node:fs");
-  const { tmpdir } = await import("node:os");
-  const dir = mkdtempSync(`${tmpdir()}/profile-`);
-  cpSync(PROFILE, dir, { recursive: true, filter: src => !src.includes("/.git") });
-  const p = JSON.parse(readFileSync(`${dir}/profile.json`, "utf8"));
-  p.installation.id = "example";
-  p.brand.name = "Example";
-  p.hosts.mcp = "https://mcp.example.test";
-  p.auth = { issuer: "https://mcp.example.test", resources: { ...p.auth.resources, mcp: "https://mcp.example.test/mcp" } };
-  p.brand.links.forum = "https://forum.example.test";
-  writeFileSync(`${dir}/profile.json`, JSON.stringify(p));
-  writeFileSync(`${dir}/legal/terms.html`, "<p>Example terms</p>\n");
-
-  const { port, child } = await startServer({ PROFILE_DIR: dir });
+test("the profile is what the surfaces read: the example installation's surfaces are its own", async () => {
+  const { port, child } = await startServer({ PROFILE_DIR: EXAMPLE });
   try {
     const base = `http://localhost:${port}`;
     assert.equal(await (await fetch(`${base}/terms`)).text(), "<p>Example terms</p>");
-    assert.match(await (await fetch(`${base}/robots.txt`)).text(), /^# Example MCP server — https:\/\/mcp\.example\.test\n/);
-    const discovery = await (await fetch(`${base}/mcp.json`)).json();
-    assert.equal(discovery.mcp_endpoint, "https://mcp.example.test/mcp");
-    assert.equal(discovery.forum_url, "https://forum.example.test");
-    assert.match(discovery.description, /^Example is a universal MCP server/);
+    assert.equal(await (await fetch(`${base}/robots.txt`)).text(), "# Example MCP server — https://mcp.example.test\n\nUser-agent: *\nAllow: /");
+    assert.deepEqual(await (await fetch(`${base}/mcp.json`)).json(), {
+      mcp_endpoint: "https://mcp.example.test/mcp",
+      site: "https://mcp.example.test",
+      description: "Example is a universal MCP server for testing.",
+      tools: ["create_item", "update_item", "get_item", "render_item", "get_spec", "list_languages", "get_language_info"],
+      product_url: "https://example.test",
+      console_url: "https://console.example.test",
+      forum_url: "https://forum.example.test",
+      github_url: "https://example.test/source",
+    });
     const health = await (await fetch(`${base}/health`)).json();
     assert.equal(health.installation.installationId, "example");
     assert.match(health.installation.profileDigest, /^[0-9a-f]{64}$/);
+    const headers = { "Content-Type": "application/json", Accept: "application/json, text/event-stream" };
     const init = await fetch(`${base}/mcp`, {
-      method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
+      method: "POST", headers,
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "x", version: "1" } } }),
     });
-    assert.equal((await rpcBody(init)).result.serverInfo.name, "example");
+    const session = init.headers.get("mcp-session-id")!;
+    const result = (await rpcBody(init)).result;
+    assert.equal(result.serverInfo.name, "example");
+    assert.equal(result.instructions, "Example makes things. Call list_languages to find the language first.\n\nUse the tools at https://console.example.test.");
+    await fetch(`${base}/mcp`, { method: "POST", headers: { ...headers, "mcp-session-id": session }, body: JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) });
+    const list = await fetch(`${base}/mcp`, { method: "POST", headers: { ...headers, "mcp-session-id": session }, body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list" }) });
+    const tools = (await rpcBody(list)).result.tools;
+    assert.equal(tools.find((t: any) => t.name === "create_item").description, "Create an item with Example.");
+    // A tool the profile doesn't word keeps its built-in description.
+    assert.match(tools.find((t: any) => t.name === "get_item").description, /^Get an existing Graffiticode item by ID\./);
   } finally {
     child.kill();
   }
+});
+
+test("a copy template naming a value the profile doesn't have stops the start", async () => {
+  const { cpSync, mkdtempSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const dir = mkdtempSync(`${tmpdir()}/profile-`);
+  cpSync(EXAMPLE, dir, { recursive: true });
+  writeFileSync(`${dir}/copy/mcp-robots.txt`, "# {{hosts.nope}}\n");
+  await assert.rejects(startServer({ PROFILE_DIR: dir }), /server did not start/);
 });
 
 test("an invalid profile stops the server from starting", async () => {
@@ -138,4 +154,29 @@ test("an invalid profile stops the server from starting", async () => {
   const dir = mkdtempSync(`${tmpdir()}/profile-`);
   writeFileSync(`${dir}/profile.json`, JSON.stringify({ profileVersion: 1 }));
   await assert.rejects(startServer({ PROFILE_DIR: dir }), /server did not start/);
+});
+
+test("the MCP server's advertised endpoint, its OAuth resource and its issuer agree", async () => {
+  for (const env of [{ PROFILE_DIR: EXAMPLE }, { MCP_SERVER_URL: "https://mcp.staging.test" }]) {
+    const { port, child } = await startServer(env);
+    try {
+      const base = `http://localhost:${port}`;
+      const discovery = await (await fetch(`${base}/mcp.json`)).json();
+      const resource = await (await fetch(`${base}/.well-known/oauth-protected-resource`)).json();
+      const server = await (await fetch(`${base}/.well-known/oauth-authorization-server`)).json();
+      assert.equal(resource.resource, discovery.mcp_endpoint, "the OAuth resource is the advertised endpoint");
+      assert.deepEqual(resource.authorization_servers, [server.issuer]);
+      assert.equal(server.authorization_endpoint, `${server.issuer}/oauth/authorize`);
+      assert.equal(new URL(server.issuer).origin, new URL(discovery.site).origin);
+    } finally {
+      child.kill();
+    }
+  }
+});
+
+test("with a profile, a contradicting host variable stops the start; a repeated one doesn't", async () => {
+  await assert.rejects(startServer({ PROFILE_DIR: EXAMPLE, MCP_SERVER_URL: "https://mcp.graffiticode.org" }), /server did not start/);
+  await assert.rejects(startServer({ PROFILE_DIR: EXAMPLE, CONSOLE_URL: "https://console.graffiticode.org" }), /server did not start/);
+  const { child } = await startServer({ PROFILE_DIR: EXAMPLE, MCP_SERVER_URL: "https://mcp.example.test", CONSOLE_URL: "https://console.example.test" });
+  child.kill();
 });

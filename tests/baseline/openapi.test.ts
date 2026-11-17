@@ -197,7 +197,10 @@ test("free plan: a workspace token, claim links, and the workspace handle when i
   const { item } = await created(mine);
   const ready = await conforms(await call("GET", `/items/${item.id}`, mine), "get_item");
   assert.match(ready.view_url, /\?claim=/);
-  assert.match(ready.claim_url, /^https:\/\/console\.graffiticode\.org\/claim\?token=.+&src=api$/);
+  // Claim links point at the installation's console host: CONSOLE_URL here
+  // (core/src/profile/hosts.ts), the harness's console.
+  const consoleHost = process.env.CONSOLE_URL!.replace(/[.]/g, "\\.");
+  assert.match(ready.claim_url, new RegExp(`^${consoleHost}/claim\\?token=.+&src=api$`));
   assert.equal((await conforms(await call("GET", `/items/${item.id}/revisions`, mine), "list_revisions")).code, "forbidden");
 
   // A second caller joins that workspace by naming the first item.

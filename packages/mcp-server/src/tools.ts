@@ -13,9 +13,9 @@ import {
   captureWorkspaceNamespace,
   type AuthContext,
   type Language,
-  CONSOLE_URL,
-  APP_URL,
-  MCP_ENDPOINT,
+  consoleUrl,
+  appUrl,
+  mcpEndpoint,
 } from "./api.js";
 import { normalizeClientKind } from "./events.js";
 import { coreBackendEnabled, coreCreateItem, coreReviseItem } from "./core-backend.js";
@@ -802,7 +802,7 @@ export function reconnectHint(host: ClientHost): string {
     case "claude-code":
       return (
         "After signing in, connect this account: " +
-        `claude mcp add --transport http graffiticode ${MCP_ENDPOINT} ` +
+        `claude mcp add --transport http graffiticode ${mcpEndpoint()} ` +
         '--header "Authorization: Bearer <api-key>" — the sign-in page issues the key.'
       );
     case "editor":
@@ -923,7 +923,7 @@ export interface ToolContext {
 // signed-in user has a session). Surfaced as `view_url` for the widget's
 // "Open in Graffiticode" link.
 function buildViewUrl(itemId: string, claimToken?: string | null): string {
-  const base = `${APP_URL}/form/${itemId}`;
+  const base = `${appUrl()}/form/${itemId}`;
   // Embed the claim token on free-plan view links so the render-host footer can
   // offer a one-click "Claim it in Graffiticode" link for this exact item. The
   // JWT is URL-safe (base64url), so no extra encoding is needed.
@@ -976,7 +976,7 @@ export function buildClaimFields(
   // name for a different taxonomy is a collision waiting to be discovered.
   const host = classifyClientHost(clientKind);
   const claimUrlFor = (src: "chat" | "widget") =>
-    `${CONSOLE_URL}/claim?token=${claimToken}&src=${src}&agent=${host}`;
+    `${consoleUrl()}/claim?token=${claimToken}&src=${src}&agent=${host}`;
   const claim_url = claimUrlFor("chat");
   return {
     token: claimToken,

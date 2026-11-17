@@ -12,12 +12,11 @@
  */
 import { RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
 import { widgetContentHash } from "./widget-html.js";
-import { FRAMED_LANGUAGES } from "./languages.js";
+import { framedLanguages } from "./languages.js";
+import { installationHosts } from "@graffiticode-app/core/profile/runtime";
 
 export { generateWidgetHtml, widgetContentHash, widgetBuildId } from "./widget-html.js";
-export { NATIVE_LANGUAGES, FRAMED_LANGUAGES, framedLanguage } from "./languages.js";
-
-const MCP_SERVER_URL = process.env.MCP_SERVER_URL || "https://mcp.graffiticode.org";
+export { NATIVE_LANGUAGES, framedLanguages, framedLanguage } from "./languages.js";
 
 /**
  * The origin the widget loads its bundles and beacons from, and so the origin its
@@ -32,7 +31,7 @@ const MCP_SERVER_URL = process.env.MCP_SERVER_URL || "https://mcp.graffiticode.o
  * `--update-env-vars` keeps any variable it isn't given.
  */
 export function widgetAssetOrigin(): string {
-  return process.env.WIDGET_ASSET_ORIGIN || MCP_SERVER_URL;
+  return installationHosts().widgetAssets;
 }
 
 // Claude / MCP Apps resource. mimeType is the official MCP Apps content type
@@ -92,7 +91,7 @@ export function matchWidgetUri(uri: string): "openai" | "mcp" | null {
  */
 export function widgetCsp(): { camel: Record<string, string[]>; snake: Record<string, string[]> } {
   const origin = widgetAssetOrigin();
-  const frames = FRAMED_LANGUAGES.map((l) => l.origin);
+  const frames = framedLanguages().map((l) => l.origin);
   return {
     camel: { resourceDomains: [origin], frameDomains: frames },
     snake: { resource_domains: [origin], frame_domains: frames },

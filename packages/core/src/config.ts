@@ -7,13 +7,26 @@
 // no node imports, and the NEXT_PUBLIC_* values are read by their literal names
 // below, which is what lets Next inline them into the client bundle.
 
+import { installedProfile } from "./profile/current.js";
+import { resolveHosts } from "./profile/hosts.js";
+
 const list = (raw: string | undefined) => (raw ?? "").split(",").map(s => s.trim()).filter(Boolean);
 
 export function configFromEnv(env: NodeJS.ProcessEnv = process.env) {
-  const consoleUrl = env.CONSOLE_URL || "https://console.graffiticode.org";
+  // Public hosts from the one resolver (profile/hosts.ts), in both modes, so core
+  // and the servers' installationHosts() always agree. The NEXT_PUBLIC_* values
+  // are read here by their literal names and passed in: in the browser, Next
+  // inlines only literal reads, and the resolver reads variables by name.
+  const installed = installedProfile();
+  const hosts = resolveHosts(installed?.profile ?? null, {
+    ...env,
+    NEXT_PUBLIC_GC_API_URL: env.NEXT_PUBLIC_GC_API_URL || process.env.NEXT_PUBLIC_GC_API_URL,
+    NEXT_PUBLIC_GC_AUTH_URL: env.NEXT_PUBLIC_GC_AUTH_URL || process.env.NEXT_PUBLIC_GC_AUTH_URL,
+  });
+  const consoleUrl = hosts.console;
   return {
-    apiUrl: env.NEXT_PUBLIC_GC_API_URL || process.env.NEXT_PUBLIC_GC_API_URL || "https://api.graffiticode.org",
-    authUrl: env.NEXT_PUBLIC_GC_AUTH_URL || process.env.NEXT_PUBLIC_GC_AUTH_URL || "https://auth.graffiticode.org",
+    apiUrl: hosts.api,
+    authUrl: hosts.auth,
     firebaseWebApiKey: env.NEXT_PUBLIC_FIREBASE_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "",
     generationQueue: {
       project: env.GENERATION_QUEUE_PROJECT || env.GOOGLE_CLOUD_PROJECT || env.GCLOUD_PROJECT || "graffiticode-app",

@@ -16,7 +16,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
-import { NATIVE_LANGUAGES, FRAMED_LANGUAGES } from "./languages.js";
+import { NATIVE_LANGUAGES, framedLanguages } from "./languages.js";
 
 // esbuild always writes the bundle to dist/widget/. In production this module is
 // itself in dist/widget/, so the module-relative path resolves directly. Under the
@@ -120,7 +120,7 @@ const STYLES = `
 export function generateWidgetHtml(origin: string): string {
   const script = loadBundle();
   const native = JSON.stringify(NATIVE_LANGUAGES.map((l) => l.id));
-  const framed = JSON.stringify(FRAMED_LANGUAGES.map(({ id, origin }) => ({ id, origin })));
+  const framed = JSON.stringify(framedLanguages().map(({ id, origin }) => ({ id, origin })));
   return `<!DOCTYPE html>
 <html>
 <head>

@@ -7,6 +7,7 @@
  * instances and restarts.
  */
 
+import { installationHosts } from "@graffiticode-app/core/profile/runtime";
 import type {
   OAuthClient,
   PendingAuth,
@@ -14,7 +15,8 @@ import type {
   TokenEntry,
 } from "./types.js";
 
-const AUTH_URL = process.env.GRAFFITICODE_AUTH_URL || "https://auth.graffiticode.org";
+// The auth service holds the OAuth store (installations plan, P5 moves it).
+const authUrl = () => installationHosts().auth;
 const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || "";
 
 // How long a pending authorization stays valid (used to set its expires_at).
@@ -46,7 +48,7 @@ export class FirestoreOAuthStore {
 
   private async putFlowRecord(collection: string, key: string, record: unknown): Promise<void> {
     const response = await authFetch(
-      `${AUTH_URL}/${collection}/${encodeURIComponent(key)}`,
+      `${authUrl()}/${collection}/${encodeURIComponent(key)}`,
       {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -59,7 +61,7 @@ export class FirestoreOAuthStore {
   }
 
   private async getFlowRecord<T>(collection: string, key: string): Promise<T | undefined> {
-    const response = await authFetch(`${AUTH_URL}/${collection}/${encodeURIComponent(key)}`);
+    const response = await authFetch(`${authUrl()}/${collection}/${encodeURIComponent(key)}`);
     if (!response.ok) {
       if (response.status === 404) return undefined;
       throw new Error(`Failed to get ${collection} record: ${await response.text()}`);
@@ -70,7 +72,7 @@ export class FirestoreOAuthStore {
 
   private async patchFlowRecord(collection: string, key: string, updates: unknown): Promise<void> {
     const response = await authFetch(
-      `${AUTH_URL}/${collection}/${encodeURIComponent(key)}`,
+      `${authUrl()}/${collection}/${encodeURIComponent(key)}`,
       {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -85,7 +87,7 @@ export class FirestoreOAuthStore {
 
   private async deleteFlowRecord(collection: string, key: string): Promise<void> {
     const response = await authFetch(
-      `${AUTH_URL}/${collection}/${encodeURIComponent(key)}`,
+      `${authUrl()}/${collection}/${encodeURIComponent(key)}`,
       { method: "DELETE" }
     );
     if (!response.ok && response.status !== 404) {
@@ -151,7 +153,7 @@ export class FirestoreOAuthStore {
    * @param entry - The token entry to save
    */
   async saveToken(providerId: string, email: string, entry: TokenEntry): Promise<void> {
-    const response = await authFetch(`${AUTH_URL}/oauth-tokens`, {
+    const response = await authFetch(`${authUrl()}/oauth-tokens`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -180,7 +182,7 @@ export class FirestoreOAuthStore {
    */
   async getTokenByAccessToken(accessToken: string): Promise<TokenEntry | null> {
     // Tokens go in the body, never the URL: request URLs are logged.
-    const response = await authFetch(`${AUTH_URL}/oauth-tokens/lookup`, {
+    const response = await authFetch(`${authUrl()}/oauth-tokens/lookup`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ access_token: accessToken }),
@@ -202,7 +204,7 @@ export class FirestoreOAuthStore {
    * Get a token by its refresh token.
    */
   async getTokenByRefreshToken(refreshToken: string): Promise<TokenEntry | null> {
-    const response = await authFetch(`${AUTH_URL}/oauth-tokens/lookup`, {
+    const response = await authFetch(`${authUrl()}/oauth-tokens/lookup`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refresh_token: refreshToken }),
@@ -227,7 +229,7 @@ export class FirestoreOAuthStore {
     accessToken: string,
     updates: Partial<Pick<TokenEntry, "firebase_id_token" | "firebase_refresh_token" | "firebase_token_expires_at">>
   ): Promise<void> {
-    const response = await authFetch(`${AUTH_URL}/oauth-tokens/update`, {
+    const response = await authFetch(`${authUrl()}/oauth-tokens/update`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...updates, access_token: accessToken }),
@@ -243,7 +245,7 @@ export class FirestoreOAuthStore {
    * Delete a token by its access token.
    */
   async deleteToken(accessToken: string): Promise<void> {
-    const response = await authFetch(`${AUTH_URL}/oauth-tokens/delete`, {
+    const response = await authFetch(`${authUrl()}/oauth-tokens/delete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ access_token: accessToken }),
@@ -264,7 +266,7 @@ export class FirestoreOAuthStore {
     oldRefreshToken: string,
     newEntry: TokenEntry
   ): Promise<void> {
-    const response = await authFetch(`${AUTH_URL}/oauth-tokens/rotate`, {
+    const response = await authFetch(`${authUrl()}/oauth-tokens/rotate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

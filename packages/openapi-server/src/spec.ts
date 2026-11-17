@@ -2,7 +2,7 @@
 // server URL), and request validation is compiled from it.
 import { readFileSync } from "node:fs";
 import { parse, stringify } from "yaml";
-import { copy, profile } from "@graffiticode-app/core/profile/runtime";
+import { copy, installationHosts, profile } from "@graffiticode-app/core/profile/runtime";
 
 const SPEC_URL = new URL("../openapi.yaml", import.meta.url);
 
@@ -12,10 +12,10 @@ export function loadSpec(): any {
 
 // The URL clients reach this API at (servers[0].url), e.g.
 // https://openapi.graffiticode.org/v1.
-// OPENAPI_PUBLIC_URL still wins while deploy.json sets it; otherwise the
-// installation profile's REST resource, otherwise the built-in default.
-export const publicBase = () =>
-  (process.env.OPENAPI_PUBLIC_URL || profile()?.auth.resources.openapi || "https://openapi.graffiticode.org/v1").replace(/\/$/, "");
+// The REST resource, which is also the advertised server URL, so servers[] and
+// the OAuth resource can't disagree (core/src/profile/hosts.ts: the profile, or
+// OPENAPI_PUBLIC_URL / OPENAPI_RESOURCE without one).
+export const publicBase = () => installationHosts().openapiResource;
 
 // The API's title, from the profile (copy key openapi.info.title).
 export const apiTitle = () => copy("openapi.info.title") ?? "Graffiticode API";
@@ -25,6 +25,33 @@ export const apiTitle = () => copy("openapi.info.title") ?? "Graffiticode API";
 // The paths, schemas and validation are the platform's and never change.
 export function servedSpec(spec: any) {
   const served = { ...spec, servers: [{ url: publicBase() }] };
+  // The OAuth flow URLs, in both modes: the same resolution as servers[] and
+  // the resource metadata, so a staging server never advertises production's
+  // authorization server.
+  const oauth2 = spec.components?.securitySchemes?.oauth2;
+  if (oauth2) {
+    const resource = publicBase();
+    const issuer = installationHosts().issuer;
+    const flow = oauth2.flows.authorizationCode;
+    served.components = {
+      ...spec.components,
+      securitySchemes: {
+        ...spec.components.securitySchemes,
+        oauth2: {
+          ...oauth2,
+          flows: {
+            ...oauth2.flows,
+            authorizationCode: {
+              ...flow,
+              authorizationUrl: `${issuer}/oauth/authorize?resource=${encodeURIComponent(resource)}`,
+              tokenUrl: `${issuer}/oauth/token`,
+              refreshUrl: `${issuer}/oauth/token`,
+            },
+          },
+        },
+      },
+    };
+  }
   const p = profile();
   if (!p) return served;
   served.info = {
@@ -34,29 +61,10 @@ export function servedSpec(spec: any) {
     description: copy("openapi.info.description") ?? spec.info.description,
     contact: { name: p.brand.name, url: p.brand.links?.product ?? p.hosts.console },
   };
-  const oauth2 = spec.components?.securitySchemes?.oauth2;
+  // The OAuth prose is the profile's copy.
   if (oauth2) {
-    const resource = p.auth.resources.openapi ?? publicBase();
-    const flow = oauth2.flows.authorizationCode;
-    served.components = {
-      ...spec.components,
-      securitySchemes: {
-        ...spec.components.securitySchemes,
-        oauth2: {
-          ...oauth2,
-          description: copy("openapi.oauth2.description") ?? oauth2.description,
-          flows: {
-            ...oauth2.flows,
-            authorizationCode: {
-              ...flow,
-              authorizationUrl: `${p.auth.issuer}/oauth/authorize?resource=${encodeURIComponent(resource)}`,
-              tokenUrl: `${p.auth.issuer}/oauth/token`,
-              refreshUrl: `${p.auth.issuer}/oauth/token`,
-            },
-          },
-        },
-      },
-    };
+    const s = served.components.securitySchemes;
+    s.oauth2 = { ...s.oauth2, description: copy("openapi.oauth2.description") ?? oauth2.description };
   }
   return served;
 }

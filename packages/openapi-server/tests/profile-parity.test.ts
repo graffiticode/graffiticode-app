@@ -2,7 +2,9 @@
 // (installations plan, P2): the served description (JSON and YAML), the docs
 // page, problem `type` URIs, the oEmbed provider and the free-plan signup
 // link. Compared byte for byte with snapshots recorded before extraction,
-// without a profile and with the Graffiticode profile installed.
+// without a profile, and (an integration gate, run when
+// GRAFFITICODE_PROFILE_DIR names it) with the Graffiticode profile installed.
+// The example installation's checks always run, from the committed fixture.
 // Re-record only for an intended change: UPDATE_PARITY_SNAPSHOTS=1.
 import { test, afterEach } from "node:test";
 import assert from "node:assert/strict";
@@ -16,8 +18,8 @@ import { loadInstallation, resetInstallation } from "@graffiticode-app/core/prof
 
 delete process.env.OPENAPI_PUBLIC_URL;
 const SNAPSHOT = new URL("./snapshots/graffiticode-surfaces.json", import.meta.url).pathname;
-const PROFILE = resolve(process.env.GRAFFITICODE_PROFILE_DIR ?? new URL("../../../../installation-graffiticode", import.meta.url).pathname);
-const haveProfile = existsSync(`${PROFILE}/profile.json`);
+const PROFILE = process.env.GRAFFITICODE_PROFILE_DIR ? resolve(process.env.GRAFFITICODE_PROFILE_DIR) : null;
+const EXAMPLE = new URL("../../core/test/fixtures/installation-example", import.meta.url).pathname;
 
 afterEach(() => resetInstallation());
 
@@ -46,37 +48,39 @@ test("without a profile, every REST surface is unchanged", async () => {
   assert.deepEqual(now, JSON.parse(readFileSync(SNAPSHOT, "utf8")));
 });
 
-test("with the Graffiticode profile installed, every REST surface is byte-identical", { skip: !haveProfile && `no Graffiticode profile at ${PROFILE}` }, async () => {
-  loadInstallation({ PROFILE_DIR: PROFILE });
+test("with the Graffiticode profile installed, every REST surface is byte-identical", { skip: !PROFILE && "integration gate: set GRAFFITICODE_PROFILE_DIR to the Graffiticode profile" }, async () => {
+  assert.ok(existsSync(`${PROFILE}/profile.json`), `no profile at ${PROFILE}`);
+  loadInstallation({ PROFILE_DIR: PROFILE! });
   const now = await surfaces();
   const expected = JSON.parse(readFileSync(SNAPSHOT, "utf8"));
   for (const key of Object.keys(expected)) assert.deepEqual((now as any)[key], expected[key], key);
 });
 
-test("a different profile changes the REST surfaces", { skip: !haveProfile && `no Graffiticode profile at ${PROFILE}` }, async () => {
-  const dir = mkdtempSync(`${tmpdir()}/profile-`);
-  cpSync(PROFILE, dir, { recursive: true, filter: src => !src.includes("/.git") });
-  const p = JSON.parse(readFileSync(`${dir}/profile.json`, "utf8"));
-  Object.assign(p.brand, { name: "Example", links: { ...p.brand.links, product: "https://example.test", signup: "https://example.test/signup" } });
-  p.hosts.openapi = "https://api.example.test";
-  p.hosts.mcp = "https://mcp.example.test";
-  p.auth = { issuer: "https://mcp.example.test", resources: { mcp: "https://mcp.example.test/mcp", openapi: "https://api.example.test/v1" } };
-  writeFileSync(`${dir}/profile.json`, JSON.stringify(p));
-  loadInstallation({ PROFILE_DIR: dir });
-
+test("the example installation's REST surfaces are its own", async () => {
+  loadInstallation({ PROFILE_DIR: EXAMPLE });
   const app = createApp();
   const spec = await (await app.request("http://x/v1/openapi.json")).json();
   assert.deepEqual(spec.servers, [{ url: "https://api.example.test/v1" }]);
   assert.equal(spec.info.title, "Example API");
+  assert.equal(spec.info.summary, "Example summary.");
+  assert.equal(spec.info.description, "Problems are https://api.example.test/problems/<code>.");
   assert.deepEqual(spec.info.contact, { name: "Example", url: "https://example.test" });
-  assert.match(spec.info.description, /https:\/\/api\.example\.test\/problems\/<code>/);
-  const flow = spec.components.securitySchemes.oauth2.flows.authorizationCode;
+  const oauth2 = spec.components.securitySchemes.oauth2;
+  assert.equal(oauth2.description, "Register at https://mcp.example.test/oauth/register; tokens are issued for https://api.example.test/v1.");
+  const flow = oauth2.flows.authorizationCode;
   assert.equal(flow.authorizationUrl, "https://mcp.example.test/oauth/authorize?resource=https%3A%2F%2Fapi.example.test%2Fv1");
   assert.equal(flow.tokenUrl, "https://mcp.example.test/oauth/token");
-  assert.match(spec.components.securitySchemes.oauth2.description, /https:\/\/mcp\.example\.test\/oauth\/register/);
+  assert.equal(flow.refreshUrl, "https://mcp.example.test/oauth/token");
   assert.match(await (await app.request("http://x/v1/docs")).text(), /<title>Example API<\/title>/);
-  const problem = await (await app.request("http://x/v1/no-such-route")).json();
-  assert.equal(problem.type, "https://api.example.test/problems/not_found");
+  assert.equal((await (await app.request("http://x/v1/no-such-route")).json()).type, "https://api.example.test/problems/not_found");
   assert.deepEqual(oembedProvider(), { name: "Example", url: "https://example.test", untitled: "Example item" });
   assert.equal(signupUrl(), "https://example.test/signup");
+  assert.equal((await (await app.request("http://x/health")).json()).installation.installationId, "example");
+});
+
+test("a copy template naming a value the profile doesn't have fails the load", () => {
+  const dir = mkdtempSync(`${tmpdir()}/profile-`);
+  cpSync(EXAMPLE, dir, { recursive: true });
+  writeFileSync(`${dir}/copy/openapi-info-title.txt`, "{{brand.nmae}} API\n");
+  assert.throws(() => loadInstallation({ PROFILE_DIR: dir }), /openapi\.info\.title refers to \{\{brand\.nmae\}\}/);
 });

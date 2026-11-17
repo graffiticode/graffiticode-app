@@ -26,7 +26,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { handleIntrospect } from "./oauth/introspection.js";
 import { coreReadiness } from "@graffiticode-app/core/readiness";
 import { coreBackendEnabled } from "./core-backend.js";
-import { copy, document, loadInstallation, profile } from "./installation.js";
+import { copy, document, installationHosts, loadInstallation, profile } from "./installation.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
   CallToolRequestSchema,
@@ -436,7 +436,6 @@ function geoFromHeaders(headers: IncomingMessage["headers"]): SessionMeta {
   return meta;
 }
 
-const MCP_SERVER_URL = process.env.MCP_SERVER_URL || "https://mcp.graffiticode.org";
 
 // How often to write a comment into an open SSE stream, keeping it under the CDN's
 // 100s idle timeout (see src/sse-keepalive.ts). 30s leaves a wide margin; 0 disables.
@@ -481,8 +480,8 @@ Disallow: /oauth/
 `;
 
 const MCP_DISCOVERY = {
-  mcp_endpoint: `${MCP_SERVER_URL}/mcp`,
-  site: MCP_SERVER_URL,
+  mcp_endpoint: "https://mcp.graffiticode.org/mcp",
+  site: "https://mcp.graffiticode.org",
   description:
     "Graffiticode is a universal MCP server of smart tools for AI agents and the people who use them. Each tool is one domain language wrapped by a specialized AI; call list_languages to discover what is available.",
   tools: [
@@ -507,7 +506,8 @@ const ITEM_TOOL_NAMES = MCP_DISCOVERY.tools;
 
 function mcpDiscovery() {
   const p = profile();
-  if (!p) return MCP_DISCOVERY;
+  // Without a profile, the endpoint follows MCP_SERVER_URL as before.
+  if (!p) return { ...MCP_DISCOVERY, mcp_endpoint: installationHosts().mcpResource, site: installationHosts().mcp };
   const itemsPath = p.surfaces.mcp.find(m => m.families.includes("items"))?.path ?? "/mcp";
   return {
     mcp_endpoint: `${p.hosts.mcp}${itemsPath}`,
@@ -1612,7 +1612,7 @@ httpServer.listen(PORT, () => {
     console.log(`  - ${tool.name}`);
   });
   console.log(`\nFor Claude Desktop: Add via Settings > Connectors with URL:`);
-  console.log(`  ${MCP_SERVER_URL}/mcp`);
+  console.log(`  ${installationHosts().mcpResource}`);
   console.log(`\nFor API key auth (legacy):`);
   console.log(JSON.stringify({
     mcpServers: {

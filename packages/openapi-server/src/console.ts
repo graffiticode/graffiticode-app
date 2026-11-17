@@ -1,9 +1,10 @@
 // The console's GraphQL endpoint, for the one item operation that runs there:
 // get_spec calls a model, and model calls run only in the console, beside the
 // generator and the key (as for MCP in core mode).
+import { installationHosts } from "@graffiticode-app/core/profile/runtime";
 import { ApiProblem } from "./problems.js";
 
-const consoleApi = () => process.env.GRAFFITICODE_CONSOLE_URL || "https://console.graffiticode.org/api";
+const consoleApi = () => installationHosts().consoleApi;
 
 const GET_SPEC = `query GetSpec($id: String!) { spec(id: $id) { spec lang itemId coverage { checked missing } } }`;
 

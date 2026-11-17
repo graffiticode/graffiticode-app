@@ -2,6 +2,7 @@
 // resources, plus listing, rename, archive, versions, src/data, retry and an
 // event stream. Everything runs through core in-process, except get_spec,
 // which calls a model and so runs in the console.
+import { installationHosts } from "@graffiticode-app/core/profile/runtime";
 import { profile } from "@graffiticode-app/core/profile/runtime";
 import type { Context, Hono } from "hono";
 import { streamSSE } from "hono/streaming";
@@ -22,8 +23,8 @@ import { db } from "@graffiticode-app/core/db";
 import { mintSessionToken } from "@graffiticode-app/core/lib/free-plan-session-token";
 import type { Validate, ValidateBody } from "../app.js";
 
-const APP_URL = () => process.env.GRAFFITICODE_APP_URL || "https://app.graffiticode.org";
-const CONSOLE_URL = () => process.env.GRAFFITICODE_CONSOLE_BASE_URL || "https://console.graffiticode.org";
+const APP_URL = () => installationHosts().app;
+const CONSOLE_URL = () => installationHosts().console;
 const CLIENT = "openapi";
 const MAX_WAIT_S = 45;
 const POLL_MS = 1000;

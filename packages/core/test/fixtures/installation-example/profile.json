@@ -1,0 +1,38 @@
+{
+  "profileVersion": 1,
+  "installation": { "id": "example", "production": false, "project": "example-installation" },
+  "brand": {
+    "name": "Example",
+    "operator": { "name": "Example Inc.", "url": "https://example.test" },
+    "assets": { "logo": "assets/logo.svg", "favicon": "assets/favicon.ico" },
+    "legal": { "privacy": "legal/privacy.html", "terms": "legal/terms.html", "about": "legal/about.html" },
+    "links": { "product": "https://example.test", "forum": "https://forum.example.test", "source": "https://example.test/source", "signup": "https://example.test/signup" }
+  },
+  "hosts": {
+    "console": "https://console.example.test",
+    "app": "https://app.example.test",
+    "api": "https://api.graffiticode.org",
+    "auth": "https://auth.graffiticode.org",
+    "mcp": "https://mcp.example.test",
+    "openapi": "https://api.example.test",
+    "languageServer": "https://l{id}.graffiticode.org"
+  },
+  "auth": {
+    "issuer": "https://mcp.example.test",
+    "resources": { "mcp": "https://mcp.example.test/mcp", "openapi": "https://api.example.test/v1" }
+  },
+  "surfaces": { "mcp": [{ "path": "/mcp", "families": ["items"] }], "rest": { "enabled": true } },
+  "copy": {
+    "mcp.robots": "copy/mcp-robots.txt",
+    "mcp.discovery.description": "copy/mcp-discovery-description.txt",
+    "mcp.instructions.lead": "copy/mcp-instructions-lead.txt",
+    "mcp.instructions.body": "copy/mcp-instructions-body.md",
+    "mcp.tool.create_item.description": "copy/mcp-tool-create-item.md",
+    "openapi.info.title": "copy/openapi-info-title.txt",
+    "openapi.info.summary": "copy/openapi-info-summary.txt",
+    "openapi.info.description": "copy/openapi-info-description.md",
+    "openapi.oauth2.description": "copy/openapi-oauth2-description.md"
+  },
+  "freePlan": { "enabled": true, "itemTtlHours": 48 },
+  "csp": { "mode": "report-only" }
+}
