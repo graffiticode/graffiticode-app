@@ -40,6 +40,13 @@
   },
   "auth": {
     "issuer": "https://mcp.example.test",
+    "firebase": {
+      "apiKey": "example-web-key",
+      "authDomain": "example-auth.firebaseapp.com",
+      "projectId": "example-auth",
+      "appId": "1:1:web:example"
+    },
+    "privyAppId": "cexampleprivyapp000000001",
     "resources": {
       "mcp": "https://mcp.example.test/mcp",
       "openapi": "https://api.example.test/v1"
@@ -90,5 +97,8 @@
   },
   "csp": {
     "mode": "report-only"
+  },
+  "billing": {
+    "stripePublishableKey": "pk_test_example"
   }
 }

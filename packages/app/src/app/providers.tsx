@@ -1,23 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { AuthProviders } from "@graffiticode/auth-react";
+import { ConfigGate, usePublicConfig } from "@/lib/public-config";
 
-// Auth (Firebase/Privy/Wagmi) is inherently client-side, and PrivyProvider
-// validates its app id eagerly at render. Mounting the provider chain only on
-// the client keeps it out of SSR/prerender (so builds don't need secrets) and
-// avoids initializing browser-only SDKs on the server.
+// Auth (Firebase/Privy/Wagmi) is inherently client-side. ConfigGate renders
+// nothing until the installation's public configuration has loaded and
+// validated (on the client, so builds and prerender need no installation),
+// and the providers then initialize with that installation's settings only.
 export function Providers({ children }: { children: React.ReactNode }) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  return (
+    <ConfigGate>
+      <ConfiguredProviders>{children}</ConfiguredProviders>
+    </ConfigGate>
+  );
+}
 
-  if (!mounted) {
-    return (
-      <div className="flex min-h-full items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-900" />
-      </div>
-    );
-  }
-
-  return <AuthProviders>{children}</AuthProviders>;
+function ConfiguredProviders({ children }: { children: React.ReactNode }) {
+  const config = usePublicConfig();
+  return (
+    <AuthProviders config={{ firebase: config.auth.firebase, privyAppId: config.auth.privyAppId, authUrl: config.hosts.auth }}>
+      {children}
+    </AuthProviders>
+  );
 }

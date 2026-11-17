@@ -101,10 +101,27 @@ export const profileSchema = {
     auth: {
       type: "object",
       additionalProperties: false,
-      required: ["issuer", "resources"],
+      // Every installation serves browser surfaces (the console and the app),
+      // and their providers initialize only from these: a profile must name
+      // its own sign-in project and Privy app, never inherit Graffiticode's.
+      required: ["issuer", "firebase", "privyAppId", "resources"],
       properties: {
         // The authorization server this installation delegates sign-in to.
         issuer: origin,
+        // The shared authentication service's public client identifiers, which
+        // browsers load from /api/config: the web config of the Firebase
+        // project users sign in to (not where application data lives), and
+        // the Privy app for email sign-in.
+        firebase: {
+          type: "object",
+          additionalProperties: false,
+          required: ["apiKey", "authDomain", "projectId", "appId"],
+          properties: {
+            apiKey: text, authDomain: text, projectId: text, appId: text,
+            databaseURL: url, storageBucket: text, messagingSenderId: text, measurementId: text,
+          },
+        },
+        privyAppId: { type: "string", pattern: "^[a-z0-9]{25}$" },
         // This installation's protected resources: tokens are bound to these.
         resources: {
           type: "object",
@@ -246,6 +263,8 @@ export const profileSchema = {
       type: "object",
       additionalProperties: false,
       properties: {
+        // Stripe's publishable key (public by design), for the browser's payment form.
+        stripePublishableKey: { type: "string", pattern: "^pk_(live|test)_[A-Za-z0-9]+$" },
         plans: {
           type: "object",
           propertyNames: { enum: ["demo", "starter", "pro", "teams", "platinum"] },
@@ -323,7 +342,12 @@ export type Profile = {
     console: string; app: string; api: string; auth: string; mcp: string;
     openapi?: string; widgetAssets?: string; languageServer?: string;
   };
-  auth: { issuer: string; resources: { mcp: string; openapi?: string } };
+  auth: {
+    issuer: string;
+    firebase: { apiKey: string; authDomain: string; projectId: string; appId: string; databaseURL?: string; storageBucket?: string; messagingSenderId?: string; measurementId?: string };
+    privyAppId: string;
+    resources: { mcp: string; openapi?: string };
+  };
   catalog?: {
     languages?: string[];
     hidden?: string[];
@@ -346,6 +370,7 @@ export type Profile = {
   };
   copy?: Record<string, string>;
   billing?: {
+    stripePublishableKey?: string;
     plans?: Partial<Record<"demo" | "starter" | "pro" | "teams" | "platinum", {
       displayName?: string; basePriceMonthly?: number; basePriceAnnual?: number;
       includedItems?: number; overageRatePerItem?: number; defaultCapUsd?: number;

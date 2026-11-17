@@ -2,7 +2,7 @@ import { getAuth, connectAuthEmulator, } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import React, { ReactNode } from 'react'
 import { FirebaseAppProvider, AuthProvider, FirestoreProvider, useFirebaseApp } from 'reactfire';
-import { apiFirebaseConfig } from '../lib/firebase';
+import { usePublicConfig } from '../lib/public-config';
 
 interface FirebaseComponentsProps {
   children: ReactNode;
@@ -10,6 +10,8 @@ interface FirebaseComponentsProps {
 
 function FirebaseComponents({ children }: FirebaseComponentsProps) {
   const app = useFirebaseApp();
+  // Observable: the project the Firebase app actually initialized with.
+  React.useEffect(() => { document.documentElement.dataset.authProject = app.options.projectId ?? ""; }, [app]);
   const auth = getAuth(app);
   const firestore = getFirestore(app);
 
@@ -37,9 +39,12 @@ interface GraffiticodeFirebaseProviderProps {
   children: ReactNode;
 }
 
+// The shared authentication project's web config, from the installation's
+// public configuration (never a built-in config).
 export default function GraffiticodeFirebaseProvider({ children }: GraffiticodeFirebaseProviderProps) {
+  const { auth } = usePublicConfig();
   return (
-    <FirebaseAppProvider firebaseConfig={apiFirebaseConfig}>
+    <FirebaseAppProvider firebaseConfig={auth.firebase}>
       <FirebaseComponents>
         {children}
       </FirebaseComponents>

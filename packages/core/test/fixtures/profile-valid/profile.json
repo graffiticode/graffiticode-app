@@ -33,6 +33,13 @@
   },
   "auth": {
     "issuer": "https://mcp.example.test",
+    "firebase": {
+      "apiKey": "valid-web-key",
+      "authDomain": "valid-auth.firebaseapp.com",
+      "projectId": "valid-auth",
+      "appId": "1:1:web:valid"
+    },
+    "privyAppId": "cvalidprivyapp00000000001",
     "resources": {
       "mcp": "https://mcp.example.test/mcp",
       "openapi": "https://openapi.example.test/v1"

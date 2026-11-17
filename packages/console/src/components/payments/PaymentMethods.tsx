@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
 import { CreditCardIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
-import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import useGraffiticodeAuth from '@graffiticode/auth-react';
 import { paymentsGet, paymentsPost, paymentsDelete } from '../../utils/payments-client';
+import { useStripePromise } from '../../lib/stripe';
 
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || 'pk_test_PwlNxtmtkJ5hH6Ze0eMPsOaS');
 
 interface PaymentMethod {
   id: string;
@@ -153,6 +152,7 @@ function AddPaymentMethodForm({ onSuccess, onCancel }: { onSuccess: () => void; 
 }
 
 export default function PaymentMethods({}: PaymentMethodsProps) {
+  const stripePromise = useStripePromise();
   const { user } = useGraffiticodeAuth();
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
@@ -262,7 +262,7 @@ export default function PaymentMethods({}: PaymentMethodsProps) {
       {showAddForm && (
         <div className="bg-gray-50 rounded-none p-6">
           <h4 className="text-sm font-medium text-gray-900 mb-4">Add New Payment Method</h4>
-          <Elements stripe={stripePromise}>
+          {stripePromise ? <Elements stripe={stripePromise}>
             <AddPaymentMethodForm
               onSuccess={() => {
                 setShowAddForm(false);
@@ -272,7 +272,7 @@ export default function PaymentMethods({}: PaymentMethodsProps) {
                 setShowAddForm(false);
               }}
             />
-          </Elements>
+          </Elements> : <p className="text-sm text-gray-600">Payments aren&rsquo;t available on this site.</p>}
         </div>
       )}
 

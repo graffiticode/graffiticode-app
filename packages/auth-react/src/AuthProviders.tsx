@@ -8,18 +8,18 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PrivyProvider } from "@privy-io/react-auth";
 import { GraffiticodeAuthProvider } from "./use-graffiticode-auth";
 import { FirebaseProvider } from "./FirebaseProvider";
+import { configureAuth } from "./auth-client";
+import type { FirebaseWebConfig } from "./firebase-config";
 
 const queryClient = new QueryClient();
 
-const config = createConfig({
+const wagmiConfig = createConfig({
   chains: [mainnet],
   connectors: [injected()],
   transports: {
     [mainnet.id]: http(),
   },
 });
-
-const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID || "";
 
 const privyConfig = {
   loginMethods: ["email" as const],
@@ -31,11 +31,17 @@ const privyConfig = {
   },
 };
 
-export function AuthProviders({ children }: { children: React.ReactNode }) {
+// The installation's authentication settings, from its public configuration
+// (/api/config). Required: the providers have no built-in settings to fall
+// back to.
+export type AuthConfig = { firebase: FirebaseWebConfig; privyAppId: string; authUrl: string };
+
+export function AuthProviders({ children, config }: { children: React.ReactNode; config: AuthConfig }) {
+  configureAuth({ authUrl: config.authUrl });
   return (
-    <FirebaseProvider>
-      <PrivyProvider appId={PRIVY_APP_ID} config={privyConfig}>
-        <WagmiProvider config={config}>
+    <FirebaseProvider firebaseConfig={config.firebase}>
+      <PrivyProvider appId={config.privyAppId} config={privyConfig}>
+        <WagmiProvider config={wagmiConfig}>
           <QueryClientProvider client={queryClient}>
             <GraffiticodeAuthProvider>{children}</GraffiticodeAuthProvider>
           </QueryClientProvider>

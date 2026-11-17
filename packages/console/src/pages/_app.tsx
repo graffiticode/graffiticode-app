@@ -5,7 +5,8 @@ import { injected } from 'wagmi/connectors'
 import { http } from 'viem'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { PrivyProvider } from '@privy-io/react-auth'
-import { GraffiticodeAuthProvider } from "@graffiticode/auth-react";
+import { GraffiticodeAuthProvider, configureAuth } from "@graffiticode/auth-react";
+import { ConfigGate, usePublicConfig } from '../lib/public-config';
 import "../styles/globals.css";
 import "../styles/prosemirror.css";
 import GraffiticodeFirebaseProvider from '../components/GraffiticodeFirebaseProvider';
@@ -31,8 +32,6 @@ const config = createConfig({
   },
 })
 
-const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID || '';
-
 const privyConfig = {
   loginMethods: ['email' as const],
   embeddedWallets: {
@@ -43,10 +42,23 @@ const privyConfig = {
   },
 };
 
-export default function App({
+// Nothing below ConfigGate renders, so no provider or client initializes,
+// until the installation's public configuration has loaded and validated.
+export default function App(props) {
+  return (
+    <ConfigGate>
+      <ConfiguredApp {...props} />
+    </ConfigGate>
+  );
+}
+
+function ConfiguredApp({
   Component,
   pageProps: { session, ...pageProps },
 }) {
+  const publicConfig = usePublicConfig();
+  configureAuth({ authUrl: publicConfig.hosts.auth });
+  const PRIVY_APP_ID = publicConfig.auth.privyAppId;
   const router = useRouter();
   const pathName = router.pathname.split('/').filter(Boolean)[0] || '';
   const languageInitialized = useRef(false);
