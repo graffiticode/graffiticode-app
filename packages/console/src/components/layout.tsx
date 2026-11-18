@@ -42,17 +42,19 @@ const specsMenu = [
   { name: 'Code Gen Instructions', href: '/specs?view=instructions' },
 ]
 
-const supportMenu = [
-  { name: 'Email', href: 'mailto:support@graffiticode.org', external: false },
-  { name: 'Forum', href: 'https://forum.graffiticode.org/c/support/57', external: true },
-]
-
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
 export default function Layout({ children, language, setLanguage, mark, setMark }) {
   const { user } = useGraffiticodeAuth();
+  // The installation's support channels (see pages/support.tsx); a missing one isn't shown.
+  const { brand } = usePublicConfig();
+  const supportForum = brand.links.support ?? brand.links.forum;
+  const supportMenu = [
+    brand.supportEmail && { name: 'Email', href: `mailto:${brand.supportEmail}`, external: false },
+    supportForum && { name: 'Forum', href: supportForum, external: true },
+  ].filter(Boolean) as { name: string; href: string; external: boolean }[];
   const router = useRouter();
   const pathName = router.pathname.split('/').filter(Boolean)[0] || '';
   // An explicitly chosen domain, else the whole offered catalog (lib/catalog.ts).
@@ -217,7 +219,7 @@ export default function Layout({ children, language, setLanguage, mark, setMark 
                       >
                         Integrations
                       </Link> */}
-                      <Menu as="div" className="relative inline-block text-left">
+                      {supportMenu.length > 0 && <Menu as="div" className="relative inline-block text-left">
                         <Menu.Button
                           className="inline-flex items-center text-gray-300 hover:text-white text-sm tracking-wide font-medium focus:outline-none"
                         >
@@ -254,7 +256,7 @@ export default function Layout({ children, language, setLanguage, mark, setMark 
                             </div>
                           </Menu.Items>
                         </Transition>
-                      </Menu>
+                      </Menu>}
                       <div className="flex items-center gap-2 text-gray-400 hover:text-white">
                         <SignIn />
                       </div>
