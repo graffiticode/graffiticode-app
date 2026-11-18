@@ -91,7 +91,10 @@ jobs:
         run: docker build -f configs/Dockerfile.${{ matrix.service }}.yaml -t gc-${{ matrix.service }} .
       - name: Start ${{ matrix.service }} and check its paths
         run: |
-          docker run -d --name svc -e PORT=${{ matrix.port }} -p ${{ matrix.port }}:${{ matrix.port }} gc-${{ matrix.service }}
+          # The servers refuse to start without an installation project (storage
+          # validation, installations plan P3). A demo- project is never a real
+          # one: nothing here can reach production data.
+          docker run -d --name svc -e PORT=${{ matrix.port }} -e GOOGLE_CLOUD_PROJECT=demo-ci -p ${{ matrix.port }}:${{ matrix.port }} gc-${{ matrix.service }}
           for i in $(seq 1 30); do
             code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:${{ matrix.port }}/ || true)
             [ "$code" != 000 ] && break
