@@ -4,8 +4,10 @@ import { Elements } from "@stripe/react-stripe-js";
 import axios from 'axios';
 import useGraffiticodeAuth from '@graffiticode/auth-react';
 import { useStripePromise } from "../lib/stripe";
+import { usePublicConfig } from "../lib/public-config";
 
 const SetupForm = () => {
+  const consoleHost = usePublicConfig().hosts.console;
   const stripe = useStripe();
   const elements = useElements();
 
@@ -26,7 +28,7 @@ const SetupForm = () => {
       //`Elements` instance that was used to create the Payment Element
       elements,
       confirmParams: {
-        return_url: 'https://console.graffiticode.org',
+        return_url: consoleHost,
       },
     });
 

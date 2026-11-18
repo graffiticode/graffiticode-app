@@ -8,14 +8,15 @@ import Editor from './editor';
 import SignIn from "./SignIn";
 import { isNonEmptyString } from "../utils";
 import useGraffiticodeAuth from "@graffiticode/auth-react";
+import { usePublicConfig } from "../lib/public-config";
 
+// The form view is served by the installation's API host (from its public
+// configuration; a local console's config names the local API).
 const useTaskIdFormUrl = ({ accessToken, lang, id, origin, connectionId = null }) => {
+  const apiHost = usePublicConfig().hosts.api;
   if (!id) {
     return "";
   }
-  const [ protocol, host ] =
-        document.location.host.indexOf("localhost") === 0 && ["http", "localhost:3100"] ||
-        ["https", "api.graffiticode.org"];
   const params = new URLSearchParams();
   if (accessToken) {
     params.set("access_token", accessToken);
@@ -27,7 +28,7 @@ const useTaskIdFormUrl = ({ accessToken, lang, id, origin, connectionId = null }
   if (connectionId) {
     params.set("connection", connectionId);
   }
-  return `${protocol}://${host}/form?lang=${lang}&id=${id}&${params.toString()}`;
+  return `${apiHost}/form?lang=${lang}&id=${id}&${params.toString()}`;
 };
 
 const HEIGHTS = [150, 240, 360, 480, 640, 860, 1020];

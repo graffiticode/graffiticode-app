@@ -14,11 +14,16 @@ import {
 } from '@heroicons/react/24/outline'
 import { ChevronDownIcon } from '@heroicons/react/20/solid'
 import SignIn from '../components/SignIn'
-import { getTitle, getPageTitle } from '../lib/utils';
+import { getPageTitle } from '../lib/utils';
+import { usePublicConfig } from '../lib/public-config';
+import { useCatalogDomain } from '../lib/catalog';
 
+// The image is still the build's (runtime assets: installations plan, P3,
+// slice 3); its name is the installation's.
 export function Logo(props) {
+  const { brand } = usePublicConfig();
   return (
-    <Image src={logo} alt='Graffiticode logo' width={30} height={30} unoptimized />
+    <Image src={logo} alt={`${brand.name} logo`} width={30} height={30} unoptimized />
   );
 }
 
@@ -49,17 +54,8 @@ export default function Layout({ children, language, setLanguage, mark, setMark 
   const { user } = useGraffiticodeAuth();
   const router = useRouter();
   const pathName = router.pathname.split('/').filter(Boolean)[0] || '';
-  const queryDomain = router.query.domain;
-  const queryDomainStr = Array.isArray(queryDomain) ? queryDomain[0] : queryDomain;
-
-  // Store domain in sessionStorage when first seen from URL
-  if (queryDomainStr && typeof window !== 'undefined') {
-    sessionStorage.setItem('graffiticode:domain', queryDomainStr);
-  }
-
-  const storedDomain = typeof window !== 'undefined' ? sessionStorage.getItem('graffiticode:domain') : null;
-  const rawDomain = queryDomainStr || storedDomain || getTitle();
-  const domain = rawDomain.toLowerCase() === 'graffiticode' ? undefined : rawDomain;
+  // An explicitly chosen domain, else the whole offered catalog (lib/catalog.ts).
+  const domain = useCatalogDomain();
   useEffect(() => {
     document.title = getPageTitle();
   }, []);

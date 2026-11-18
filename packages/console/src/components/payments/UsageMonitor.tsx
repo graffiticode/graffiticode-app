@@ -3,8 +3,7 @@ import Link from 'next/link';
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import useGraffiticodeAuth from '@graffiticode/auth-react';
 import { paymentsGet, paymentsPost } from '../../utils/payments-client';
-import { planDetails, type PlanId } from '../../utils/plans';
-import { defaultOverageCapUsd } from '@graffiticode-app/core/lib/plans-config';
+import { usePlanDisplay, type PlanId } from '../../utils/plans';
 
 interface UsageData {
   plan: string;
@@ -32,12 +31,12 @@ interface UsageData {
 
 const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-// Prefilled enrollment cap, from plans-config ($10 = 25 items on Bronze). The
-// customer can change it before a card goes on file; the server applies the
-// same default if none is sent.
-const DEFAULT_ENROLL_CAP_USD = defaultOverageCapUsd('demo') ?? 0;
-
 export default function UsageMonitor() {
+  const { planDetails, defaultOverageCapUsd } = usePlanDisplay();
+  // Prefilled enrollment cap, from the configured plan terms ($10 = 25 items
+  // on Bronze). The customer can change it before a card goes on file; the
+  // server applies the same default if none is sent.
+  const DEFAULT_ENROLL_CAP_USD = defaultOverageCapUsd('demo') ?? 0;
   const { user } = useGraffiticodeAuth();
   const [usage, setUsage] = useState<UsageData | null>(null);
   const [loading, setLoading] = useState(true);

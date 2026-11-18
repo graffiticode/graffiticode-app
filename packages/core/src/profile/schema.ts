@@ -78,7 +78,8 @@ export const profileSchema = {
         links: {
           type: "object",
           additionalProperties: false,
-          properties: { product: url, docs: url, forum: url, source: url, signup: url },
+          // support: where people ask for help (a forum category, a help desk).
+          properties: { product: url, docs: url, forum: url, support: url, source: url, signup: url },
         },
       },
     },
@@ -336,7 +337,7 @@ export type Profile = {
     operator: { name: string; url: string; supportEmail?: string };
     assets: { logo: string; favicon: string; icon?: string };
     legal: { privacy: string; terms: string; about?: string };
-    links?: { product?: string; docs?: string; forum?: string; source?: string; signup?: string };
+    links?: { product?: string; docs?: string; forum?: string; support?: string; source?: string; signup?: string };
   };
   hosts: {
     console: string; app: string; api: string; auth: string; mcp: string;

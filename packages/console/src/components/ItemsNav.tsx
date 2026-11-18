@@ -15,6 +15,7 @@ import { elideCompoundId } from '../utils';
 import { generateThumbnail } from '../lib/generate-thumbnail';
 import { useThumbnailJob } from '../lib/thumbnail-jobs';
 import useGraffiticodeAuth from '@graffiticode/auth-react';
+import { usePublicConfig } from '../lib/public-config';
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
@@ -32,6 +33,8 @@ function formatTimestamp(ts) {
 }
 
 function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], lang, help, code, created, updated, client, connectionId = null, publicationId = null, publicationConnectionId = null, publishedTaskId = null, lastWrite = null, onChange, onRefresh, isOpen, onOpen, onClose, onArrowKey }) {
+  // The installation's app host, where items open in the form view.
+  const appHost = usePublicConfig().hosts.app;
   const { user } = useGraffiticodeAuth();
   const [nameValue, setNameValue] = useState(name);
   const [showShareDialog, setShowShareDialog] = useState(false);
@@ -367,7 +370,7 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    const base = process.env.NEXT_PUBLIC_FORM_APP_URL || "https://app.graffiticode.org";
+                    const base = appHost;
                     const w = window.open(`${base}/form/${itemId}`, '_blank');
                     if (w) w.focus();
                     onClose();

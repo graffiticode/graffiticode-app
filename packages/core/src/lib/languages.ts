@@ -387,6 +387,14 @@ export function platformLanguageById(id: string): Language | undefined {
   return PLATFORM_LANGUAGES.find(l => l.id === normalized);
 }
 
+/**
+ * Every language this installation resolves, under its policy: the offered
+ * ones and those it no longer offers, which existing items still use.
+ */
+export function resolvableLanguages(installed: For = installedProfile()): Language[] {
+  return catalog(installed).all;
+}
+
 export function findLanguageById(id: string): Language | undefined {
   const normalized = id.replace(/^L/i, "").padStart(4, "0");
   return catalog().all.find(l => l.id === normalized);

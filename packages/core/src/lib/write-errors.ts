@@ -1,10 +1,9 @@
 // Plain-language reasons for a failed or skipped write through a connection
 // (an item's lastWrite). The recorded message is whatever the compile, policy
 // or broker said; policy refusals carry their reason code in it, e.g.
-// "permission denied (system-connection)". Shared by the browser and the
-// server, so it imports only browser-safe modules (the installation's name).
-
-import { installationBrand } from "../profile/brand.js";
+// "permission denied (system-connection)". Browser-safe, with no installation
+// state of its own: the caller passes the installation's name (in a browser,
+// from its public configuration).
 
 export type WriteProblem = {
   // "Not saved to …", to lead the reason with.
@@ -28,7 +27,7 @@ type LastWriteLike = { status?: string | null; message?: string | null } | null 
 const has = (message: string, ...codes: string[]) =>
   codes.some(code => new RegExp(`(^|[^A-Za-z-])${code}([^A-Za-z-]|$)`).test(message));
 
-export function describeWriteProblem(write: LastWriteLike): WriteProblem | null {
+export function describeWriteProblem(write: LastWriteLike, brandName: string): WriteProblem | null {
   if (!write || (write.status !== "failed" && write.status !== "skipped")) return null;
   const message = write.message || "";
   if (write.status === "skipped" || message === "no-connection") {
@@ -50,7 +49,7 @@ export function describeWriteProblem(write: LastWriteLike): WriteProblem | null 
     return failed("The save is uncertain — it may or may not have been written. Check the item bank; to save again anyway, recompile the item (the write may repeat).", false);
   }
   if (has(message, "system-connection")) {
-    return failed(`This is ${installationBrand().name}'s preview account; it can't write to an item bank. Add your own Learnosity connection in Settings.`, false);
+    return failed(`This is ${brandName}'s preview account; it can't write to an item bank. Add your own Learnosity connection in Settings.`, false);
   }
   if (has(message, "not-granted", "fn-not-in-session")) {
     // The owner's own settings for the connection refuse it the same way a

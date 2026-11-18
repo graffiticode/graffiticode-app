@@ -29,6 +29,7 @@ import { ReadOnlyCodePanel } from "./ReadOnlyCodePanel";
 import { CompilerTabs } from "./CompilerTabs";
 import { useRouter } from 'next/router';
 import { elideCompoundId } from '../utils';
+import { usePublicConfig } from '../lib/public-config';
 
 
 
@@ -49,6 +50,8 @@ function formatTimestamp(ts) {
 }
 
 function TaskMenu({ task, isOpen, onOpen, onClose, onFilterByItem }) {
+  // The installation's app host, where items open in the form view.
+  const appHost = usePublicConfig().hosts.app;
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuPosition, setMenuPosition] = useState({ top: -9999, left: -9999 });
@@ -199,7 +202,7 @@ function TaskMenu({ task, isOpen, onOpen, onClose, onFilterByItem }) {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    const base = process.env.NEXT_PUBLIC_FORM_APP_URL || "https://app.graffiticode.org";
+                    const base = appHost;
                     const w = window.open(`${base}/form/${encodeURIComponent(task.id)}`, '_blank');
                     if (w) w.focus();
                     onClose();

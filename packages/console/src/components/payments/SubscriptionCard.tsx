@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { CheckCircleIcon, XCircleIcon, ClockIcon } from '@heroicons/react/24/outline';
 import useGraffiticodeAuth from '@graffiticode/auth-react';
 import { paymentsGet, paymentsPost } from '../../utils/payments-client';
-import { planDetails } from '@/utils/plans';
+import { usePlanDisplay } from '@/utils/plans';
 
 interface SubscriptionData {
   status: 'active' | 'canceled' | 'past_due' | 'trialing' | 'none';
@@ -19,6 +19,7 @@ interface SubscriptionData {
 }
 
 export default function SubscriptionCard() {
+  const { planDetails } = usePlanDisplay();
   const { user } = useGraffiticodeAuth();
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
   const [loading, setLoading] = useState(true);

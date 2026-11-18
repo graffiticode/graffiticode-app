@@ -1,0 +1,177 @@
+{
+ "plans": [
+  {
+   "id": "demo",
+   "name": "Bronze",
+   "monthlyPrice": 0,
+   "annualPrice": 0,
+   "listPrice": 10,
+   "monthlyUnits": 25,
+   "additionalItem": 0.4,
+   "note": "The on-ramp — the first 25 items each month are free, with no credit card. A card is required only to create additional items, along with a monthly spend cap; move to Silver when volume makes the flat rate cheaper.",
+   "cta": "Current Plan",
+   "isFree": true
+  },
+  {
+   "id": "pro",
+   "name": "Silver",
+   "monthlyPrice": 100,
+   "annualPrice": 1000,
+   "monthlyUnits": 500,
+   "additionalItem": 0.2,
+   "note": "Flat $0.20/item with a $100 monthly minimum.",
+   "cta": "Choose Silver"
+  },
+  {
+   "id": "teams",
+   "name": "Gold",
+   "monthlyPrice": 1000,
+   "annualPrice": 10000,
+   "monthlyUnits": 10000,
+   "additionalItem": 0.1,
+   "note": "Cheaper than Silver above ~5,000 items/mo — $0.10/item.",
+   "cta": "Choose Gold"
+  },
+  {
+   "id": "platinum",
+   "name": "Platinum",
+   "monthlyPrice": 10000,
+   "annualPrice": 100000,
+   "monthlyUnits": 200000,
+   "additionalItem": 0.05,
+   "note": "The partner engagement — our lowest per-item rate at $0.05, and it includes custom language development with no additional fee.",
+   "cta": "Choose Platinum"
+  }
+ ],
+ "planDetails": {
+  "demo": {
+   "name": "Bronze",
+   "monthlyUnits": 25,
+   "price": {
+    "monthly": 0,
+    "annual": 0
+   }
+  },
+  "pro": {
+   "name": "Silver",
+   "monthlyUnits": 500,
+   "price": {
+    "monthly": 100,
+    "annual": 1000
+   }
+  },
+  "teams": {
+   "name": "Gold",
+   "monthlyUnits": 10000,
+   "price": {
+    "monthly": 1000,
+    "annual": 10000
+   }
+  },
+  "platinum": {
+   "name": "Platinum",
+   "monthlyUnits": 200000,
+   "price": {
+    "monthly": 10000,
+    "annual": 100000
+   }
+  },
+  "starter": {
+   "name": "Starter",
+   "monthlyUnits": 500,
+   "price": {
+    "monthly": 10,
+    "annual": 100
+   }
+  }
+ },
+ "labels": [
+  "Current Plan",
+  "Downgrade to Bronze",
+  "Current Plan",
+  "Current Plan",
+  "Upgrade to Silver",
+  "Upgrade to Silver",
+  "Cancel Plan",
+  "Cancel Plan",
+  "Upgrade to Gold",
+  "Upgrade to Gold",
+  "Cancel Plan",
+  "Cancel Plan",
+  "Upgrade to Platinum",
+  "Upgrade to Platinum",
+  "Cancel Plan",
+  "Cancel Plan",
+  "Downgrade to Bronze",
+  "Downgrade to Bronze",
+  "Current Plan",
+  "Current Plan",
+  "Upgrade to Silver",
+  "Upgrade to Silver",
+  "Cancel Plan",
+  "Cancel Plan",
+  "Upgrade to Gold",
+  "Upgrade to Gold",
+  "Cancel Plan",
+  "Cancel Plan",
+  "Upgrade to Platinum",
+  "Upgrade to Platinum",
+  "Cancel Plan",
+  "Cancel Plan",
+  "Downgrade to Bronze",
+  "Downgrade to Bronze",
+  "Current Plan",
+  "Current Plan",
+  "Choose Silver",
+  "Choose Silver",
+  "Cancel Plan",
+  "Cancel Plan",
+  "Upgrade to Gold",
+  "Upgrade to Gold",
+  "Cancel Plan",
+  "Cancel Plan",
+  "Upgrade to Platinum",
+  "Upgrade to Platinum",
+  "Cancel Plan",
+  "Cancel Plan",
+  "Downgrade to Bronze",
+  "Downgrade to Bronze",
+  "Current Plan",
+  "Current Plan",
+  "Downgrade to Silver",
+  "Downgrade to Silver",
+  "Cancel Plan",
+  "Cancel Plan",
+  "Choose Gold",
+  "Choose Gold",
+  "Cancel Plan",
+  "Cancel Plan",
+  "Upgrade to Platinum",
+  "Upgrade to Platinum",
+  "Cancel Plan",
+  "Cancel Plan",
+  "Downgrade to Bronze",
+  "Downgrade to Bronze",
+  "Current Plan",
+  "Current Plan",
+  "Downgrade to Silver",
+  "Downgrade to Silver",
+  "Cancel Plan",
+  "Cancel Plan",
+  "Downgrade to Gold",
+  "Downgrade to Gold",
+  "Cancel Plan",
+  "Cancel Plan",
+  "Choose Platinum",
+  "Choose Platinum",
+  "Cancel Plan",
+  "Cancel Plan"
+ ],
+ "caps": {
+  "demo": 10,
+  "starter": 10,
+  "pro": 100,
+  "teams": 1000,
+  "platinum": 10000
+ }
+}

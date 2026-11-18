@@ -6,6 +6,7 @@
 // error and initializes nothing: there are no built-in settings to fall back to.
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { loadPublicConfig, type PublicConfig } from "@graffiticode-app/core/profile/public-config";
+import { configFromPublic, setCoreConfig } from "@graffiticode-app/core/config";
 
 const PublicConfigContext = createContext<PublicConfig | null>(null);
 
@@ -24,6 +25,9 @@ export function ConfigGate({ children }: { children: ReactNode }) {
     loadPublicConfig().then(r => {
       if (!live) return;
       if (r.ok) {
+        // Core's clients (the API, language assets) in this browser use the
+        // installation's hosts; before this, core refuses to resolve any.
+        setCoreConfig(configFromPublic(r.config));
         // Observable: which installation this page initialized as.
         document.documentElement.dataset.installation = r.config.installation.id;
         setState({ status: "ready", config: r.config });

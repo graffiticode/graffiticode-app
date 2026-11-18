@@ -11,6 +11,7 @@ import { buildSessionInvalidError, buildSignupUrl } from "../src/lib/free-plan-c
 import { buildBurstError } from "../src/lib/free-plan-throttle.js";
 import { describeWriteProblem } from "../src/lib/write-errors.js";
 import { loadInstallation, resetInstallation } from "../src/profile/runtime.js";
+import { installationBrand } from "../src/profile/brand.js";
 
 const SNAPSHOT = new URL("./snapshots/graffiticode-messages.json", import.meta.url).pathname;
 const PROFILE = process.env.GRAFFITICODE_PROFILE_DIR ? resolve(process.env.GRAFFITICODE_PROFILE_DIR) : null;
@@ -26,7 +27,7 @@ function messages() {
     daily: payload(buildDailyPaceError(3, new Date(Date.UTC(2026, 10, 16, 12)))),
     sessionInvalid: payload(buildSessionInvalidError()),
     burst: payload(buildBurstError(7, 20, 60)),
-    systemConnectionWrite: describeWriteProblem({ status: "failed", message: "system-connection" } as any),
+    systemConnectionWrite: describeWriteProblem({ status: "failed", message: "system-connection" } as any, installationBrand().name),
     signup: buildSignupUrl("item_limit"),
     signupBranded: buildSignupUrl("item_limit", "assessments"),
   };

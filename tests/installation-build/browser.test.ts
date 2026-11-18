@@ -41,6 +41,11 @@ function profile(id: Name) {
   const { authProject, privyAppId } = INSTALLATIONS[id];
   Object.assign(p.installation, { id, project: `${id}-installation` });
   p.brand.name = id;
+  p.brand.operator.supportEmail = `help@${id}.test`;
+  p.brand.links.support = `https://support.${id}.test/help`;
+  p.hosts.app = `https://app.${id}.test`;
+  p.hosts.api = `https://api.${id}.test`;
+  p.hosts.languageServer = `https://l{id}.${id}.test`;
   p.auth.firebase = { apiKey: `${id}-web-key`, authDomain: `${authProject}.firebaseapp.com`, projectId: authProject, appId: `1:1:web:${id}` };
   p.auth.privyAppId = privyAppId;
   writeFileSync(join(dir, "profile.json"), JSON.stringify(p));
@@ -113,6 +118,47 @@ for (const server of ["console", "app"] as const) {
       const all = r.requested.join(" ");
       assert.ok(!all.includes(other.privyAppId) && !all.includes(other.authProject), "nothing of the other installation");
       assert.ok(!/cmom2ijrw00040cl4hd9qvjnq|656973052505/.test(all), "nothing of the built-in Graffiticode settings");
+      assert.deepEqual(r.requested.filter(u => /graffiticode\.org/.test(u)), [], "no request to a built-in host");
+    });
+  }
+}
+
+// What each installation's pages show comes from its own configuration
+// (slice 2b): the app's name and MCP endpoint, the console's support channels.
+for (const name of ["alpha", "beta"] as const) {
+  test(`app as ${name}: the home page shows its own installation`, { skip }, async () => {
+    const r = await chrome.visit(`${bases[`app:${name}`]}/`, { allowOrigin: bases[`app:${name}`], until: "document.documentElement.dataset.authProject" });
+    assert.match(r.text, new RegExp(`This is where ${name} artifacts are rendered`), r.text);
+    assert.match(r.text, /mcp\.example\.test\/mcp/);
+    assert.doesNotMatch(r.text, /Graffiticode|graffiticode\.org/i);
+    assert.doesNotMatch(r.text, new RegExp(name === "alpha" ? "beta" : "alpha"));
+  });
+
+  test(`console as ${name}: the support page shows its own channels`, { skip }, async () => {
+    const r = await chrome.visit(`${bases[`console:${name}`]}/support`, { allowOrigin: bases[`console:${name}`], until: "document.documentElement.dataset.authProject" });
+    assert.match(r.text, new RegExp(`help@${name}\\.test`), r.text);
+    assert.match(r.text, new RegExp(`support\\.${name}\\.test`));
+    assert.doesNotMatch(r.text, /graffiticode\.org/i);
+  });
+}
+
+// Core's API client in the browser (spec pages: the spec frame, and language
+// assets) uses the installation's API host, from its configuration: never a
+// build-time value or Graffiticode's default.
+for (const name of ["alpha", "beta"] as const) {
+  for (const [what, path, expected] of [
+    ["the spec frame", "/specs/0180", `https://api.${name}.test/L0180/spec.html`],
+    ["a language asset", "/specs/0180?view=usage-guide", `https://api.${name}.test/L0180/`],
+  ] as const) {
+    test(`console as ${name}: ${what} comes from its own API host`, { skip }, async () => {
+      const base = bases[`console:${name}`];
+      const r = await chrome.visit(`${base}${path}`, {
+        allowOrigin: base,
+        until: `performance.getEntriesByType("resource").some(e => e.name.startsWith(${JSON.stringify(expected)}))`,
+      });
+      assert.ok(r.requested.some(u => u.startsWith(expected)), `expected a request to ${expected}: ${r.requested.filter(u => !u.startsWith(base)).join(" ")}\n${r.text.slice(0, 300)}`);
+      assert.deepEqual(r.requested.filter(u => /graffiticode\.org/.test(u)), [], "no request to a built-in host");
+      assert.ok(!r.requested.some(u => u.includes(`api.${name === "alpha" ? "beta" : "alpha"}.test`)));
     });
   }
 }

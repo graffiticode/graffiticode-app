@@ -1,7 +1,6 @@
 import { useCallback } from 'react';
 import useGraffiticodeAuth from '@graffiticode/auth-react';
-
-const authUrl = process.env.NEXT_PUBLIC_GC_AUTH_URL || 'https://auth.graffiticode.org';
+import { usePublicConfig } from '../lib/public-config';
 
 export interface LinkedEmail {
   id: string;
@@ -23,6 +22,8 @@ export type EmailCheck =
 
 export function useLinkedEmails() {
   const { user } = useGraffiticodeAuth();
+  // The installation's auth host, from its public configuration.
+  const authUrl = usePublicConfig().hosts.auth;
 
   const listEmails = useCallback(async (): Promise<LinkedEmail[]> => {
     if (!user) throw new Error('Must be logged in');
@@ -36,7 +37,7 @@ export function useLinkedEmails() {
     }
     const body = await res.json();
     return body.data?.emails || [];
-  }, [user]);
+  }, [user, authUrl]);
 
   // Pre-OTP availability check. Returns { available: true } if the email is
   // unused, or { available: false, ownedBy } so the caller can show the right
@@ -58,7 +59,7 @@ export function useLinkedEmails() {
     }
     const body = await res.json();
     return body.data as EmailCheck;
-  }, [user]);
+  }, [user, authUrl]);
 
   // Add an email after the caller has verified ownership via a Privy OTP. The
   // browser hands the resulting Privy access token to the console, which
@@ -89,7 +90,7 @@ export function useLinkedEmails() {
       return { success: false, error: body?.error?.message || 'Failed to add email' };
     }
     return { success: true, email: body.data?.email };
-  }, [user]);
+  }, [user, authUrl]);
 
   const removeEmail = useCallback(async (id: string): Promise<void> => {
     if (!user) throw new Error('Must be logged in');
@@ -102,7 +103,7 @@ export function useLinkedEmails() {
       const body = await res.json().catch(() => ({}));
       throw new Error(body?.error?.message || 'Failed to remove email');
     }
-  }, [user]);
+  }, [user, authUrl]);
 
   return { listEmails, checkEmail, addEmail, removeEmail };
 }

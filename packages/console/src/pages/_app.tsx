@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { PrivyProvider } from '@privy-io/react-auth'
 import { GraffiticodeAuthProvider, configureAuth } from "@graffiticode/auth-react";
 import { ConfigGate, usePublicConfig } from '../lib/public-config';
+import { useCatalog, useCatalogDomain } from '../lib/catalog';
 import "../styles/globals.css";
 import "../styles/prosemirror.css";
 import GraffiticodeFirebaseProvider from '../components/GraffiticodeFirebaseProvider';
@@ -17,8 +18,6 @@ import { marks } from "../components/mark-selector";
 import { clients, findClientById } from "../components/client-selector";
 import { DEFAULT_SORT, DEFAULT_DATE_FILTER } from "../components/items-header-menu";
 import AuthWrapper from '../components/AuthWrapper';
-import { selectLanguages, findLanguageByNumber } from '../components/language-selector';
-import { getTitle } from '../lib/utils';
 
 const queryClient = new QueryClient()
 
@@ -59,18 +58,17 @@ function ConfiguredApp({
   const publicConfig = usePublicConfig();
   configureAuth({ authUrl: publicConfig.hosts.auth });
   const PRIVY_APP_ID = publicConfig.auth.privyAppId;
+  const { selectLanguages, findLanguageByNumber } = useCatalog();
   const router = useRouter();
   const pathName = router.pathname.split('/').filter(Boolean)[0] || '';
   const languageInitialized = useRef(false);
 
-  // Get domain from query params or sessionStorage
-  const queryDomain = router.query.domain;
-  const queryDomainStr = Array.isArray(queryDomain) ? queryDomain[0] : queryDomain;
-  const storedDomain = typeof window !== 'undefined' ? sessionStorage.getItem('graffiticode:domain') : null;
-  const rawDomain = queryDomainStr || storedDomain || getTitle();
-  const domain = rawDomain.toLowerCase() === 'graffiticode' ? undefined : rawDomain;
+  // An explicitly chosen domain (?domain=), else the installation's whole
+  // offered catalog (lib/catalog.ts).
+  const domain = useCatalogDomain();
   const domainLanguages = selectLanguages(domain);
-  // The list is newest first; the default stays pinned to the lowest id (L0000 with no domain).
+  // The list is newest first; the default is its lowest id, so an offered
+  // language. (The placeholder only for an installation that offers none.)
   const defaultLanguage = domainLanguages.length > 0 ? domainLanguages[domainLanguages.length - 1] : {id: "0000", name: "L0000"};
 
   const [language, setLanguage] = useLocalStorage("graffiticode:language", defaultLanguage);

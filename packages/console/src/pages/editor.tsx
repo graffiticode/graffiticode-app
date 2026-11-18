@@ -8,8 +8,10 @@ import { createItem } from '../utils/swr/fetchers';
 import { getPageTitle } from '../lib/utils';
 import SignIn from '../components/SignIn';
 import Gallery from '../components/gallery';
+import { usePublicConfig } from '../lib/public-config';
 
 export default function Editor({ language, setLanguage, mark }) {
+  const { brand, hosts } = usePublicConfig();
   const router = useRouter();
   const { lang: rawLang, itemId: rawItemId, mode, origin, token: rawToken } = router.query;
   const lang = Array.isArray(rawLang) ? rawLang[0] : rawLang;
@@ -225,16 +227,16 @@ export default function Editor({ language, setLanguage, mark }) {
           <div className="max-w-md w-full">
             <h2 className="text-center text-2xl font-bold mb-4">Sign in to continue</h2>
             <p className="text-center text-gray-600 mb-8">
-              Graffiticode account required to create or edit questions.
+              {brand.name} account required to create or edit questions.
               <br />
               New here? Create a free account by signing in with an Ethereum wallet. No blockchain fees required.
             </p>
             <div className="flex justify-center">
               <button
-                onClick={() => window.open('https://graffiticode.com', '_blank')}
+                onClick={() => window.open(brand.links.product ?? hosts.console, '_blank')}
                 className="px-6 py-3 bg-gray-600 text-white rounded-none hover:bg-gray-700 transition-colors font-medium"
               >
-                Open Graffiticode to Sign In
+                Open {brand.name} to Sign In
               </button>
             </div>
           </div>

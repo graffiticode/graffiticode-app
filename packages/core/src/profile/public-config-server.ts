@@ -5,7 +5,7 @@
 import { PUBLIC_CONFIG_VERSION, type FirebaseWebConfig, type PublicConfig } from "./public-config.js";
 import { installationHosts, profile } from "./runtime.js";
 import { installationBrand } from "./brand.js";
-import { selectLanguages } from "../lib/languages.js";
+import { isLanguageOffered, resolvableLanguages } from "../lib/languages.js";
 import { plans } from "../lib/plans-config.js";
 import { freePlanEnabled, freePlanItemTtlHours } from "../lib/free-plan-context.js";
 
@@ -65,13 +65,21 @@ export function buildPublicConfig(env: NodeJS.ProcessEnv = process.env): PublicC
   const ids = clientIds(env);
   const firebase = Object.fromEntries(FIREBASE_FIELDS.filter(k => ids.firebase[k] !== undefined).map(k => [k, ids.firebase[k]])) as FirebaseWebConfig;
   const { privyAppId, stripePublishableKey } = ids;
-  const links = p?.brand.links ?? { product: "https://graffiticode.org", forum: "https://forum.graffiticode.org", source: "https://github.com/graffiticode", signup: brand.signupUrl };
+  const links = p?.brand.links ?? {
+    product: "https://graffiticode.org",
+    forum: "https://forum.graffiticode.org",
+    support: "https://forum.graffiticode.org/c/support/57",
+    source: "https://github.com/graffiticode",
+    signup: brand.signupUrl,
+  };
+  const supportEmail = p ? p.brand.operator.supportEmail : "support@graffiticode.org";
   return {
     configVersion: PUBLIC_CONFIG_VERSION,
     installation: { id: brand.id },
     brand: {
       name: brand.name,
-      links: Object.fromEntries((["product", "docs", "forum", "source", "signup"] as const).filter(k => links[k]).map(k => [k, links[k]])),
+      ...(supportEmail ? { supportEmail } : {}),
+      links: Object.fromEntries((["product", "docs", "forum", "support", "source", "signup"] as const).filter(k => links[k]).map(k => [k, links[k]])),
     },
     hosts: { console: hosts.console, app: hosts.app, api: hosts.api, auth: hosts.auth, mcp: hosts.mcp, languageServer: hosts.languageServer },
     mcp: { endpoint: hosts.mcpResource },
@@ -90,11 +98,15 @@ export function buildPublicConfig(env: NodeJS.ProcessEnv = process.env): PublicC
       }])),
     },
     catalog: {
-      // The languages this installation offers, under its policy.
-      languages: selectLanguages().map(l => ({
+      // Every language this installation resolves, under its policy, each
+      // marked whether it is offered (listed, and open to new items) or
+      // resolves only for existing items.
+      languages: resolvableLanguages().map(l => ({
         id: l.id,
+        offered: isLanguageOffered(l.id),
         name: l.name,
         description: l.description,
+        ...(l.routingHint ? { routingHint: l.routingHint } : {}),
         domains: l.domains,
         ...(l.status ? { status: l.status } : {}),
         ...(l.hidden ? { hidden: true } : {}),

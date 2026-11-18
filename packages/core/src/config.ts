@@ -9,30 +9,27 @@
 
 import { installedProfile } from "./profile/current.js";
 import { resolveHosts } from "./profile/hosts.js";
+import type { PublicConfig } from "./profile/public-config.js";
 import { storageProjectOrNull } from "./profile/storage-config.js";
 
 const list = (raw: string | undefined) => (raw ?? "").split(",").map(s => s.trim()).filter(Boolean);
 
 export function configFromEnv(env: NodeJS.ProcessEnv = process.env) {
+  // A browser has no environment of its own to read: what a bundle could see
+  // is a build-time value, which would bake one installation into a bundle
+  // every installation shares. Its configuration comes from the installation's
+  // public configuration instead (configFromPublic, set by the page's
+  // configuration gate). Until then, nothing in a browser may resolve a host.
+  if (typeof window !== "undefined") {
+    throw new Error("core's configuration in a browser comes from the installation's public configuration (/api/config), which hasn't loaded");
+  }
   // Public hosts from the one resolver (profile/hosts.ts), in both modes, so core
-  // and the servers' installationHosts() always agree.
-  //
-  // The literal process.env.NEXT_PUBLIC_* reads are the browser's only way to
-  // see those values: Next inlines a literal read at build time. So they're
-  // used in the browser alone. On a server, Next inlines them too, into the
-  // server bundle, and a value baked in at build time isn't the server's
-  // environment: passed to the resolver it would contradict an installation
-  // profile naming other hosts. The server resolver sees only `env`, the
-  // runtime environment, whose variables are still checked against the profile.
+  // and the servers' installationHosts() always agree. The resolver sees only
+  // `env`, the runtime environment, whose variables are checked against the
+  // profile: a value Next inlined into the server bundle at build time isn't
+  // the server's environment.
   const installed = installedProfile();
-  const inBrowser = typeof window !== "undefined";
-  const hosts = resolveHosts(installed?.profile ?? null, inBrowser
-    ? {
-      ...env,
-      NEXT_PUBLIC_GC_API_URL: env.NEXT_PUBLIC_GC_API_URL || process.env.NEXT_PUBLIC_GC_API_URL,
-      NEXT_PUBLIC_GC_AUTH_URL: env.NEXT_PUBLIC_GC_AUTH_URL || process.env.NEXT_PUBLIC_GC_AUTH_URL,
-    }
-    : env);
+  const hosts = resolveHosts(installed?.profile ?? null, env);
   const consoleUrl = hosts.console;
   return {
     apiUrl: hosts.api,
@@ -77,6 +74,26 @@ export function configFromEnv(env: NodeJS.ProcessEnv = process.env) {
 }
 
 export type CoreConfig = ReturnType<typeof configFromEnv>;
+
+// Core's configuration in a browser, from the installation's validated public
+// configuration: its public hosts and the shared sign-in project's web key.
+// Everything server-only (queues, secrets, alerts) is empty: a browser never
+// has it.
+export function configFromPublic(pc: PublicConfig): CoreConfig {
+  return {
+    apiUrl: pc.hosts.api,
+    authUrl: pc.hosts.auth,
+    firebaseWebApiKey: pc.auth.firebase.apiKey,
+    generationQueue: { project: "", location: "", name: "", secret: "", consoleUrl: pc.hosts.console, workerUrl: "", local: false },
+    alerts: { sendgridApiKey: "", emailFrom: "", twilioAccountSid: "", twilioAuthToken: "", twilioFrom: "", smsTo: "" },
+    funnel: { excludeSessions: [], internalNamespaces: [], internalToken: "" },
+    actAs: { grantSecret: "", audience: "" },
+    generationProtocol: 1,
+    ragDebug: false,
+    judgeMaxTokens: 8192,
+    trainingDir: "training",
+  };
+}
 
 let current: CoreConfig | null = null;
 

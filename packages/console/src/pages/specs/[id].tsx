@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm';
 import { useToken } from '@graffiticode/auth-react';
 import { getPageTitle } from '../../lib/utils';
 import { getBaseUrlForApi, getLanguageAsset } from '@graffiticode-app/core/lib/api';
-import { findLanguageByNumber } from '../../components/language-selector';
+import { useCatalog } from '../../lib/catalog';
 
 /** Fixed per page load: a fresh visit busts the cache, a re-render does not reload the frame. */
 const PAGE_LOAD = Date.now();
@@ -36,6 +36,7 @@ function normalizeLangId(raw: any): string | null {
 }
 
 export default function SpecDetail({ language, setLanguage }) {
+  const { findLanguageByNumber } = useCatalog();
   const router = useRouter();
   const rawId = router.query.id;
   const urlLangId = normalizeLangId(Array.isArray(rawId) ? rawId[0] : rawId);

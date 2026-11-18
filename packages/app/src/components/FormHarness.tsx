@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { usePublicConfig } from "@/lib/public-config";
 
-const apiBase = process.env.NEXT_PUBLIC_GC_API_URL || "https://api.graffiticode.org";
-
-function buildSrc(taskId: string, lang: string | null, accessToken: string | null, origin: string) {
+// `apiBase` is the installation's API host, from its public configuration.
+function buildSrc(apiBase: string, taskId: string, lang: string | null, accessToken: string | null, origin: string) {
   const params = new URLSearchParams();
   if (lang) params.set("lang", lang);
   params.set("id", taskId);
@@ -28,6 +28,7 @@ export function FormHarness({
   lang?: string | null;
   accessToken: string | null;
 }) {
+  const apiBase = usePublicConfig().hosts.api;
   const [src, setSrc] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
@@ -48,11 +49,11 @@ export function FormHarness({
   const applyTaskId = useCallback(
     (tid: string) => {
       if (typeof window === "undefined") return;
-      setSrc(buildSrc(tid, lang, accessToken, window.location.origin));
+      setSrc(buildSrc(apiBase, tid, lang, accessToken, window.location.origin));
       setIsLoading(true);
       appliedTaskIdRef.current = tid;
     },
-    [lang, accessToken],
+    [apiBase, lang, accessToken],
   );
 
   useEffect(() => {

@@ -31,10 +31,15 @@ export type FirebaseWebConfig = {
   measurementId?: string;
 };
 
+// A language the installation resolves. `offered` languages are listed and
+// can be chosen for new items; the others resolve for existing items only.
 export type PublicLanguage = {
   id: string;
+  offered: boolean;
   name: string;
   description: string;
+  // The longer public description agents see (list_languages).
+  routingHint?: string;
   domains: string[];
   status?: string;
   hidden?: boolean;
@@ -48,7 +53,8 @@ export type PublicPlan = {
   basePriceMonthly: number;
   basePriceAnnual: number;
   includedItems: number;
-  overageRatePerItem: number;
+  // null when the plan offers no items beyond its included ones.
+  overageRatePerItem: number | null;
   tier: number;
   hardCap: boolean;
   defaultCapUsd?: number;
@@ -57,12 +63,17 @@ export type PublicPlan = {
 export type PublicConfig = {
   configVersion: number;
   installation: { id: string };
-  brand: { name: string; links: { product?: string; docs?: string; forum?: string; source?: string; signup?: string } };
+  brand: {
+    name: string;
+    // Where people write for help, and where they ask in public.
+    supportEmail?: string;
+    links: { product?: string; docs?: string; forum?: string; support?: string; source?: string; signup?: string };
+  };
   hosts: { console: string; app: string; api: string; auth: string; mcp: string; languageServer: string };
   mcp: { endpoint: string };
   auth: { firebase: FirebaseWebConfig; privyAppId: string };
   billing: { stripePublishableKey: string | null; plans: Record<string, PublicPlan> };
-  catalog: { languages: PublicLanguage[] };
+  catalog: { languages: PublicLanguage[] };  // every resolvable language
   freePlan: { enabled: boolean; itemTtlHours: number };
 };
 
@@ -113,7 +124,7 @@ function bool(v: unknown, path: string) {
 const optionally = (v: unknown, check: () => unknown) => { if (v !== undefined) check(); };
 
 const PLAN_IDS = ["demo", "starter", "pro", "teams", "platinum"];
-const LINKS = ["product", "docs", "forum", "source", "signup"] as const;
+const LINKS = ["product", "docs", "forum", "support", "source", "signup"] as const;
 const FIREBASE_REQUIRED = ["apiKey", "authDomain", "projectId", "appId"] as const;
 const FIREBASE_OPTIONAL = ["databaseURL", "storageBucket", "messagingSenderId", "measurementId"] as const;
 
@@ -123,8 +134,9 @@ function check(raw: unknown) {
   const installation = fields(c.installation, "installation", ["id"]);
   text(installation.id, "installation.id", /^[a-z0-9][a-z0-9-]*$/);
 
-  const brand = fields(c.brand, "brand", ["name", "links"]);
+  const brand = fields(c.brand, "brand", ["name", "links"], ["supportEmail"]);
   text(brand.name, "brand.name");
+  optionally(brand.supportEmail, () => text(brand.supportEmail, "brand.supportEmail", /^[^\s@]+@[^\s@]+\.[^\s@]+$/));
   const links = fields(brand.links, "brand.links", [], LINKS);
   for (const k of LINKS) optionally(links[k], () => url(links[k], `brand.links.${k}`));
 
@@ -158,7 +170,7 @@ function check(raw: unknown) {
     amount(plan.basePriceMonthly, `${at}.basePriceMonthly`);
     amount(plan.basePriceAnnual, `${at}.basePriceAnnual`);
     amount(plan.includedItems, `${at}.includedItems`, { integer: true });
-    amount(plan.overageRatePerItem, `${at}.overageRatePerItem`);
+    if (plan.overageRatePerItem !== null) amount(plan.overageRatePerItem, `${at}.overageRatePerItem`);
     amount(plan.tier, `${at}.tier`, { integer: true });
     bool(plan.hardCap, `${at}.hardCap`);
     optionally(plan.defaultCapUsd, () => amount(plan.defaultCapUsd, `${at}.defaultCapUsd`));
@@ -169,12 +181,14 @@ function check(raw: unknown) {
   const seen = new Set<string>();
   (catalog.languages as unknown[]).forEach((raw, i) => {
     const at = `catalog.languages[${i}]`;
-    const l = fields(raw, at, ["id", "name", "description", "domains"], ["status", "hidden", "internal", "sponsor", "sponsorUrl"]);
+    const l = fields(raw, at, ["id", "offered", "name", "description", "domains"], ["routingHint", "status", "hidden", "internal", "sponsor", "sponsorUrl"]);
     const id = text(l.id, `${at}.id`, /^[0-9]{4}$/);
     if (seen.has(id)) refuse(`${at}.id`, "repeats another language");
     seen.add(id);
+    bool(l.offered, `${at}.offered`);
     text(l.name, `${at}.name`);
     if (typeof l.description !== "string") refuse(`${at}.description`, "isn't a string");
+    optionally(l.routingHint, () => text(l.routingHint, `${at}.routingHint`));
     if (!Array.isArray(l.domains)) refuse(`${at}.domains`, "isn't a list");
     (l.domains as unknown[]).forEach((d, j) => text(d, `${at}.domains[${j}]`));
     optionally(l.status, () => text(l.status, `${at}.status`));

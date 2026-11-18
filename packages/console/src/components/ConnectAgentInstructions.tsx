@@ -1,6 +1,7 @@
 import Link from "next/link";
 import React from "react";
 import CopyButton from "./CopyButton";
+import { usePublicConfig } from "../lib/public-config";
 
 /**
  * "Connect your agent to this account" — shown once a trial user has claimed.
@@ -42,25 +43,23 @@ export function hostTakesApiKey(host: ClientHost): boolean {
   return host === "claude-code" || host === "editor" || host === "unknown";
 }
 
-const MCP_ENDPOINT =
-  process.env.NEXT_PUBLIC_MCP_ENDPOINT || "https://mcp.graffiticode.org/mcp";
-
 const KEY_PLACEHOLDER = "<your-api-key>";
 
-function claudeCodeCommand(key: string): string {
+// `endpoint` is the installation's MCP endpoint, from its public configuration.
+function claudeCodeCommand(endpoint: string, key: string): string {
   return [
     "claude mcp add --transport http graffiticode",
-    MCP_ENDPOINT,
+    endpoint,
     `--header "Authorization: Bearer ${key}"`,
   ].join(" ");
 }
 
-function editorConfig(key: string): string {
+function editorConfig(endpoint: string, key: string): string {
   return JSON.stringify(
     {
       mcpServers: {
         graffiticode: {
-          url: MCP_ENDPOINT,
+          url: endpoint,
           headers: { Authorization: `Bearer ${key}` },
         },
       },
@@ -96,6 +95,7 @@ export default function ConnectAgentInstructions({
   creatingKey: boolean;
   keyError?: string | null;
 }) {
+  const endpoint = usePublicConfig().mcp.endpoint;
   const key = apiKey?.token || KEY_PLACEHOLDER;
   const needsKey = hostTakesApiKey(host);
 
@@ -132,7 +132,7 @@ export default function ConnectAgentInstructions({
       {host === "claude-code" && (
         <>
           <p className="text-sm text-gray-600 mb-2">Run this in your terminal:</p>
-          <Snippet text={claudeCodeCommand(key)} />
+          <Snippet text={claudeCodeCommand(endpoint, key)} />
         </>
       )}
 
@@ -143,7 +143,7 @@ export default function ConnectAgentInstructions({
               ? "Add the header to the graffiticode entry in your MCP config:"
               : "Most agents take a remote MCP server in a config file like this:"}
           </p>
-          <Snippet text={editorConfig(key)} />
+          <Snippet text={editorConfig(endpoint, key)} />
         </>
       )}
 
