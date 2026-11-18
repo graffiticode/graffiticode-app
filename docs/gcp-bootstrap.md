@@ -168,6 +168,10 @@ for s in INTERNAL_JOB_SECRET FREE_PLAN_API_KEY FREE_PLAN_NAMESPACE_SALT ACT_AS_G
   gcloud secrets add-iam-policy-binding $s --project=$P --member=serviceAccount:$SA \
     --role=roles/secretmanager.secretAccessor --condition=None; done
 
+# Every TTL policy, for an installation's own project and database, idempotently:
+#   npm run profile -- ttl <profile-dir> > ttl.sh   (review it, then run it)
+# (core/src/storage-ttl.ts). The commands below are the default database's three.
+
 # Idempotency keys (idempotency-keys/{hash}) carry expiresAt; the TTL policy
 # deletes them once past it (an expired key already reads as absent, so this
 # only reclaims space).

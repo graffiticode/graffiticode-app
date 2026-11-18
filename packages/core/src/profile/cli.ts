@@ -1,6 +1,9 @@
 // gc-profile: validate an installation profile, or generate its discovery files.
 //   npm run profile -- validate <profile-dir>
 //   npm run profile -- discovery <profile-dir> --out <dir>
+//   npm run profile -- ttl <profile-dir>
+// `ttl` prints the script that provisions the database's TTL policies
+// (storage-ttl.ts) for the profile's project and database. It runs nothing.
 // `discovery` writes app/llms.txt, app/.well-known/mcp.json, and (with a
 // listing) skills/plugin.meta.json and its icon, plus discovery-receipt.json:
 // the profile digest, this release's version, each file's sha256, the families
@@ -14,6 +17,7 @@ import { renderTemplate } from "./template.js";
 import { generateDiscoveryFiles } from "./discovery-files.js";
 import { listLanguages } from "../lib/languages.js";
 import { isDiscoverable } from "../discovery.js";
+import { ttlProvisioningScript } from "../storage-ttl.js";
 
 const fail = (message: string): never => {
   console.error(message);
@@ -84,8 +88,11 @@ if (isMain) {
       const receipt = await discovery(dir, rest[1]);
       console.log(`wrote discovery files for ${receipt.installationId} to ${rest[1]} (profile ${receipt.profileDigest.slice(0, 12)})`);
       for (const o of receipt.omittedFamilies) console.log(`  omitted: ${o.family} (${o.reason})`);
+    } else if (command === "ttl" && dir) {
+      const { installation } = loadProfile(dir).profile;
+      process.stdout.write(ttlProvisioningScript({ project: installation.project, database: installation.database }));
     } else {
-      console.error("usage: gc-profile validate <profile-dir>\n       gc-profile discovery <profile-dir> --out <dir>");
+      console.error("usage: gc-profile validate <profile-dir>\n       gc-profile discovery <profile-dir> --out <dir>\n       gc-profile ttl <profile-dir>");
       process.exit(2);
     }
   } catch (err) {

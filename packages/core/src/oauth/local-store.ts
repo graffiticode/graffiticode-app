@@ -16,9 +16,20 @@
 //     live token of the family in the same transaction.
 //   oauth_legacy_claims/<kind>:<hash>    one per legacy code or pending
 //     authorization used through the fallback: { state: prepared | consumed |
-//     tombstoned, claimId }. Only the transaction that moves it to consumed
-//     hands the record to its caller.
+//     tombstoned, claimId, expires_at }. Only the transaction that moves it to
+//     consumed hands the record to its caller.
+//
+// Expiry. Pending authorizations, codes and claims expire; nothing else here
+// does. Each carries two fields:
+//   expires_at  epoch milliseconds: the credential's own expiry, the only one
+//               validation reads, and enforced on every read, however late
+//               cleanup runs. A claim takes its credential's expiry when it is
+//               created, and nothing (a retry, a settlement) changes it.
+//   expireAt    a Firestore Timestamp for the TTL policy (storage-ttl.ts):
+//               expires_at plus CLEANUP_GRACE_MS. Cleanup never comes before
+//               the credential stopped being usable, even with clock skew.
 import { randomUUID } from "node:crypto";
+import { Timestamp } from "firebase-admin/firestore";
 import { db } from "../db.js";
 import type { ConsumeKind, MigrationMode } from "./legacy-contract.js";
 import {
@@ -36,7 +47,19 @@ export const COLLECTIONS = {
   claims: "oauth_legacy_claims",
 } as const;
 
-const PENDING_TTL_MS = 10 * 60 * 1000;
+export const PENDING_TTL_MS = 10 * 60 * 1000;
+// How long after a credential expires its document may be cleaned up.
+export const CLEANUP_GRACE_MS = 60 * 60 * 1000;
+export const cleanupAt = (expiresAtMs: number) => Timestamp.fromMillis(expiresAtMs + CLEANUP_GRACE_MS);
+
+// When a legacy code or pending authorization stops being usable: a code's own
+// expiry; a pending authorization's recorded one (the auth service stores
+// expires_at), else ten minutes from its creation, as it was issued.
+export function credentialExpiry(kind: ConsumeKind, record: AuthorizationCode | PendingAuth): number {
+  if (kind === "code") return (record as AuthorizationCode).expires_at;
+  const recorded = (record as PendingAuth & { expires_at?: number }).expires_at;
+  return typeof recorded === "number" ? recorded : (record as PendingAuth).created_at + PENDING_TTL_MS;
+}
 
 export type MigrationState = "prepared" | "acknowledged" | "confirmed" | "tombstoned" | "revoked";
 export type MigrationRecord = {
@@ -55,7 +78,7 @@ export type MigrationRecord = {
 export type ClaimState = "prepared" | "consumed" | "tombstoned";
 // `record`: the code or pending authorization as the source held it when
 // claimed, since once consumed there the source reads it as used or gone.
-export type LegacyClaim<T = AuthorizationCode | PendingAuth> = { kind: ConsumeKind; hash: string; state: ClaimState; claimId: string; record: T; updated_at: number };
+export type LegacyClaim<T = AuthorizationCode | PendingAuth> = { kind: ConsumeKind; hash: string; state: ClaimState; claimId: string; record: T; expires_at: number; updated_at: number };
 
 // What a transaction and a batch have in common, for writing token documents.
 type Writer = { set(ref: FirebaseFirestore.DocumentReference, data: FirebaseFirestore.DocumentData): unknown; delete(ref: FirebaseFirestore.DocumentReference): unknown };
@@ -93,7 +116,8 @@ export class LocalOAuthStore {
   // --- pending authorizations ----------------------------------------------
 
   async savePendingAuth(pending: PendingAuth) {
-    await this.col("pending").doc(credentialHash(pending.state)).set(plain({ ...pending, expires_at: this.now() + PENDING_TTL_MS }));
+    const expires_at = this.now() + PENDING_TTL_MS;
+    await this.col("pending").doc(credentialHash(pending.state)).set({ ...plain({ ...pending, expires_at }), expireAt: cleanupAt(expires_at) });
   }
   async getPendingAuth(state: string): Promise<PendingAuth | undefined> {
     const s = await this.col("pending").doc(credentialHash(state)).get();
@@ -117,18 +141,19 @@ export class LocalOAuthStore {
   // --- codes ---------------------------------------------------------------
 
   async saveAuthCode(code: AuthorizationCode) {
-    await this.col("codes").doc(credentialHash(code.code)).set(plain(code));
+    await this.col("codes").doc(credentialHash(code.code)).set({ ...plain(code), expireAt: cleanupAt(code.expires_at) });
   }
+  // Returned expired too: the token endpoint checks expires_at and says so.
   async getAuthCode(code: string): Promise<AuthorizationCode | undefined> {
     const s = await this.col("codes").doc(credentialHash(code)).get();
-    return s.exists ? (s.data() as AuthorizationCode) : undefined;
+    return s.exists ? stripCleanup(s.data() as AuthorizationCode) : undefined;
   }
   async consumeAuthCode(code: string): Promise<boolean> {
     const ref = this.col("codes").doc(credentialHash(code));
     return this.firestore().runTransaction(async tx => {
       const s = await tx.get(ref);
       const d = s.data() as AuthorizationCode | undefined;
-      if (!d || d.used) return false;
+      if (!d || d.used || d.expires_at <= this.now()) return false;
       tx.update(ref, { used: true });
       return true;
     });
@@ -298,18 +323,21 @@ export class LocalOAuthStore {
   private claimRef(kind: ConsumeKind, hash: string) {
     return this.col("claims").doc(`${kind}:${hash}`);
   }
+  // Returned expired too: the caller checks expires_at (a claim outlives its
+  // credential's use only until cleanup).
   async getClaim(kind: ConsumeKind, hash: string): Promise<LegacyClaim | null> {
     const s = await this.claimRef(kind, hash).get();
-    return s.exists ? (s.data() as LegacyClaim) : null;
+    return s.exists ? stripCleanup(s.data() as LegacyClaim) : null;
   }
   // The one claim on a legacy code or pending authorization, created if absent.
   async claim(kind: ConsumeKind, hash: string, record: AuthorizationCode | PendingAuth): Promise<LegacyClaim> {
     const ref = this.claimRef(kind, hash);
     return this.firestore().runTransaction(async tx => {
       const s = await tx.get(ref);
-      if (s.exists) return s.data() as LegacyClaim;
-      const c: LegacyClaim = plain({ kind, hash, state: "prepared", claimId: randomUUID(), record, updated_at: this.now() });
-      tx.create(ref, c);
+      if (s.exists) return stripCleanup(s.data() as LegacyClaim);
+      const expires_at = credentialExpiry(kind, record);
+      const c: LegacyClaim = plain({ kind, hash, state: "prepared", claimId: randomUUID(), record, expires_at, updated_at: this.now() });
+      tx.create(ref, { ...c, expireAt: cleanupAt(expires_at) });
       return c;
     });
   }
@@ -326,9 +354,13 @@ export class LocalOAuthStore {
   }
 }
 
-function stripExpiry(d: PendingAuth & { expires_at?: number }): PendingAuth {
-  const { expires_at: _e, ...rest } = d;
+function stripExpiry(d: PendingAuth & { expires_at?: number; expireAt?: unknown }): PendingAuth {
+  const { expires_at: _e, expireAt: _c, ...rest } = d;
   return rest;
+}
+function stripCleanup<T>(d: T & { expireAt?: unknown }): T {
+  const { expireAt: _c, ...rest } = d;
+  return rest as T;
 }
 function stripUid(d: TokenEntry & { uid?: string; family?: string }): TokenEntry {
   const { uid: _u, family: _f, ...rest } = d;

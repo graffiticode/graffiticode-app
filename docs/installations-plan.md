@@ -423,8 +423,8 @@ Commits and merges happen only when you ask.
     9. Switch to `OAUTH_STORE=local` with `OAUTH_LEGACY_FALLBACK_RETIRED=1`.
 
     Nothing in this repo can check step 3. A check that lists reachable revisions against the release is still to be written.
+  - **Expiry and cleanup.** Pending authorizations, codes and legacy claims keep their millisecond `expires_at`, the only expiry validation reads, enforced on every read however late cleanup runs. Each also carries `expireAt`, a Firestore Timestamp equal to `expires_at` plus one hour (`CLEANUP_GRACE_MS`), for the TTL policy, so cleanup never comes before the credential stopped being usable. A legacy claim takes the claimed credential's expiry when it is created: a code's own, or a pending authorization's recorded one, else ten minutes from its creation. Nothing changes it afterwards, neither a retry nor a racing first attempt. An expired legacy code or pending authorization is neither claimed nor consumed at the source. The claim is checked again, for state and expiry, immediately before the source is asked, because creating it takes time; and once more before the record is handed out. That also settles claims a crash left prepared: they expire with their credential, and TTL removes them.
+  - **TTL provisioning** (`core/src/storage-ttl.ts`; `npm run profile -- ttl <profile>` prints it). Every TTL policy the database needs (the three existing ones and the OAuth store's three) is a script that names the installation's `--project` and `--database` on every call. Each policy is read first and enabled only if it isn't `ACTIVE` or `CREATING`, so a re-run changes nothing. It is only printed; applying it is the operator's step, and the parameterized bootstrap will call it. Tests run it against a stand-in `gcloud`.
   - **Still open:**
     - the auth-service half;
-    - a Firestore TTL policy for `oauth_pending` and `oauth_codes`; reads already ignore expired ones, but the documents stay;
-    - prepared claims on legacy codes, which expire with the codes and aren't swept;
     - the drained-revision check above.

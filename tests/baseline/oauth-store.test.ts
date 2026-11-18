@@ -74,7 +74,7 @@ function setup({ fenced = true, pollMs = 0, now }: { fenced?: boolean; pollMs?: 
   const source = new core.standin.LegacyStandIn();
   source.seedClient(legacyClient);
   if (fenced) source.fence();
-  const local = new core.local.LocalOAuthStore(() => h.db);
+  const local = new core.local.LocalOAuthStore(() => h.db, now ?? Date.now);
   const store = new core.store.MigratingOAuthStore(local, source, "graffiticode", { pollMs, now });
   return { source, local, store };
 }
@@ -677,6 +677,123 @@ test("a source refusing for its seal never tombstones a credential", async () =>
   source.seal();
   await assert.rejects(store.rotateTokens(t.refresh_token, next()), core.records.StoreUnavailable);
   assert.equal((await local.getMigration(core.records.tokenKey(t)))?.state, "prepared");
+});
+
+// --- expiry and cleanup (TTL) ------------------------------------------------------
+
+const GRACE = 60 * 60 * 1000;
+const millis = (ts: any) => ts.toMillis();
+
+test("local pending authorizations and codes keep millisecond expiry for validation, and clean up only after it", async () => {
+  let clock = Date.now();
+  const { store } = setup({ now: () => clock });
+  const p = { state: `state-${++n}`, client_id: CLIENT, redirect_uri: "https://agent.example/cb", scope: "graffiticode", code_challenge: "c", code_challenge_method: "S256", resource: MCP, created_at: clock };
+  await store.savePendingAuth(p);
+  const pdoc = (await h.db.collection("oauth_pending").doc(hash(p.state)).get()).data();
+  assert.equal(pdoc.expires_at, clock + 10 * 60_000);
+  assert.equal(millis(pdoc.expireAt), pdoc.expires_at + GRACE);
+  const c = legacyCode({ expires_at: clock + 10 * 60_000 });
+  await store.saveAuthCode(c as any);
+  const cdoc = (await h.db.collection("oauth_codes").doc(hash(c.code)).get()).data();
+  assert.equal(cdoc.expires_at, c.expires_at);
+  assert.equal(millis(cdoc.expireAt), c.expires_at + GRACE);
+  assert.equal("expireAt" in (await store.getAuthCode(c.code))!, false, "reads return the record as issued");
+  // Past expiry, before any cleanup ran: still refused.
+  clock += 10 * 60_000 + 1;
+  assert.equal(await store.getPendingAuth(p.state), undefined);
+  assert.equal(await store.takePendingAuth(p.state), undefined);
+  assert.equal(await store.consumeAuthCode(c.code), false);
+});
+
+test("a legacy code's claim carries the code's own expiry; a retry never extends it", async () => {
+  let clock = Date.now();
+  const { source, local, store } = setup({ now: () => clock });
+  const c = legacyCode({ expires_at: clock + 5 * 60_000 });
+  source.seedCode(c as any);
+  source.fail("consume", "after");
+  await assert.rejects(store.consumeAuthCode(c.code), core.records.StoreUnavailable);
+  const ref = h.db.collection("oauth_legacy_claims").doc(`code:${hash(c.code)}`);
+  const first = (await ref.get()).data();
+  assert.equal(first.expires_at, c.expires_at);
+  assert.equal(millis(first.expireAt), c.expires_at + GRACE, "cleanup comes only after the code stopped being usable");
+  clock += 60_000;
+  assert.equal(await store.consumeAuthCode(c.code), true, "the retry, still within the code's life");
+  const after = (await ref.get()).data();
+  assert.deepEqual([after.expires_at, millis(after.expireAt)], [first.expires_at, millis(first.expireAt)], "unchanged by the retry");
+  // A racing first attempt that reaches claim() after it exists changes nothing either.
+  clock += 60_000;
+  await local.claim("code", hash(c.code), { ...c, expires_at: clock + 10 * 60_000 } as any);
+  const raced = (await ref.get()).data();
+  assert.deepEqual([raced.expires_at, millis(raced.expireAt)], [first.expires_at, millis(first.expireAt)]);
+});
+
+test("an expired legacy code or claim is never consumed at the source", async () => {
+  let clock = Date.now();
+  const { source, store } = setup({ now: () => clock });
+  const claimed = legacyCode({ expires_at: clock + 60_000 });
+  source.seedCode(claimed as any);
+  source.fail("consume", "before");
+  await assert.rejects(store.consumeAuthCode(claimed.code), core.records.StoreUnavailable);
+  const unclaimed = legacyCode({ expires_at: clock + 60_000 });
+  source.seedCode(unclaimed as any);
+  clock += 60_001;
+  const calls = source.calls.filter(c => c.op === "consume").length;
+  assert.equal(await store.consumeAuthCode(claimed.code), false, "its claim has expired");
+  assert.equal(await store.consumeAuthCode(unclaimed.code), false, "expired before any claim");
+  assert.equal(source.calls.filter(c => c.op === "consume").length, calls, "nothing asked of the source");
+  assert.equal(await h.db.collection("oauth_legacy_claims").doc(`code:${hash(unclaimed.code)}`).get().then((d: any) => d.exists), false);
+});
+
+test("expiry passing while the claim is being created: nothing is consumed at the source", async () => {
+  let clock = Date.now();
+  const { source, local, store } = setup({ now: () => clock });
+  const c = legacyCode({ expires_at: clock + 60_000 });
+  source.seedCode(c as any);
+  const p = { state: `slow-${++n}`, client_id: CLIENT, redirect_uri: "https://agent.example/cb", scope: "graffiticode", code_challenge: "c", code_challenge_method: "S256", resource: MCP, created_at: clock, expires_at: clock + 60_000 };
+  source.seedPending(p as any);
+  // The claim transaction completes only after the credential has expired.
+  const claim = local.claim.bind(local);
+  local.claim = async (...args) => {
+    const made = await claim(...args);
+    clock += 60_001;
+    return made;
+  };
+  assert.equal(await store.consumeAuthCode(c.code), false);
+  clock -= 60_001; // the pending authorization starts within its life too
+  assert.equal(await store.takePendingAuth(p.state), undefined);
+  assert.equal(source.calls.filter(x => x.op === "consume").length, 0, "the source was never asked");
+  assert.equal((await source.getAuthCode(c.code))?.used, false);
+});
+
+test("expiry passing while the source consumes: the record isn't handed out", async () => {
+  let clock = Date.now();
+  const { source, store } = setup({ now: () => clock });
+  const p = { state: `late-${++n}`, client_id: CLIENT, redirect_uri: "https://agent.example/cb", scope: "graffiticode", code_challenge: "c", code_challenge_method: "S256", resource: MCP, created_at: clock, expires_at: clock + 60_000 };
+  source.seedPending(p as any);
+  source.after("consume", () => { clock += 60_001; });
+  assert.equal(await store.takePendingAuth(p.state), undefined);
+  assert.equal(await store.takePendingAuth(p.state), undefined, "and it stays spent");
+});
+
+test("a legacy pending authorization's claim: its recorded expiry, or ten minutes from its creation", async () => {
+  let clock = Date.now();
+  const { source, store } = setup({ now: () => clock });
+  const base = { client_id: CLIENT, redirect_uri: "https://agent.example/cb", scope: "graffiticode", code_challenge: "c", code_challenge_method: "S256", resource: MCP };
+  const recorded = { ...base, state: `rec-${++n}`, created_at: clock - 60_000, expires_at: clock + 3 * 60_000 };
+  const unrecorded = { ...base, state: `unrec-${++n}`, created_at: clock - 60_000 };
+  source.seedPending(recorded as any);
+  source.seedPending(unrecorded as any);
+  assert.ok(await store.takePendingAuth(recorded.state));
+  assert.ok(await store.takePendingAuth(unrecorded.state));
+  const claim = async (state: string) => (await h.db.collection("oauth_legacy_claims").doc(`pending:${hash(state)}`).get()).data();
+  assert.equal((await claim(recorded.state)).expires_at, recorded.expires_at);
+  assert.equal((await claim(unrecorded.state)).expires_at, unrecorded.created_at + 10 * 60_000);
+  for (const s of [recorded.state, unrecorded.state]) assert.equal(millis((await claim(s)).expireAt), (await claim(s)).expires_at + GRACE);
+  // An expired legacy pending authorization isn't offered or taken.
+  const old = { ...base, state: `old-${++n}`, created_at: clock - 11 * 60_000 };
+  source.seedPending(old as any);
+  assert.equal(await store.getPendingAuth(old.state), undefined);
+  assert.equal(await store.takePendingAuth(old.state), undefined);
 });
 
 // --- HTTP helper ------------------------------------------------------------------

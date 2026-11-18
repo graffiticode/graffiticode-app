@@ -36,7 +36,7 @@
 // unknown outcome leaves them prepared, answers StoreUnavailable, and the
 // client's retry, or the sweeper, completes them under the same claim.
 import { LEGACY_CONTRACT_VERSION, LegacyFenced, LegacyTransient, parseOutcome, type ConsumeKind, type LegacySource, type LegacyToken, type Outcome } from "./legacy-contract.js";
-import { LocalOAuthStore, type MigrationRecord } from "./local-store.js";
+import { LocalOAuthStore, credentialExpiry, type MigrationRecord } from "./local-store.js";
 import {
   CredentialRefused, LEGACY_ISSUER, StoreUnavailable, credentialHash, tokenKey,
   type AuthorizationCode, type FirebaseUpdate, type OAuthClient, type OAuthStore, type PendingAuth, type TokenEntry,
@@ -239,8 +239,9 @@ export class MigratingOAuthStore implements OAuthStore {
       const local = await this.local.getPendingAuth(state);
       if (local) return local;
       const claim = await this.local.getClaim("pending", credentialHash(state));
-      if (claim) return claim.state === "prepared" ? (claim.record as PendingAuth) : undefined;
-      return settle(this.source.getPendingAuth(state));
+      if (claim) return claim.state === "prepared" && claim.expires_at > this.now() ? (claim.record as PendingAuth) : undefined;
+      const p = await settle(this.source.getPendingAuth(state));
+      return p && credentialExpiry("pending", p) > this.now() ? p : undefined;
     });
   }
   takePendingAuth(state: string) {
@@ -279,19 +280,25 @@ export class MigratingOAuthStore implements OAuthStore {
 
   // A legacy code or pending authorization, used once: claim it here, consume
   // it at the source under that claim, and hand it to whoever settles the claim.
+  // Never once it has expired (the claim carries the credential's expiry).
   private async takeLegacy(kind: ConsumeKind, credential: string, read: () => Promise<AuthorizationCode | PendingAuth | undefined>) {
     const hash = credentialHash(credential);
+    // A claim is usable while prepared and unexpired. Checked again right
+    // before the source is asked (claiming takes time, and expiry doesn't
+    // wait), and once more before the record is handed out.
+    const usableClaim = (c: { state: string; expires_at: number }) => c.state === "prepared" && c.expires_at > this.now();
     let claim = await this.local.getClaim(kind, hash);
-    if (claim && claim.state !== "prepared") return undefined;
+    if (claim && !usableClaim(claim)) return undefined;
     if (!claim) {
       const record = await read();
-      if (!record) return undefined;
+      if (!record || credentialExpiry(kind, record) <= this.now()) return undefined;
       claim = await this.local.claim(kind, hash, record);
-      if (claim.state !== "prepared") return undefined;
     }
+    if (!usableClaim(claim)) return undefined;
     const out = decided(await settle(this.source.consume(this.installation, kind, hash, claim.claimId)));
     if (out.outcome === "applied") {
-      return (await this.local.settleClaim(kind, hash, claim.claimId, "consumed")) ? claim.record : undefined;
+      const won = await this.local.settleClaim(kind, hash, claim.claimId, "consumed");
+      return won && claim.expires_at > this.now() ? claim.record : undefined;
     }
     if (out.reason === "not_fenced" || out.reason === "sealed") throw new StoreUnavailable(`The legacy store refused: ${out.reason}`);
     await this.local.settleClaim(kind, hash, claim.claimId, "tombstoned");
