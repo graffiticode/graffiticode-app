@@ -26,6 +26,7 @@ import { installationBrand } from "@graffiticode-app/core/profile/brand";
 import { SURFACE_FAMILIES } from "@graffiticode-app/core/surfaces";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { handleIntrospect } from "./oauth/introspection.js";
+import { oauthStoreStatus } from "./oauth/firestore-store.js";
 import { coreReadiness } from "@graffiticode-app/core/readiness";
 import { coreBackendEnabled } from "./core-backend.js";
 import { assertServiceCatalogsWriteFree, handleServiceMcp, serviceSurfaces } from "./service-tools.js";
@@ -1155,7 +1156,9 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     res.writeHead(200, { "Content-Type": "application/json" });
     // The installation receipt, when a profile is loaded (until gc-deploy
     // records it with the release; docs/installations-plan.md).
-    res.end(JSON.stringify(installationReceipt ? { status: "ok", installation: installationReceipt } : { status: "ok" }));
+    // The OAuth store, unless it is today's (so legacy's answer is unchanged).
+    const store = oauthStoreStatus();
+    res.end(JSON.stringify({ status: "ok", ...(installationReceipt ? { installation: installationReceipt } : {}), ...(store.mode !== "legacy" ? { oauthStore: store } : {}) }));
     return;
   }
 
@@ -1614,9 +1617,14 @@ const httpServer = createServer((req, res) => {
 
 // The installation profile (PROFILE_DIR), loaded and validated before the
 // first request. An invalid profile stops the start.
-// Storage is required in core mode, where this server reads and writes Firestore.
-const installationReceipt = loadInstallation(process.env, { requireStorage: coreBackendEnabled() });
+// Storage is required in core mode, where this server reads and writes Firestore,
+// and whenever the OAuth store is the installation's own (OAUTH_STORE).
+const ownOAuthStore = (process.env.OAUTH_STORE ?? "legacy").trim() !== "legacy" && (process.env.OAUTH_STORE ?? "").trim() !== "";
+const installationReceipt = loadInstallation(process.env, { requireStorage: coreBackendEnabled() || ownOAuthStore });
 if (installationReceipt) console.log(`[installation] ${JSON.stringify(installationReceipt)}`);
+
+// The OAuth store: an invalid OAUTH_STORE configuration stops the start.
+console.log(`[oauth-store] ${JSON.stringify(oauthStoreStatus())}`);
 
 // Service surfaces run their jobs in-process (core mode), and none may expose
 // a skill that writes before execution is ready: fail at startup, not on a call.

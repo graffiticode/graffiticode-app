@@ -2,20 +2,8 @@
  * OAuth 2.1 Types for MCP Server
  */
 
-// OAuth Client registered via Dynamic Client Registration (RFC 7591)
-export interface OAuthClient {
-  client_id: string;
-  client_secret?: string;
-  client_name?: string;
-  redirect_uris: string[];
-  grant_types: string[];
-  response_types: string[];
-  token_endpoint_auth_method: string;
-  client_id_issued_at: number;
-  // The issuer of the installation it registered with. Absent on clients
-  // registered before installations: those are Graffiticode's.
-  issuer?: string;
-}
+// The stored records are core's (core/src/oauth/records.ts), shared by every store.
+export type { OAuthClient, PendingAuth, AuthorizationCode, TokenEntry } from "@graffiticode-app/core/oauth/records";
 
 // Client registration request (RFC 7591)
 export interface ClientRegistrationRequest {
@@ -38,38 +26,6 @@ export interface AuthorizationRequest {
   resource?: string;
 }
 
-// Pending authorization (waiting for consent page callback)
-export interface PendingAuth {
-  state: string;
-  client_id: string;
-  redirect_uri: string;
-  scope: string;
-  code_challenge: string;
-  code_challenge_method: string;
-  resource: string;
-  created_at: number;
-}
-
-// Authorization code (short-lived, single use)
-export interface AuthorizationCode {
-  code: string;
-  client_id: string;
-  redirect_uri: string;
-  scope: string;
-  code_challenge: string;
-  code_challenge_method: string;
-  /**
-   * The consent page's one-time console grant (core/oauth-grants), redeemed at
-   * token exchange together with the internal state it was minted for. Optional
-   * only for codes saved before the Google path was removed; those fail cleanly.
-   */
-  grant?: string;
-  grant_state?: string;
-  resource: string;
-  expires_at: number;
-  used: boolean;
-}
-
 // Token request parameters
 export interface TokenRequest {
   grant_type: string;
@@ -87,25 +43,6 @@ export interface TokenResponse {
   expires_in: number;
   refresh_token?: string;
   scope?: string;
-}
-
-// Stored token entry (maps access_token to firebase_id_token)
-export interface TokenEntry {
-  access_token: string;
-  refresh_token?: string;
-  client_id: string;
-  client_name?: string;
-  scope: string;
-  firebase_id_token: string;
-  firebase_refresh_token: string;
-  firebase_token_expires_at: number;
-  // Advertised OAuth access-token expiry (created_at + expires_in). Enforced on
-  // every use, independent of the refreshable Firebase token behind it, so an
-  // access token stops working past its own lifetime. Optional for back-compat
-  // with entries written before this field existed (treated as already-expired).
-  access_token_expires_at?: number;
-  resource: string;
-  created_at: number;
 }
 
 // OAuth error response

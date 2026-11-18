@@ -5,6 +5,7 @@
 import { installationHosts } from "@graffiticode-app/core/profile/runtime";
 import type { IncomingMessage, ServerResponse } from "http";
 import { oauthStore } from "./firestore-store.js";
+import { CredentialRefused, StoreUnavailable, LEGACY_ISSUER, LEGACY_RESOURCE } from "@graffiticode-app/core/oauth/records";
 import { verifyPKCE, generateRandomString } from "./pkce.js";
 import { redeemOAuthGrant, OAuthGrantError } from "@graffiticode-app/core/oauth-grants";
 import type {
@@ -45,8 +46,7 @@ export const isAllowedResource = (resource: string) => allowedResources().includ
 // Records written before installations name neither. They are Graffiticode's:
 // its issuer and its MCP resource, exactly as they were served then, so its
 // existing clients and tokens keep working there and nowhere else.
-export const LEGACY_ISSUER = "https://mcp.graffiticode.org";
-export const LEGACY_RESOURCE = "https://mcp.graffiticode.org/mcp";
+export { LEGACY_ISSUER, LEGACY_RESOURCE };
 export const boundResource = (record: { resource?: string }) => record.resource || LEGACY_RESOURCE;
 export const clientIssuer = (client: Pick<OAuthClient, "issuer">) => client.issuer || LEGACY_ISSUER;
 const isOwnClient = (client: OAuthClient | undefined): client is OAuthClient => !!client && clientIssuer(client) === hosts().issuer;
@@ -132,6 +132,16 @@ function sendJson(res: ServerResponse, status: number, data: unknown): void {
  */
 function sendError(res: ServerResponse, status: number, error: OAuthError): void {
   sendJson(res, status, error);
+}
+
+/**
+ * The store couldn't decide yet (an unknown outcome at the legacy store during
+ * the migration): nothing was decided against the credential, so the client
+ * retries the same request.
+ */
+function unavailable(res: ServerResponse): void {
+  res.writeHead(503, { "Content-Type": "application/json", "Retry-After": "2", "Cache-Control": "no-store" });
+  res.end(JSON.stringify({ error: "temporarily_unavailable", error_description: "Try again shortly." }));
 }
 
 /**
@@ -424,10 +434,10 @@ export async function handleCallback(
 
   // Check for error from consent page
   if (error) {
-    const pending = state ? await oauthStore.getPendingAuth(state) : null;
-    if (pending && isAllowedResource(boundResource(pending))) {
+    const peeked = state ? await oauthStore.getPendingAuth(state) : null;
+    const pending = peeked && isAllowedResource(boundResource(peeked)) ? await oauthStore.takePendingAuth(state!) : undefined;
+    if (pending) {
       const clientState = (pending as any).client_state;
-      await oauthStore.deletePendingAuth(state!);
 
       const redirectUrl = new URL(pending.redirect_uri);
       redirectUrl.searchParams.set("error", error);
@@ -454,15 +464,22 @@ export async function handleCallback(
   }
 
   // Look up pending auth: only this installation's (by its resource). Another
-  // installation's is left where it is.
-  const pending = await oauthStore.getPendingAuth(state);
-  if (!pending || !isAllowedResource(boundResource(pending))) {
+  // installation's is left where it is. Used once: of two callbacks for the
+  // same state, one gets it.
+  let pending: PendingAuth | undefined;
+  try {
+    const peeked = await oauthStore.getPendingAuth(state);
+    pending = peeked && isAllowedResource(boundResource(peeked)) ? await oauthStore.takePendingAuth(state) : undefined;
+  } catch (err) {
+    if (err instanceof StoreUnavailable) return unavailable(res);
+    throw err;
+  }
+  if (!pending) {
     sendError(res, 400, { error: "invalid_request", error_description: "Invalid or expired state" });
     return;
   }
 
   const clientState = (pending as any).client_state;
-  await oauthStore.deletePendingAuth(state);
 
   // Generate authorization code
   const code = generateRandomString(64);
@@ -686,7 +703,13 @@ async function handleAuthorizationCodeGrant(
   // Look up authorization code
   // Only this installation's codes (by resource). Another installation's code
   // reads as unknown and is left unused.
-  const authCode = await oauthStore.getAuthCode(code);
+  let authCode: AuthorizationCode | undefined;
+  try {
+    authCode = await oauthStore.getAuthCode(code);
+  } catch (err) {
+    if (err instanceof StoreUnavailable) return unavailable(res);
+    throw err;
+  }
   if (!authCode || !isAllowedResource(boundResource(authCode))) {
     sendError(res, 400, { error: "invalid_grant", error_description: "Invalid or expired authorization code" });
     return;
@@ -730,8 +753,18 @@ async function handleAuthorizationCodeGrant(
     return;
   }
 
-  // Mark code as used
-  await oauthStore.markAuthCodeUsed(code);
+  // Use the code up: of two exchanges, one gets tokens.
+  let won: boolean;
+  try {
+    won = await oauthStore.consumeAuthCode(code);
+  } catch (err) {
+    if (err instanceof StoreUnavailable) return unavailable(res);
+    throw err;
+  }
+  if (!won) {
+    sendError(res, 400, { error: "invalid_grant", error_description: "Authorization code already used" });
+    return;
+  }
 
   try {
     // Redeem the consent for a Firebase ID token + refresh token.
@@ -879,18 +912,28 @@ async function handleRefreshTokenGrant(
       created_at: issuedAt,
     };
 
-    // Rotate tokens in Firestore (delete old, create new)
-    await oauthStore.rotateTokens(refreshToken, newTokenEntry);
+    // Rotate: what the store issues may be a decision already made for this
+    // refresh token (a migration's recorded pair), not newTokenEntry.
+    const issued = await oauthStore.rotateTokens(refreshToken, newTokenEntry);
 
-    // Return token response with full expiration time (since we refreshed)
+    // The lifetime left on what was issued: a replayed pair is older than this
+    // request. One already expired is never handed out; the client's retry
+    // rotates past it.
+    const expiresIn = Math.floor(((accessTokenExpiry(issued) ?? 0) - Date.now()) / 1000);
+    if (expiresIn <= 0) return unavailable(res);
     sendJson(res, 200, {
-      access_token: newAccessToken,
+      access_token: issued.access_token,
       token_type: "Bearer",
-      expires_in: TOKEN_EXPIRES_IN,
-      refresh_token: newRefreshToken,
-      scope: tokenEntry.scope,
+      expires_in: expiresIn,
+      refresh_token: issued.refresh_token,
+      scope: issued.scope,
     });
   } catch (error) {
+    if (error instanceof CredentialRefused) {
+      sendError(res, 400, { error: "invalid_grant", error_description: "Invalid refresh_token" });
+      return;
+    }
+    if (error instanceof StoreUnavailable) return unavailable(res);
     console.error("Token refresh error:", error);
     sendError(res, 500, {
       error: "server_error",

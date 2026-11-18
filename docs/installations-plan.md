@@ -4,7 +4,7 @@
 
 `graffiticode-app` becomes a reusable frontend product, in the way Discourse is: one open-source codebase, run as independent *installations*. Each installation supplies its own branding, legal content, service catalog, storage and credentials. Graffiticode is the first installation and Artcompiler (Learnosity services) the second.
 
-`artcompiler-app` is dropped, and the earlier plans for it are superseded. The work that was in flight is reused:
+The separate `artcompiler-app` application repository is dropped, and the earlier plans for it are superseded. The Artcompiler installation's GCP project ID is `artcompiler-app`. The work that was in flight is reused:
 - **Kept:** the service-job core that is already merged (`packages/core/src/service-*.ts`).
 - **Generalized:** the uncommitted `/learnosity/mcp` work (`packages/mcp-server/src/learnosity.ts`, `core/src/service-runner.ts`) becomes a service-tool family that profiles select.
 
@@ -221,11 +221,11 @@ Two surveys this session found:
 - **Gate.** P6 starts only after:
   - P5's backend installation context is deployed: enforcement, untagged-record handling, the rollout guard, per-installation item authority and act-as;
   - the OAuth migration has cut over for Graffiticode.
-- Create the profile repo in the Artcompiler project, for example `artcompiler/installation-artcompiler`:
+- Create the profile repo in the Artcompiler GitHub organization, for example `artcompiler/installation-artcompiler`:
   - Assessments branding, Artcompiler legal content;
   - the Learnosity services, selecting `generate-content` and `plan-data-job`;
   - surfaces: service tools on `/mcp`, and generic tools if wanted.
-- Bootstrap a new GCP project with `bootstrap-installation.sh` and deploy the *same release* with `--env artcompiler`.
+- Bootstrap the GCP project `artcompiler-app` with `bootstrap-installation.sh`, set the profile's `installation.project` to `artcompiler-app`, and deploy the *same release* with `--env artcompiler`. The installation ID and deployment environment remain `artcompiler`.
 - Update the Assessments discovery generator (`artcompiler-assessments/scripts/generate-agent-discovery.mjs`) to consume the profile's discovery output. This also fixes the three mismatches found earlier.
 
 ## Verification
@@ -364,3 +364,67 @@ Commits and merges happen only when you ask.
     - A mutation check confirms that each guard is covered.
   - **Deployment order:** MCP before or with REST. REST tolerates a missing `iss`, and nothing else changes on the wire. Proof revisions keep production's hosts.
   - **Backend part 2** (installation context in the API and Policy, act-as and credentials per installation, untagged records, the rollout guard) follows the backend repo's sequence and must be deployed before P6 starts.
+- **P5 store handover, this repo's half (built against stand-ins).** The authorization server's records move from the shared auth service into each installation's database, behind one store interface (`core/src/oauth/records.ts`). The handlers no longer know which store answers.
+  - **The contract** (`core/src/oauth/legacy-contract.ts`, version 1) is what this half needs from the auth service, with its HTTP binding:
+    - status (contract version, fenced or not);
+    - reads that carry each record's marks (revoked, migrated under which claim);
+    - the one-way fence, which refuses every ordinary write;
+    - `consume`, `markMigrated` and `revoke`, accepted only once fenced; `consume` and `markMigrated` are compare-and-set, applied again for the same claim, refused for good otherwise, and a throw when the outcome is unknown;
+    - the inventory.
+
+    One suite (`legacy-contract-suite.ts`) holds both implementations to it:
+    - the stand-in (`legacy-standin.ts`), in `core/test/oauth-legacy-contract.test.ts`;
+    - the real service through the MCP server's HTTP client, in `mcp-server/tests/oauth-legacy-contract.test.ts`, which is skipped unless `OAUTH_LEGACY_CONTRACT_URL` names a disposable auth service, because the fence can't be lifted.
+
+    Only the real run clears activation.
+  - **The installation's store** (`core/src/oauth/local-store.ts`): documents keyed by credential hashes; codes, pending authorizations and refresh rotation are single-use transactions. It also holds one migration record per legacy token (created only if absent, activated only by confirmation) and one claim per legacy code or pending authorization.
+  - **Modes** (`core/src/oauth/store.ts`, `OAUTH_STORE`, checked at startup):
+    - **`legacy`**, the default: deploying changes nothing.
+    - **`migrating`**: Graffiticode only, and it requires `OAUTH_MIGRATION_VERIFIED_CONTRACT=1`, which the operator sets after the real run passes. It behaves as legacy until the source itself reports the installation fenced under that version; a fenced write latches it too, after the same check. Then it writes locally and reads locally first, falling back to the legacy store. Through the fallback, a legacy credential is used once:
+      - a refresh token: a prepared migration record with its one replacement pair, then `markMigrated`. The record is then `acknowledged`: durable, and still not live. The source is read again, and it must still hold the token unrevoked under this claim; only then is the record confirmed and the pair live. A failed validation leaves the record acknowledged, and the client's retry or the sweeper validates it again. Every concurrent or retried refresh gets that pair while it is unused.
+      - a code or pending authorization: a claim, then `consume`, and only the caller that settles the claim gets it.
+      - Refusals tombstone. Unknown outcomes stay prepared and answer `temporarily_unavailable` (503); the retry or the sweeper completes them under the same claim. An answer that isn't exactly one of the contract's outcomes (`parseOutcome`) counts as unknown, never as a refusal, in the HTTP client and again in the store.
+      - A lookup that finds a legacy token already marked migrated at the source reads locally again before answering, so a racing import never turns a valid token into `invalid_grant`.
+      - A recorded pair answers retries only while its access token is good. After that, a retry of the original rotates the pair once more, and the endpoint's `expires_in` is the lifetime left on what it issued. It never hands out an expired token; it answers 503 instead, so the client retries.
+      - **Revocation during the overlap** is durable here first (`revokeLegacy`), then at the source. The migration record becomes `revoked`, no confirmation can follow, and every live token descended from it is deleted in the same transaction. Every token activated from a record carries that record's key as its `family`, through later rotations. A revocation made at the source before validation is found by that validation, so nothing goes live. One made after migration is reconciled by the sweeper.
+      - A legacy access token's refreshed Firebase session isn't persisted (the fenced store refuses it) until the token migrates.
+    - **`local`**: no fallback. For every other installation, and for Graffiticode once `OAUTH_LEGACY_FALLBACK_RETIRED=1`.
+
+    `/health` reports the mode and whether migration is active, except in legacy mode, whose answer is unchanged.
+  - **Jobs** (`core/src/oauth/migration.ts`, `npm run oauth-migration -- import | sweep | report` in mcp-server):
+    - **import** copies clients without overwriting, and imports live tokens, never overwriting a record; a re-run completes what a crash left prepared.
+    - **sweep** completes prepared records, and revokes here any migrated token the source shows revoked.
+    - **report** allows retiring the fallback only when a re-run of the inventory finds no token unmigrated, no client missing, and nothing undecided. In addition, every revocation the source holds must be applied here (the record revoked, nothing descended from it live), and the source must be sealed.
+  - **The seal** is the handoff that retires the fallback. It is one-way, like the fence. Once the source is sealed, it refuses every migration operation, revocation included (`sealed`), so no revocation can land there unseen after the installation stops reading it. The store treats a `sealed` refusal as retryable, never as final for a credential.
+  - **Issuer:** unchanged throughout. Clients keep the issuer they registered with, and the fallback is tied to Graffiticode's issuer URL. Hosting the issuer on a dedicated server is fine, but changing its URL is its own compatible migration, because part 1 binds clients to it.
+  - **Gate:** `tests/baseline/oauth-store.test.ts` (emulator and stand-in) covers:
+    - activation, including a fence under another contract version;
+    - clients and access tokens from before cutover, on MCP and on REST;
+    - one pair for concurrent refreshes, the 503 and its retry, and lost acknowledgements;
+    - a crash after the claim, and a crash inside the claim transaction;
+    - revocation between preparation and confirmation;
+    - the writer fence;
+    - codes and pending authorizations used once, including racing exchanges;
+    - import against rotation, both in sequence and racing;
+    - imports of revoked and marked records;
+    - an import resumed after a crash;
+    - the retirement report.
+
+    A mutation check confirms each guard is covered.
+  - **Activation order (runbook):**
+    1. Deploy the auth-service half (backend sequence), and run the contract suite against a disposable instance.
+    2. Deploy this release with `OAUTH_STORE=migrating` and `OAUTH_MIGRATION_VERIFIED_CONTRACT=1`. It stays legacy, because nothing is fenced.
+    3. Drain: untag or delete every MCP and REST revision older than this release.
+    4. The operator sets the fence. Instances latch: `/health` shows `oauthStore.migrating: true`.
+    5. Run `import`, then `sweep`, and `report` until only `sealed` is missing.
+    6. The operator seals the source.
+    7. Run `sweep` once more: it applies every revocation the source holds, and none can arrive after.
+    8. Run `report` until it says `fallbackRetirable`.
+    9. Switch to `OAUTH_STORE=local` with `OAUTH_LEGACY_FALLBACK_RETIRED=1`.
+
+    Nothing in this repo can check step 3. A check that lists reachable revisions against the release is still to be written.
+  - **Still open:**
+    - the auth-service half;
+    - a Firestore TTL policy for `oauth_pending` and `oauth_codes`; reads already ignore expired ones, but the documents stay;
+    - prepared claims on legacy codes, which expire with the codes and aren't swept;
+    - the drained-revision check above.

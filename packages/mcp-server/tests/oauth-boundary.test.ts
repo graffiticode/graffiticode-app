@@ -21,7 +21,7 @@ import {
   resolveOAuthAccessToken,
 } from "../src/oauth/handlers.js";
 import { introspect, introspectionAudience } from "../src/oauth/introspection.js";
-import { oauthStore } from "../src/oauth/firestore-store.js";
+import { setOAuthStore } from "../src/oauth/firestore-store.js";
 import type { AuthorizationCode, OAuthClient, PendingAuth, TokenEntry } from "../src/oauth/types.js";
 
 delete process.env.PROFILE_DIR;
@@ -64,15 +64,24 @@ const codes = new Map<string, AuthorizationCode>();
 const tokens = new Map<string, TokenEntry>();
 const byRefresh = (rt: string) => [...tokens.values()].find(t => t.refresh_token === rt) ?? null;
 const clone = <T>(x: T): T => (x === undefined || x === null ? x : JSON.parse(JSON.stringify(x)));
-Object.assign(oauthStore, {
+setOAuthStore({
   registerClient: async (c: OAuthClient) => void clients.set(c.client_id, clone(c)),
   getClient: async (id: string) => clone(clients.get(id)),
   savePendingAuth: async (p: PendingAuth) => void pendings.set(p.state, clone(p)),
   getPendingAuth: async (s: string) => clone(pendings.get(s)),
-  deletePendingAuth: async (s: string) => void pendings.delete(s),
+  takePendingAuth: async (s: string) => {
+    const p = clone(pendings.get(s));
+    pendings.delete(s);
+    return p;
+  },
   saveAuthCode: async (c: AuthorizationCode) => void codes.set(c.code, clone(c)),
   getAuthCode: async (c: string) => clone(codes.get(c)),
-  markAuthCodeUsed: async (c: string) => void (codes.get(c)!.used = true),
+  consumeAuthCode: async (c: string) => {
+    const code = codes.get(c);
+    if (!code || code.used) return false;
+    code.used = true;
+    return true;
+  },
   deleteAuthCode: async (c: string) => void codes.delete(c),
   saveToken: async (_p: string, _e: string, t: TokenEntry) => void tokens.set(t.access_token, clone(t)),
   getTokenByAccessToken: async (at: string) => clone(tokens.get(at) ?? null),
@@ -83,6 +92,7 @@ Object.assign(oauthStore, {
     const prev = byRefresh(old);
     if (prev) tokens.delete(prev.access_token);
     tokens.set(next.access_token, clone(next));
+    return next;
   },
 });
 
