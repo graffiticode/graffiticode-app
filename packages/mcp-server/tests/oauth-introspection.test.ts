@@ -16,9 +16,9 @@ const verify = async (token: string, audience: string) => {
 };
 const caller = (email = OPENAPI, aud = introspectionAudience()) => `Bearer idt|${email}|${aud}`;
 const token = `${OAUTH_ACCESS_TOKEN_PREFIX}abc`;
-const resolved: Array<[string, string, boolean]> = [];
-const resolve = (async (t: string, resource: string, strict: boolean) => {
-  resolved.push([t, resource, strict]);
+const resolved: Array<[string, string]> = [];
+const resolve = (async (t: string, resource: string) => {
+  resolved.push([t, resource]);
   return t === token ? { status: "valid", firebaseToken: "firebase-id-token" } : { status: "invalid", reason: "revoked" };
 }) as any;
 
@@ -33,11 +33,11 @@ test("the authorization server issues for MCP and for the REST API, nothing else
 test("strict resource binding: a legacy token with no resource is valid for /mcp only", () => {
   const legacy = { scope: "graffiticode", created_at: NOW - 1000 };
   assert.equal(evaluateTokenValidity(legacy, MCP, NOW), null);
-  assert.equal(evaluateTokenValidity(legacy, openapiResource(), NOW, true), "resource");
+  assert.equal(evaluateTokenValidity(legacy, openapiResource(), NOW), "resource");
   const forMcp = { ...legacy, resource: MCP };
-  assert.equal(evaluateTokenValidity(forMcp, openapiResource(), NOW, true), "resource", "a /mcp token can't be used for REST");
+  assert.equal(evaluateTokenValidity(forMcp, openapiResource(), NOW), "resource", "a /mcp token can't be used for REST");
   const forRest = { ...legacy, resource: openapiResource() };
-  assert.equal(evaluateTokenValidity(forRest, openapiResource(), NOW, true), null);
+  assert.equal(evaluateTokenValidity(forRest, openapiResource(), NOW), null);
   assert.equal(evaluateTokenValidity(forRest, MCP, NOW), "resource", "a REST token can't be used for /mcp");
 });
 
@@ -53,8 +53,8 @@ test("introspection refuses any caller but the REST service's identity", async (
 test("introspection answers active only for a live token bound to the REST resource", async () => {
   const ok = await introspect({ authorization: caller(), token, verify, resolve });
   assert.equal(ok.status, 200);
-  assert.deepEqual(ok.body, { active: true, token_type: "Bearer", scope: "graffiticode", aud: openapiResource(), gc_firebase_token: "firebase-id-token" });
-  assert.deepEqual(resolved.at(-1), [token, openapiResource(), true], "looked up strictly for the REST resource");
+  assert.deepEqual(ok.body, { active: true, token_type: "Bearer", scope: "graffiticode", iss: "https://mcp.graffiticode.org", aud: openapiResource(), gc_firebase_token: "firebase-id-token" });
+  assert.deepEqual(resolved.at(-1), [token, openapiResource()], "looked up for the REST resource");
   assert.deepEqual((await introspect({ authorization: caller(), token: `${OAUTH_ACCESS_TOKEN_PREFIX}gone`, verify, resolve })).body, { active: false });
   assert.deepEqual((await introspect({ authorization: caller(), token: "gc_live_apikey", verify, resolve })).body, { active: false }, "an API key isn't an OAuth token");
   assert.deepEqual((await introspect({ authorization: caller(), token: undefined, verify, resolve })).body, { active: false });

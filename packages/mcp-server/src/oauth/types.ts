@@ -12,6 +12,9 @@ export interface OAuthClient {
   response_types: string[];
   token_endpoint_auth_method: string;
   client_id_issued_at: number;
+  // The issuer of the installation it registered with. Absent on clients
+  // registered before installations: those are Graffiticode's.
+  issuer?: string;
 }
 
 // Client registration request (RFC 7591)

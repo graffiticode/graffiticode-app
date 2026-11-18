@@ -17,6 +17,26 @@ export function loadSpec(): any {
 // OPENAPI_PUBLIC_URL / OPENAPI_RESOURCE without one).
 export const publicBase = () => installationHosts().openapiResource;
 
+// Whether this API takes OAuth access tokens: only when the installation
+// declares it as a resource (core/src/profile/hosts.ts). Otherwise nothing
+// advertises OAuth: no flows or security alternatives in the description, no
+// resource metadata, and no metadata pointer in a challenge.
+export const restOAuthEnabled = () => installationHosts().resources.includes(publicBase());
+
+// The description without its OAuth scheme, and without it among any
+// operation's alternatives.
+function withoutOAuth(spec: any) {
+  const drop = (security: any) =>
+    Array.isArray(security) ? security.filter((alt: any) => !(alt && typeof alt === "object" && "oauth2" in alt)) : security;
+  const { oauth2: _dropped, ...schemes } = spec.components?.securitySchemes ?? {};
+  const paths = Object.fromEntries(Object.entries(spec.paths ?? {}).map(([path, item]: [string, any]) => [
+    path,
+    Object.fromEntries(Object.entries(item ?? {}).map(([k, op]: [string, any]) =>
+      [k, op && typeof op === "object" && "security" in op ? { ...op, security: drop(op.security) } : op])),
+  ]));
+  return { ...spec, security: drop(spec.security), paths, components: { ...spec.components, securitySchemes: schemes } };
+}
+
 // The API's title, from the profile (copy key openapi.info.title).
 export const apiTitle = () => copy("openapi.info.title") ?? "Graffiticode API";
 
@@ -24,6 +44,7 @@ export const apiTitle = () => copy("openapi.info.title") ?? "Graffiticode API";
 // profile, the installation's identity (info) and its authorization server.
 // The paths, schemas and validation are the platform's and never change.
 export function servedSpec(spec: any) {
+  if (!restOAuthEnabled()) spec = withoutOAuth(spec);
   const served = { ...spec, servers: [{ url: publicBase() }] };
   // The OAuth flow URLs, in both modes: the same resolution as servers[] and
   // the resource metadata, so a staging server never advertises production's

@@ -1,14 +1,16 @@
 // POST /oauth/introspect (RFC 7662) — how the Graffiticode REST API validates
 // the OAuth access tokens this authorization server issues for it.
 //
-// Only Graffiticode services may ask: the caller authenticates with a
-// Google-signed ID token for its Cloud Run service account (audience: this
-// endpoint's URL), and the account must be in OAUTH_INTROSPECTION_CALLERS
-// (openapi-run@ only). Token lookups go through the auth service with the
-// shared internal key, which stays here; the REST service never holds it.
+// Only this installation's REST service may ask: the caller authenticates
+// with a Google-signed ID token for its Cloud Run service account (audience:
+// this endpoint on this installation's issuer), and the account must be in
+// OAUTH_INTROSPECTION_CALLERS, by default the installation project's
+// openapi-run@. Token lookups go through the auth service with the shared
+// internal key, which stays here; the REST service never holds it.
 //
-// A token is active only if it was authorized for the REST API's resource —
-// strictly: legacy entries with no recorded resource are not. An active
+// A token is active only if it was authorized for this installation's REST
+// resource, and only if the installation declares one; a legacy entry with no
+// recorded resource is bound to /mcp and never is. An active
 // answer carries, as the extension field gc_firebase_token, the Firebase ID
 // token the access token stands for, so the REST service can act as that user
 // exactly as this server does for MCP requests.
@@ -16,13 +18,15 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { isOAuthAccessToken, openapiResource, resolveOAuthAccessToken } from "./handlers.js";
 import { installationHosts } from "@graffiticode-app/core/profile/runtime";
+import { installedProfile } from "@graffiticode-app/core/profile/current";
 
 // The audience a caller's identity token must name: this endpoint on the issuer.
 export const introspectionAudience = () => `${installationHosts().issuer}/oauth/introspect`;
 const MAX_BODY_BYTES = 8 * 1024;
 
+// Without a profile, Graffiticode's REST service, as today.
 export const introspectionCallers = () =>
-  (process.env.OAUTH_INTROSPECTION_CALLERS ?? "openapi-run@graffiticode-app.iam.gserviceaccount.com")
+  (process.env.OAUTH_INTROSPECTION_CALLERS ?? `openapi-run@${installedProfile()?.profile.installation.project ?? "graffiticode-app"}.iam.gserviceaccount.com`)
     .split(",").map(s => s.trim()).filter(Boolean);
 
 type Claims = { email?: string; email_verified?: boolean };
@@ -55,11 +59,11 @@ export async function introspect({ authorization, token, verify = googleVerifier
     return { status: 401, body: { error: "invalid_client" } };
   }
   if (!token || !isOAuthAccessToken(token)) return { status: 200, body: { active: false } };
-  const resolved = await resolve(token, openapiResource(), true);
+  const resolved = await resolve(token, openapiResource());
   if (resolved.status !== "valid") return { status: 200, body: { active: false } };
   return {
     status: 200,
-    body: { active: true, token_type: "Bearer", scope: "graffiticode", aud: openapiResource(), gc_firebase_token: resolved.firebaseToken },
+    body: { active: true, token_type: "Bearer", scope: "graffiticode", iss: installationHosts().issuer, aud: openapiResource(), gc_firebase_token: resolved.firebaseToken },
   };
 }
 

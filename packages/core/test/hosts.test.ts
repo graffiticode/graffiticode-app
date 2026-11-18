@@ -22,6 +22,7 @@ test("without a profile: today's defaults", () => {
     issuer: "https://mcp.graffiticode.org",
     mcpResource: "https://mcp.graffiticode.org/mcp",
     openapiResource: "https://openapi.graffiticode.org/v1",
+    resources: ["https://mcp.graffiticode.org/mcp", "https://openapi.graffiticode.org/v1"],
     consoleApi: "https://console.graffiticode.org/api",
   });
 });
@@ -94,11 +95,22 @@ test("advertised server URLs and OAuth resources must agree", () => {
   // Without a profile, the REST server's public base is its resource, so
   // servers[] and the resource can't drift apart; a resource off its host can.
   assert.throws(() => resolveHosts(null, { MCP_SERVER_URL: "https://mcp.a.test", MCP_OAUTH_URL: "https://mcp.b.test" }), /issuer https:\/\/mcp\.b\.test must be the MCP host/);
-  // With a profile, the issuer must be the MCP host until P5 separates them.
+  // With a profile, the issuer must still be the MCP host, which serves /oauth/*.
   assert.throws(() => resolveHosts(profile(p => { p.auth.issuer = "https://auth.example.test"; }), {}), /must be the MCP host/);
   // Bypassing the profile validator, a resource off its host is still caught.
   assert.throws(() => resolveHosts(profile(p => { p.auth.resources.openapi = "https://elsewhere.test/v1"; }), {}), /REST resource https:\/\/elsewhere\.test\/v1 isn't on the REST host/);
   assert.throws(() => resolveHosts(profile(p => { p.auth.resources.mcp = "https://elsewhere.test/mcp"; }), {}), /MCP resource .* isn't on the MCP host/);
+});
+
+test("the resources an installation declares are the only ones tokens bind to", () => {
+  assert.deepEqual(resolveHosts(profile(), {}).resources, ["https://mcp.example.test/mcp", "https://api.example.test/v1"]);
+  // A profile without a REST resource still resolves the REST server's public
+  // base, but declares only its MCP resource.
+  const mcpOnly = resolveHosts(profile(p => { delete p.auth.resources.openapi; }), {});
+  assert.equal(mcpOnly.openapiResource, "https://api.example.test/v1");
+  assert.deepEqual(mcpOnly.resources, ["https://mcp.example.test/mcp"]);
+  // Without a profile: today's two, following the environment.
+  assert.deepEqual(resolveHosts(null, { MCP_SERVER_URL: "https://mcp.b.test", OPENAPI_RESOURCE: "https://rest.b.test/v1" }).resources, ["https://mcp.b.test/mcp", "https://rest.b.test/v1"]);
 });
 
 test("a language server's origin follows the pattern", () => {

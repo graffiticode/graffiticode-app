@@ -17,9 +17,10 @@
 // Two environment variables naming the same host must agree in either mode.
 //
 // Consistency (both modes): each OAuth resource sits on its own server's
-// origin, and the REST resource is the REST server's public base. Until the
-// authorization server is separated from the MCP server (plan P5), the issuer
-// must be the MCP host, because that server serves /oauth/*.
+// origin, and the REST resource is the REST server's public base. The issuer
+// and the resources are separate values (plan P5), but the issuer must still
+// be the MCP host, because that server serves /oauth/*; an issuer of its own
+// comes with the OAuth-store handover.
 //
 // Browser-safe: no node imports.
 import type { Profile } from "./schema.js";
@@ -39,6 +40,12 @@ export type InstallationHosts = {
   // OAuth protected resources; tokens are bound to these.
   mcpResource: string;
   openapiResource: string;
+  // The resources this installation declares: the only ones its authorization
+  // server issues for, refreshes or introspects. A profile declares them in
+  // auth.resources; without a profile they're today's two (MCP and REST). A
+  // REST resource a profile doesn't declare still resolves (openapiResource,
+  // the REST server's public base) but no token can be bound to it.
+  resources: string[];
   // Internal wiring, not a public host: where this server calls the console's API.
   consoleApi: string;
 };
@@ -125,6 +132,7 @@ export function resolveHosts(profile: Profile | null, env: Env): InstallationHos
       issuer: issuerEnv ?? mcp,
       mcpResource: `${mcp}/mcp`,
       openapiResource,
+      resources: [`${mcp}/mcp`, openapiResource],
       consoleApi: env.GRAFFITICODE_CONSOLE_URL ? trim(env.GRAFFITICODE_CONSOLE_URL) : DEFAULTS.consoleApi,
     };
   } else {
@@ -144,6 +152,7 @@ export function resolveHosts(profile: Profile | null, env: Env): InstallationHos
       issuer: trim(profile.auth.issuer),
       mcpResource: trim(profile.auth.resources.mcp),
       openapiResource: trim(profile.auth.resources.openapi ?? `${openapiHost}/v1`),
+      resources: [profile.auth.resources.mcp, profile.auth.resources.openapi].filter((r): r is string => !!r).map(trim),
       consoleApi: env.GRAFFITICODE_CONSOLE_URL ? trim(env.GRAFFITICODE_CONSOLE_URL) : `${trim(h.console)}/api`,
     };
     // The environment may repeat the profile, never contradict it.

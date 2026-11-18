@@ -8,7 +8,7 @@ import { createHash } from "node:crypto";
 import type { Hono } from "hono";
 import { identityToken } from "@graffiticode-app/core/act-as";
 import { ApiProblem } from "./problems.js";
-import { publicBase } from "./spec.js";
+import { publicBase, restOAuthEnabled } from "./spec.js";
 
 const PREFIX = "gcmcp_at_";
 const CACHE_MS = 30_000;
@@ -21,24 +21,37 @@ export const isOAuthToken = (bearer: string) => bearer.startsWith(PREFIX);
 const metadataPath = () => `/.well-known/oauth-protected-resource${new URL(publicBase()).pathname.replace(/\/$/, "")}`;
 export const resourceMetadataUrl = () => `${new URL(publicBase()).origin}${metadataPath()}`;
 
-export const oauthChallenge = () => new ApiProblem(401, "invalid_token", "Access token not valid", {
-  detail: "The OAuth access token is expired, revoked, or wasn't issued for this API. Sign in again.",
-  headers: { "WWW-Authenticate": `Bearer realm="graffiticode", error="invalid_token", resource_metadata="${resourceMetadataUrl()}"` },
-});
+// Without REST OAuth, the challenge points nowhere: there's no metadata to
+// follow, and no sign-in would help.
+export const oauthChallenge = () => restOAuthEnabled()
+  ? new ApiProblem(401, "invalid_token", "Access token not valid", {
+    detail: "The OAuth access token is expired, revoked, or wasn't issued for this API. Sign in again.",
+    headers: { "WWW-Authenticate": `Bearer realm="graffiticode", error="invalid_token", resource_metadata="${resourceMetadataUrl()}"` },
+  })
+  : new ApiProblem(401, "invalid_token", "Access token not valid", {
+    detail: "This API doesn't accept OAuth access tokens. Use an API key.",
+    headers: { "WWW-Authenticate": `Bearer realm="graffiticode", error="invalid_token"` },
+  });
 
 const cache = new Map<string, { firebaseToken: string | null; until: number }>();
 
-// The Firebase ID token an active access token stands for, or null.
-export async function introspectOAuthToken(token: string, now = Date.now()): Promise<string | null> {
+type IntrospectionDeps = { fetch?: typeof fetch; identityToken?: (audience: string) => Promise<string> };
+
+// The Firebase ID token an active access token stands for, or null. Active
+// means active for this installation: the answer must come from its issuer
+// and name its REST resource, which must be one it declares.
+export async function introspectOAuthToken(token: string, now = Date.now(), deps: IntrospectionDeps = {}): Promise<string | null> {
+  const hosts = installationHosts();
+  if (!restOAuthEnabled()) return null;
   const key = createHash("sha256").update(token).digest("hex");
   const hit = cache.get(key);
   if (hit && hit.until > now) return hit.firebaseToken;
   const endpoint = `${authorizationServer()}/oauth/introspect`;
   let res: Response;
   try {
-    res = await fetch(endpoint, {
+    res = await (deps.fetch ?? fetch)(endpoint, {
       method: "POST",
-      headers: { Authorization: `Bearer ${await identityToken(endpoint)}`, "Content-Type": "application/x-www-form-urlencoded" },
+      headers: { Authorization: `Bearer ${await (deps.identityToken ?? identityToken)(endpoint)}`, "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ token, token_type_hint: "access_token" }).toString(),
       signal: AbortSignal.timeout(5000),
     });
@@ -50,7 +63,8 @@ export async function introspectOAuthToken(token: string, now = Date.now()): Pro
     throw new ApiProblem(503, "unavailable", "Temporarily unavailable", { detail: "Couldn't check the access token. Try again.", headers: { "Retry-After": "5" } });
   }
   const body: any = await res.json().catch(() => ({}));
-  const firebaseToken = body?.active === true && typeof body.gc_firebase_token === "string" ? body.gc_firebase_token : null;
+  const bound = body?.active === true && body.aud === publicBase() && (body.iss === undefined || body.iss === hosts.issuer);
+  const firebaseToken = bound && typeof body.gc_firebase_token === "string" ? body.gc_firebase_token : null;
   cache.set(key, { firebaseToken, until: now + CACHE_MS });
   if (cache.size > 10_000) cache.clear();
   return firebaseToken;
@@ -64,6 +78,8 @@ export function oauthRoutes(app: Hono) {
     bearer_methods_supported: ["header"],
     resource_documentation: `${publicBase()}/docs`,
   });
-  app.get("/.well-known/oauth-protected-resource", (c) => c.json(metadata()));
-  app.get(metadataPath(), (c) => c.json(metadata()));
+  // Served only while REST OAuth is enabled, decided per request.
+  const serve = (c: any) => (restOAuthEnabled() ? c.json(metadata()) : c.notFound());
+  app.get("/.well-known/oauth-protected-resource", serve);
+  app.get(metadataPath(), serve);
 }
