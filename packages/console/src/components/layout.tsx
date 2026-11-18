@@ -48,6 +48,13 @@ function classNames(...classes) {
 
 export default function Layout({ children, language, setLanguage, mark, setMark }) {
   const { user } = useGraffiticodeAuth();
+  // The installation's support channels (see pages/support.tsx); a missing one isn't shown.
+  const { brand } = usePublicConfig();
+  const supportForum = brand.links.support ?? brand.links.forum;
+  const supportMenu = [
+    brand.supportEmail && { name: 'Email', href: `mailto:${brand.supportEmail}`, external: false },
+    supportForum && { name: 'Forum', href: supportForum, external: true },
+  ].filter(Boolean) as { name: string; href: string; external: boolean }[];
   const router = useRouter();
   const pathName = router.pathname.split('/').filter(Boolean)[0] || '';
   // An explicitly chosen domain, else the whole offered catalog (lib/catalog.ts).
@@ -212,17 +219,44 @@ export default function Layout({ children, language, setLanguage, mark, setMark 
                       >
                         Integrations
                       </Link> */}
-                      <Link
-                        href="/support"
-                        className={classNames(
-                          pathName === 'support'
-                            ? 'text-white'
-                            : 'text-gray-300 hover:text-white',
-                          'text-sm tracking-wide font-medium'
-                        )}
-                      >
-                        Support
-                      </Link>
+                      {supportMenu.length > 0 && <Menu as="div" className="relative inline-block text-left">
+                        <Menu.Button
+                          className="inline-flex items-center text-gray-300 hover:text-white text-sm tracking-wide font-medium focus:outline-none"
+                        >
+                          Support
+                          <ChevronDownIcon className="ml-1 -mr-1 h-4 w-4" aria-hidden="true" />
+                        </Menu.Button>
+                        <Transition
+                          as={Fragment}
+                          enter="transition ease-out duration-100"
+                          enterFrom="transform opacity-0 scale-95"
+                          enterTo="transform opacity-100 scale-100"
+                          leave="transition ease-in duration-75"
+                          leaveFrom="transform opacity-100 scale-100"
+                          leaveTo="transform opacity-0 scale-95"
+                        >
+                          <Menu.Items className="absolute right-0 z-10 mt-2 w-40 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                            <div className="py-1">
+                              {supportMenu.map((item) => (
+                                <Menu.Item key={item.name}>
+                                  {({ active }) => (
+                                    <a
+                                      href={item.href}
+                                      {...(item.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                                      className={classNames(
+                                        active ? 'bg-gray-100 text-gray-900' : 'text-gray-700',
+                                        'block px-4 py-2 text-sm'
+                                      )}
+                                    >
+                                      {item.name}
+                                    </a>
+                                  )}
+                                </Menu.Item>
+                              ))}
+                            </div>
+                          </Menu.Items>
+                        </Transition>
+                      </Menu>}
                       <div className="flex items-center gap-2 text-gray-400 hover:text-white">
                         <SignIn />
                       </div>
@@ -277,13 +311,17 @@ export default function Layout({ children, language, setLanguage, mark, setMark 
                   >
                     Integrations
                   </Disclosure.Button> */}
-                  <Disclosure.Button
-                    as="a"
-                    href="/support"
-                    className="text-gray-300 hover:text-white block px-3 py-2 rounded-none text-base font-medium"
-                  >
-                    Support
-                  </Disclosure.Button>
+                  {supportMenu.map((item) => (
+                    <Disclosure.Button
+                      key={item.name}
+                      as="a"
+                      href={item.href}
+                      {...(item.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                      className="text-gray-300 hover:text-white block px-3 py-2 rounded-none text-base font-medium"
+                    >
+                      {`Support ${item.name}`}
+                    </Disclosure.Button>
+                  ))}
                 </div>
                 <div className="pt-4 pb-3 border-t border-gray-700">
                   <div className="flex items-center px-5">
