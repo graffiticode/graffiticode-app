@@ -414,7 +414,7 @@ Commits and merges happen only when you ask.
   - **Activation order (runbook):**
     1. Deploy the auth-service half (backend sequence), and run the contract suite against a disposable instance.
     2. Deploy this release with `OAUTH_STORE=migrating` and `OAUTH_MIGRATION_VERIFIED_CONTRACT=1`. It stays legacy, because nothing is fenced.
-    3. Drain: untag or delete every MCP and REST revision older than this release.
+    3. Drain: untag or delete every MCP and REST revision older than this release, then run `npm run check:drained -- --release <this release's MCP receipt id>` until it passes.
     4. The operator sets the fence. Instances latch: `/health` shows `oauthStore.migrating: true`.
     5. Run `import`, then `sweep`, and `report` until only `sealed` is missing.
     6. The operator seals the source.
@@ -422,9 +422,12 @@ Commits and merges happen only when you ask.
     8. Run `report` until it says `fallbackRetirable`.
     9. Switch to `OAUTH_STORE=local` with `OAUTH_LEGACY_FALLBACK_RETIRED=1`.
 
-    Nothing in this repo can check step 3. A check that lists reachable revisions against the release is still to be written.
+    **The drain check** (`scripts/drained-revisions.mjs`) is read-only. The required release must be a gc-deploy receipt that was released from a clean tree; its commit is the baseline. Every MCP and REST revision reachable through traffic or a tag must pass three tests:
+      - it is a clean gc-deploy release: its `gc-release` label, its `GC_RELEASE` value and its `commit-sha` label agree, and `gc-dirty` is `false`;
+      - it runs the image built for that release (the registry's digest for `<image>:<release>`);
+      - its commit contains the baseline (`git merge-base --is-ancestor`).
+
+    "Older" is code lineage, not time. Anything that can't be established fails the check: a revision not made by gc-deploy, a commit this clone lacks, or an unreadable build tag. It prints a JSON report and exits 0 only when everything passed. The tests use recorded Cloud Run answers and a real git history (`tests/deploy/`, in `npm test`).
   - **Expiry and cleanup.** Pending authorizations, codes and legacy claims keep their millisecond `expires_at`, the only expiry validation reads, enforced on every read however late cleanup runs. Each also carries `expireAt`, a Firestore Timestamp equal to `expires_at` plus one hour (`CLEANUP_GRACE_MS`), for the TTL policy, so cleanup never comes before the credential stopped being usable. A legacy claim takes the claimed credential's expiry when it is created: a code's own, or a pending authorization's recorded one, else ten minutes from its creation. Nothing changes it afterwards, neither a retry nor a racing first attempt. An expired legacy code or pending authorization is neither claimed nor consumed at the source. The claim is checked again, for state and expiry, immediately before the source is asked, because creating it takes time; and once more before the record is handed out. That also settles claims a crash left prepared: they expire with their credential, and TTL removes them.
   - **TTL provisioning** (`core/src/storage-ttl.ts`; `npm run profile -- ttl <profile>` prints it). Every TTL policy the database needs (the three existing ones and the OAuth store's three) is a script that names the installation's `--project` and `--database` on every call. Each policy is read first and enabled only if it isn't `ACTIVE` or `CREATING`, so a re-run changes nothing. It is only printed; applying it is the operator's step, and the parameterized bootstrap will call it. Tests run it against a stand-in `gcloud`.
-  - **Still open:**
-    - the auth-service half;
-    - the drained-revision check above.
+  - **Still open:** the auth-service half.
