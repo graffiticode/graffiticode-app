@@ -12,7 +12,8 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "gcp:logs": "gcloud logging read 'resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"app\"' --project graffiticode-app --limit 100 --format='table(timestamp,severity,httpRequest.status,httpRequest.requestMethod,httpRequest.requestUrl,httpRequest.latency,textPayload)'",
-    "gcp:logs:tail": "gcloud beta run services logs tail app --project graffiticode-app --region us-central1"
+    "gcp:logs:tail": "gcloud beta run services logs tail app --project graffiticode-app --region us-central1",
+    "test": "tsx --test src/server/*.test.ts"
   },
   "dependencies": {
     "@ethereumjs/util": "^8.0.3",
@@ -28,6 +29,7 @@
     "classnames": "^2.5.1",
     "firebase": "^9.23.0",
     "firebase-admin": "^13.5.0",
+    "jose": "^4.15.9",
     "next": "^15.4.6",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
