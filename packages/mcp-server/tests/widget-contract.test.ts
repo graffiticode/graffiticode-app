@@ -78,10 +78,10 @@ test("renderer merges namespaced hydration with compact structured content", () 
 });
 
 test("the widget resource asks ChatGPT not to narrate what it shows (openai/widgetDescription)", async () => {
-  const { widgetResourceMeta, WIDGET_DESCRIPTION } = await import("../src/widget/index.js");
+  const { widgetResourceMeta, widgetDescription } = await import("../src/widget/index.js");
   const meta = widgetResourceMeta() as Record<string, unknown>;
-  assert.equal(meta["openai/widgetDescription"], WIDGET_DESCRIPTION);
-  assert.match(WIDGET_DESCRIPTION, /need not restate its contents/);
+  assert.equal(meta["openai/widgetDescription"], widgetDescription());
+  assert.match(widgetDescription(), /need not restate its contents/);
 });
 
 test("the widget build id is the bundle's hash, injected into the HTML without a cycle", async () => {

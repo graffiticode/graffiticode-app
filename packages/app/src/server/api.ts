@@ -1,8 +1,10 @@
 import bent from "bent";
+import { coreConfig } from "@graffiticode-app/core/config";
 
-const apiUrl = process.env.NEXT_PUBLIC_GC_API_URL || "https://api.graffiticode.org";
+// The installation's API host, read at use time (core config).
+const apiUrl = () => coreConfig().apiUrl;
 
-export const getBaseUrlForApi = () => apiUrl;
+export const getBaseUrlForApi = () => apiUrl();
 
 export type TaskAuth = { uid?: string; token?: string };
 
@@ -12,7 +14,7 @@ export type TaskAuth = { uid?: string; token?: string };
 export async function getApiTask({ auth, id }: { auth?: TaskAuth; id: string }) {
   const headers: Record<string, string> = {};
   if (auth?.token) headers["Authorization"] = auth.token;
-  const getApiJSON = bent(apiUrl, "GET", "json");
+  const getApiJSON = bent(apiUrl(), "GET", "json");
   const { status, error, data: task } = await getApiJSON(`/task?id=${encodeURIComponent(id)}`, null, headers);
   if (status !== "success") {
     throw new Error(`failed to get task ${id}: ${error?.message}`);
@@ -38,7 +40,7 @@ export async function postTask({
   if (!isPublic && auth?.token) {
     headers["Authorization"] = auth.token;
   }
-  const postApiJSON = bent(apiUrl, "POST", "json");
+  const postApiJSON = bent(apiUrl(), "POST", "json");
   const { data } = await postApiJSON("/task", { task }, headers);
   return data;
 }
@@ -46,7 +48,7 @@ export async function postTask({
 // GET /data?id= — returns the compiled data model for a task (the input the
 // form view renders from). Useful for debugging what /form receives.
 export async function getData({ accessToken, id }: { accessToken?: string; id: string }) {
-  const get = bent(apiUrl, "GET", "json", 200);
+  const get = bent(apiUrl(), "GET", "json", 200);
   const qs = new URLSearchParams({ id });
   if (accessToken) qs.set("access_token", accessToken);
   const resp = await get(`/data?${qs.toString()}`);
@@ -68,7 +70,7 @@ export async function postApiCompile({
     "x-graffiticode-storage-type": "persistent",
   };
   if (accessToken) headers["authorization"] = accessToken;
-  const post = bent(apiUrl, "POST", "json", headers);
+  const post = bent(apiUrl(), "POST", "json", headers);
   const resp = await post("/compile", { id, data });
   if (resp.status !== "success") {
     throw new Error(`failed to post compile ${id}: ${resp.status}`);

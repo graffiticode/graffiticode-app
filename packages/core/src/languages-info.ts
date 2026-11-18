@@ -7,7 +7,9 @@
  * language server by getLanguageServerDoc().
  */
 
-import { LANGUAGES, listLanguages as listLangs, type Language } from "./lib/languages.js";
+import { findLanguageById, isLanguageOffered, listLanguages as listLangs, type Language } from "./lib/languages.js";
+import { installedProfile } from "./profile/current.js";
+import { languageServerOrigin, resolveHosts } from "./profile/hosts.js";
 import { getLanguageScope, getLanguageServerDoc } from "./lib/language-server-client.js";
 
 export type { Language };
@@ -50,12 +52,14 @@ export async function getLanguageInfo(id: string): Promise<LanguageInfo | null> 
   const langId = id.replace(/^L/i, "");
 
   // Find base language info
-  const baseLang = LANGUAGES.find(l => l.id === langId);
-  if (!baseLang) {
+  // A language the installation doesn't offer has no detail to give here
+  // (discovery), though its existing items still resolve by id elsewhere.
+  const baseLang = findLanguageById(langId);
+  if (!baseLang || !isLanguageOffered(langId)) {
     return null;
   }
 
-  const specUrl = `https://l${langId}.graffiticode.org/spec.html`;
+  const specUrl = `${languageServerOrigin(resolveHosts(installedProfile()?.profile ?? null, process.env), langId)}/spec.html`;
 
   const [{ envelope, usageGuide }, scope] = await Promise.all([
     getLanguageServerDoc(langId),

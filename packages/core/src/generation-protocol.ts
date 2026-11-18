@@ -13,6 +13,7 @@
 // system/generation-protocol.minProtocol). The floor is written once, by
 // scripts/enable-generation-v2.ts, and is never lowered: after that, setting
 // the env var back to v1 or redeploying with it changes nothing.
+import { installedProfile } from "./profile/current.js";
 import { db } from "./db.js";
 import { coreConfig } from "./config.js";
 import { ConflictError } from "./errors.js";
@@ -75,10 +76,18 @@ export async function activateGenerationV2({ by, now = Date.now() }: { by: strin
 // Staging only: removes the floor, for rehearsing the rollout again. Refused in
 // production, and anywhere a v2 job exists: an item with a pointer must never
 // meet a v1 producer.
+// Without an installation profile, Graffiticode's own production project. With
+// one, the profile says whether the installation is production.
 export const PRODUCTION_PROJECT = "graffiticode-app";
 
+export function isProductionInstallation(project: string): boolean {
+  const installed = installedProfile();
+  if (installed) return installed.profile.installation.production;
+  return project === PRODUCTION_PROJECT;
+}
+
 export async function removeFloorForStaging({ project }: { project: string }) {
-  if (!project || project === PRODUCTION_PROJECT) {
+  if (!project || isProductionInstallation(project)) {
     throw new Error("The generation-protocol floor is never lowered in production.");
   }
   const anyJob = await db().collection("generation-jobs").limit(1).get();

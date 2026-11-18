@@ -27,6 +27,13 @@ const challenge = () => new ApiProblem(401, "unauthenticated", "Credentials requ
   headers: { "WWW-Authenticate": 'Bearer realm="graffiticode"' },
 });
 
+// The REST form of core's free_plan_disabled refusal.
+export const freePlanDisabledProblem = (payload: { message?: string; signup_url?: string } = {}) =>
+  new ApiProblem(403, "free_plan_disabled", "Account required", {
+    detail: payload.message ?? "This installation requires an account.",
+    signup_url: payload.signup_url,
+  });
+
 export async function callerFor(c: Context): Promise<Caller> {
   const authorization = c.req.header("authorization") ?? "";
   const bearer = /^Bearer\s+(.+)$/i.exec(authorization)?.[1]?.trim();
@@ -47,6 +54,9 @@ export async function callerFor(c: Context): Promise<Caller> {
     try {
       admitted = await admitRequest({ headers: { "x-free-plan-session": workspace } });
     } catch (err: any) {
+      // An installation without a free plan says so, with the way to sign in,
+      // rather than inviting the caller to start another workspace.
+      if (err?.code === "free_plan_disabled") throw freePlanDisabledProblem(err.payload);
       // A rate limit keeps its 429; any other refusal (bad signature, expired,
       // malformed) means the token isn't one we issued.
       if (err?.status === 429) {

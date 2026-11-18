@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useStripe, useElements, PaymentElement } from '@stripe/react-stripe-js';
-import { loadStripe } from "@stripe/stripe-js";
 import { Elements } from "@stripe/react-stripe-js";
 import axios from 'axios';
 import useGraffiticodeAuth from '@graffiticode/auth-react';
+import { useStripePromise } from "../lib/stripe";
+import { usePublicConfig } from "../lib/public-config";
 
 const SetupForm = () => {
+  const consoleHost = usePublicConfig().hosts.console;
   const stripe = useStripe();
   const elements = useElements();
 
@@ -26,7 +28,7 @@ const SetupForm = () => {
       //`Elements` instance that was used to create the Payment Element
       elements,
       confirmParams: {
-        return_url: 'https://console.graffiticode.org',
+        return_url: consoleHost,
       },
     });
 
@@ -52,9 +54,9 @@ const SetupForm = () => {
   )
 };
 
-const stripePromise = loadStripe('pk_test_51LhI57LUz4JwpsJ6p6lzznvkbFNQj8k9LnAYckCJZ4Tv9AZzYHxKafXTKsTS12F8vUpKyELdBvXtvgSmNOzdqug200VALmBhSl');
 
 function SetupApp() {
+  const stripePromise = useStripePromise();
   const { user } = useGraffiticodeAuth();
   const [clientSecret, setClientSecret] = useState();
   useEffect(() => {
@@ -72,7 +74,7 @@ function SetupApp() {
 
   return (
     clientSecret &&
-    <Elements stripe={stripePromise} options={clientSecret}>
+    stripePromise && <Elements stripe={stripePromise} options={clientSecret}>
       <SetupForm />
     </Elements>
     || <div />

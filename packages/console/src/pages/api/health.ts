@@ -4,10 +4,16 @@
 // system/generation-protocol.minProtocol (app tier Phase 3.5).
 import type { NextApiRequest, NextApiResponse } from "next";
 import { effectiveProtocol } from "@graffiticode-app/core/generation-protocol";
+import { installationReceipt } from "@graffiticode-app/core/profile/runtime";
+import { withInstallation } from "../../lib/with-installation";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Cache-Control", "no-store");
-  if (req.query.deep !== "1") return res.status(200).json({ ok: true });
+  if (req.query.deep !== "1") {
+    // The installation receipt, when a profile is loaded (docs/installations-plan.md).
+    const receipt = installationReceipt();
+    return res.status(200).json(receipt ? { ok: true, installation: receipt } : { ok: true });
+  }
   try {
     const protocol = await effectiveProtocol();
     return res.status(200).json({
@@ -21,3 +27,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(503).json({ ok: false, error: "deep_check_failed" });
   }
 }
+
+export default withInstallation(handler);

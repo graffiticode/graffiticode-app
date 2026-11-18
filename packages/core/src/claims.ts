@@ -2,7 +2,7 @@
 import { randomUUID } from "crypto";
 import { getFirestore } from "./utils/db/index.js";
 import { getApiTask } from "./lib/api.js";
-import { FREE_PLAN_ITEM_TTL_MS } from "./lib/free-plan-context.js";
+import { freePlanItemTtlMs } from "./lib/free-plan-context.js";
 import { adoptSiblingWorkspace } from "./lib/workspace-adoption.js";
 import { mintSessionToken, isSessionTokenConfigured } from "./lib/free-plan-session-token.js";
 import { mintClaimToken } from "./lib/claim-token.js";
@@ -91,7 +91,7 @@ export function freePlanItemFields(auth: AuthArg, now = Date.now()) {
   return {
     freePlan: true,
     sessionNamespace: auth.sessionNamespace,
-    expiresAt: now + FREE_PLAN_ITEM_TTL_MS,
+    expiresAt: now + freePlanItemTtlMs(),
   };
 }
 

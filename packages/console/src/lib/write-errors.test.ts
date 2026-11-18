@@ -3,7 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { describeWriteProblem, canRetryWrite, isCheckableWrite, itemWriteFields, reconcileTarget, describeReconcile, describeReconcileRefusal } from "@graffiticode-app/core/lib/write-errors";
 
-const failed = (message: string) => describeWriteProblem({ status: "failed", message });
+const failed = (message: string) => describeWriteProblem({ status: "failed", message }, "Graffiticode");
 
 // The api's W4 refusal messages, as the console records them (message, then
 // the reason code when the message doesn't already name it).
@@ -48,7 +48,7 @@ test("an uncertain outcome still says so, and earlier mappings are unchanged", (
   assert.match(lost!.text, /uncertain/);
   assert.equal(failed("Error: permission denied (not-granted)")?.retryable, false);
   assert.equal(failed("something unexpected")?.retryable, true);
-  assert.equal(describeWriteProblem({ status: "ok", message: null }), null);
+  assert.equal(describeWriteProblem({ status: "ok", message: null }, "Graffiticode"), null);
 });
 
 // Reconciliation (capability W5, WRITE-02).

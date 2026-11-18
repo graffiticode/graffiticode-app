@@ -17,7 +17,9 @@
     "build:mcp": "npm run build -w packages/mcp-server",
     "lint": "npm run lint -w packages/console",
     "typecheck": "npm run build:core && npm run typecheck -w packages/console && npm run typecheck -w packages/mcp-server && npm run typecheck -w packages/openapi-server && npm --prefix packages/app run typecheck",
-    "test": "npm run build:core && npm test -w packages/core && npm test -w packages/console && npm test -w packages/mcp-server && npm test -w packages/openapi-server && npm --prefix packages/app test",
+    "test": "npm run build:core && npm test -w packages/core && npm test -w packages/console && npm test -w packages/mcp-server && npm test -w packages/openapi-server && npm --prefix packages/app test && npm run test:deploy-tools",
+    "test:deploy-tools": "node --test tests/deploy/*.test.mjs",
+    "check:drained": "node scripts/drained-revisions.mjs",
     "deploy": "gc-deploy",
     "gcp-cost": "npm run gcp-cost -w packages/console --",
     "rollback": "gc-deploy rollback",
@@ -25,7 +27,9 @@
     "build:app": "npm --prefix packages/app run build",
     "test:baseline": "npm run build:core && npx --yes firebase-tools@15.32.0 emulators:exec --config tests/baseline/firebase.json --only firestore --project demo-baseline \"cd packages/console && tsx --test --test-concurrency=1 ../../tests/baseline/*.test.ts\"",
     "build:core": "npm run build -w packages/core",
-    "build:openapi": "npm run build -w packages/openapi-server"
+    "build:openapi": "npm run build -w packages/openapi-server",
+    "profile": "tsx packages/core/src/profile/cli.ts",
+    "test:installation-build": "npm run build:console && npm --prefix packages/app run build && node tests/installation-build/assemble.mjs && npx --yes firebase-tools@15.32.0 emulators:exec --config tests/baseline/firebase.json --only firestore --project demo-installation \"tsx --test --test-concurrency=1 tests/installation-build/*.test.ts\""
   },
   "devDependencies": {
     "@graffiticode/deploy": "file:vendor/graffiticode-deploy-0.1.0.tgz"

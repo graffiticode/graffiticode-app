@@ -7,12 +7,7 @@
 
 import { NextApiRequest, NextApiResponse } from "next";
 import { ragAnalytics } from "@graffiticode-app/core/lib/rag-analytics";
-import admin from "firebase-admin";
 
-// Initialize Firebase Admin if not already initialized
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
 
 interface AnalyticsQuery {
   action: "metrics" | "details" | "export";

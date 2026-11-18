@@ -2,9 +2,12 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import useGraffiticodeAuth from "@graffiticode/auth-react";
+import InstallationCopy from "../components/InstallationCopy";
+import { usePublicConfig } from "../lib/public-config";
 
 export default function Home() {
   const { user, loading } = useGraffiticodeAuth();
+  const { copy } = usePublicConfig();
   const router = useRouter();
   const redirected = useRef(false);
   const [showWelcome, setShowWelcome] = useState(false);
@@ -45,6 +48,7 @@ export default function Home() {
 
   return (
     <div className="flex flex-col items-center justify-center h-[calc(100vh-100px)] gap-4">
+      <InstallationCopy markdown={copy.consoleHome} className="w-1/2">
       <h1 className="text-2xl font-medium text-gray-700">Welcome to Graffiticode</h1>
       <p className="text-sm text-gray-500 text-justify w-1/2">
         Graffiticode is a platform for deploying smart tools for agents and humans.
@@ -57,6 +61,7 @@ export default function Home() {
           </>
         )}
       </p>
+      </InstallationCopy>
     </div>
   )
 }

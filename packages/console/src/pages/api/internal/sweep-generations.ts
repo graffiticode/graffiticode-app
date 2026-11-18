@@ -14,8 +14,9 @@
 // Idle until v2 jobs exist: both queries come back empty.
 import type { NextApiRequest, NextApiResponse } from "next";
 import { sweep } from "@graffiticode-app/core/sweeper";
+import { withInstallation } from "../../../lib/with-installation";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
   const secret = process.env.INTERNAL_JOB_SECRET || "";
   if (!secret || req.headers["x-internal-job-secret"] !== secret) {
@@ -32,3 +33,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: "sweep_failed" });
   }
 }
+
+export default withInstallation(handler);

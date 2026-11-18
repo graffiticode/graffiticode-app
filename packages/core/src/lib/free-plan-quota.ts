@@ -1,3 +1,5 @@
+import { freePlanItemTtlHours } from "./free-plan-context.js";
+import { displayUrl, installationBrand } from "../profile/brand.js";
 import { getFirestore } from "../utils/db/index.js";
 import { FreePlanError, buildSignupUrl } from "./free-plan-context.js";
 import { emitEvent } from "./funnel-events.js";
@@ -143,11 +145,12 @@ export async function recordTrialItem(now = new Date()): Promise<void> {
 
 export function buildMonthlyQuotaError(itemsUsed?: number, itemsLimit?: number): FreePlanError {
   emitEvent("wall_hit", { wall: "item_limit", auth: "freePlan" });
+  const b = installationBrand();
   return new FreePlanError("free_plan_item_limit_reached", 429, {
     error: "free_plan_item_limit_reached",
     message:
-      "The Graffiticode free plan has reached its item limit for this month. " +
-      "Create a free account at graffiticode.org/signup to keep creating items.",
+      `The ${b.name} free plan has reached its item limit for this month. ` +
+      `Create a free account at ${displayUrl(b.signupUrl)} to keep creating items.`,
     items_used: itemsUsed,
     items_limit: itemsLimit,
     signup_url: buildSignupUrl("item_limit"),
@@ -157,12 +160,13 @@ export function buildMonthlyQuotaError(itemsUsed?: number, itemsLimit?: number):
 export function buildScopeError(lang: string | undefined | null, allowed: string[]): FreePlanError {
   emitEvent("wall_hit", { wall: "language_scope", auth: "freePlan", lang: lang ?? undefined });
   const allowedList = allowed.map((id) => `L${id}`).join(", ");
+  const b = installationBrand();
   return new FreePlanError("language_not_in_trial_scope", 403, {
     error: "language_not_in_trial_scope",
     message:
-      `L${String(lang ?? "").replace(/^L/i, "")} is not available on the Graffiticode free plan. ` +
+      `L${String(lang ?? "").replace(/^L/i, "")} is not available on the ${b.name} free plan. ` +
       `Available without an account: ${allowedList}. ` +
-      `Create a free account at graffiticode.org/signup to use every language.`,
+      `Create a free account at ${displayUrl(b.signupUrl)} to use every language.`,
     language: lang ?? null,
     allowed_languages: allowed,
     signup_url: buildSignupUrl("language_scope"),
@@ -171,11 +175,12 @@ export function buildScopeError(lang: string | undefined | null, allowed: string
 
 export function buildItemExpiredError(): FreePlanError {
   emitEvent("wall_hit", { wall: "item_expired", auth: "freePlan" });
+  const b = installationBrand();
   return new FreePlanError("free_plan_item_expired", 410, {
     error: "free_plan_item_expired",
     message:
-      "This item has expired. Free-plan items are kept for 48 hours unless they're claimed. " +
-      "Create it again, or create a free account at graffiticode.org/signup to keep items permanently.",
+      `This item has expired. Free-plan items are kept for ${freePlanItemTtlHours()} hours unless they're claimed. ` +
+      `Create it again, or create a free account at ${displayUrl(b.signupUrl)} to keep items permanently.`,
     signup_url: buildSignupUrl("item_expired"),
   });
 }
@@ -292,11 +297,12 @@ export async function maybeAlertBudget({
 
 export function buildDailyPaceError(allowance: number, now = new Date()): FreePlanError {
   emitEvent("wall_hit", { wall: "daily_pace", auth: "freePlan" });
+  const b = installationBrand();
   return new FreePlanError("free_plan_daily_limit_reached", 429, {
     error: "free_plan_daily_limit_reached",
     message:
-      "The Graffiticode free plan has reached its item limit for today and resumes tomorrow UTC. " +
-      "Create a free account at graffiticode.org/signup for uninterrupted access.",
+      `The ${b.name} free plan has reached its item limit for today and resumes tomorrow UTC. ` +
+      `Create a free account at ${displayUrl(b.signupUrl)} for uninterrupted access.`,
     items_limit: allowance,
     signup_url: buildSignupUrl("daily_pace"),
     resumes_at: nextUtcMidnightIso(now),

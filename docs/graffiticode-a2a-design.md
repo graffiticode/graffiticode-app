@@ -1,24 +1,24 @@
-# Graffiticode A2A frontend and backend design
+# Graffiticode shared service architecture and A2A/MCP interfaces
 
-Status: Draft for review  
-Date: November 11, 2026  
-Scope: `graffiticode-app` frontend and `graffiticode` backend  
+Status: Draft for review\
+Date: November 11, 2026\
+Updated: November 17, 2026\
+Scope: shared `graffiticode-app` frontend and its `graffiticode` backend integration, across installations\
 Basis: [MCP/A2A design brief](./mcp-a2a-design-brief.md)
+
+This is the shared architectural reference for frontend service definitions, capability selection, authorization, durable jobs, execution observation, outcomes, recovery, and A2A/MCP translation. Backend execution contracts remain owned by the backend designs; this document consumes them.
+
+The [Artcompiler service design](./artcompiler-a2a-design.md) owns the Learnosity product responsibilities, public identities, supported deliverables, and domain completion requirements. The [installations plan](./installations-plan.md) owns deployment/profile boundaries, and it and the execution observation plan own implementation sequencing (§12). Product profiles use these shared contracts rather than redefining them.
 
 ## 1. Decision
 
-**The Graffiticode frontend (`graffiticode-app`) implements and operates specialized micro-agents. The Graffiticode backend (`graffiticode`) supplies controlled execution of their work and inspection of the results.**
+**Independent installations use the shared Graffiticode frontend (`graffiticode-app`) to implement and operate specialized services. The Graffiticode backend (`graffiticode`) supplies controlled execution of their work and inspection of the results.**
 
 In this document, **frontend** means the application and agent-service layer, including its server-side code, protocol adapters, console, and generation workers. **Backend** means the language and execution platform, including compilation, interpretation, execution policy, and broker services. These are repository and responsibility boundaries; both layers can contain server-side services.
 
-The frontend owns domain expertise, intent translation, code generation, language selection and composition, and the completion contract for each service. The backend compiles and interprets the generated work within enforced capability boundaries and supplies results and execution evidence. A2A and MCP expose the frontend's service contracts.
+The frontend implements intent translation, code generation, language selection and composition, and service completion validators. Each installation selects and parameterizes implemented capabilities through an external, versioned profile. The operator owns the product responsibilities and completion requirements. The backend compiles and interprets the generated work within enforced capability boundaries and supplies results and execution evidence. A2A and MCP expose the same service contracts.
 
-Use Learnosity as the initial domain with two frontend services:
-
-- **Assessment Authoring:** create and revise assessment content, validate it, provide previews, and eventually save an explicitly selected revision through an authorized connection.
-- **Data Operations:** plan and eventually execute bounded reads, exports, transformations, and migrations of assessment records and collections.
-
-Expose two A2A Agent Cards and initially one Learnosity-specific frontend MCP endpoint with two bounded toolsets. Keep the existing general-purpose frontend MCP interface and its no-external-writes contract intact. The proposed Learnosity MCP endpoint is a distinct interface; adding it does not silently add writes to existing tools.
+Artcompiler's Learnosity installation is the initial product application. Its [service design](./artcompiler-a2a-design.md) defines Assessment Authoring and Data Operations, their two A2A identities, and their initial MCP packaging. Graffiticode's general-purpose MCP interface retains its existing no-external-writes contract.
 
 Define service scope, execution contracts, and verification once in the frontend. Both frontend adapters call these definitions directly and use the same backend execution contracts. An A2A request does not need an additional model that forwards it through MCP.
 
@@ -26,7 +26,7 @@ The initial release offers only capabilities that can be demonstrated end to end
 
 ## 2. Goals and boundaries
 
-The architecture must support additional frontend service domains without rebuilding authentication, job tracking, clarification, artifact delivery, or recovery. A new service should primarily supply its supported intents, language constraints, provider operations, and completion validators.
+The architecture must support additional frontend service domains without rebuilding authentication, job tracking, clarification, artifact delivery, or recovery. A new profile selects supported intents, language constraints, provider capabilities, and registered completion validators. A new capability or validator implementation is added to shared code before a profile can select it.
 
 A frontend service earns delegation by supplying maintained capability: appropriate generation, reliable execution through the backend, constrained provider access, and evidence of the outcome. A2A itself does not make the underlying work more intelligent or reliable.
 
@@ -38,7 +38,7 @@ The micro-agents exist to do useful work that is **secure, transparent, and acce
 
 A frontend micro-agent is defined here by its bounded responsibility and observable results. Internal composition and delegation are implementation choices. This design does not require one model, language, internal micro-agent, or deployment per public agent. It does not introduce a general autonomous multi-agent scheduler. Cross-service workflows begin as explicit compositions with recorded child jobs and authority boundaries.
 
-Learner delivery, human-facing reporting, and unrestricted Learnosity administration are outside the initial service scope. Embedding Learnosity's authoring UI is an authoring integration-planning skill when supported by a current language; it does not require a third public identity.
+Domain-specific inclusions and exclusions belong to each product contract. The initial Learnosity scope is defined in the [Artcompiler design](./artcompiler-a2a-design.md#2-goals-and-boundaries).
 
 ## 3. Current foundation and implementation gaps
 
@@ -69,7 +69,7 @@ The backend owns these contracts, and this design translates them. It does not d
 
 ### 4.1 Components and ownership
 
-**Frontend service registry.** Stores reviewed, versioned service definitions. Owns stable service and skill identifiers, supported requests, allowed language compositions, maximum provider capabilities, output contracts, and completion criteria. Deployment configuration enables a subset of implemented skills. This service registry is distinct from the backend's language registry.
+**Frontend service registry.** Serves reviewed, versioned service definitions from the selected installation profile. Shared code owns the profile schema, capability registry, handlers, and validator implementations; profiles select capabilities and supply supported parameters, stable service and skill identifiers, language constraints, output requirements, and limits. Availability and write readiness come from registered code and enforced dependencies. This service registry is distinct from the backend's language registry. The [installations plan](./installations-plan.md#p4-capability-registry-pinned-definitions-and-the-service-tool-family-graffiticode-app) governs profile integration and definition pinning.
 
 **Frontend protocol adapters.** Authenticate requests, resolve the selected service, validate protocol payloads, and translate messages, job state, and artifacts. They own A2A and MCP transport behavior and client compatibility. They do not contain Learnosity business logic.
 
@@ -91,9 +91,11 @@ Each definition contains:
 - Skills with stable IDs, examples, required context, input schemas, output schemas, and deliverable kinds.
 - Allowed languages and composition rules, plus protected functions and broker operations available to each skill.
 - Supported provider connection types and resource constraints, including bank and record scope where enforceable.
-- Completion validators and required evidence for each requested delivery state.
+- References to registered completion validators, their supported parameters, and required evidence for each requested delivery state.
 - Limits for elapsed time, generation attempts, records, bytes, provider calls, and cost.
 - Protocol exposure settings and deployment feature gates.
+
+Profiles are declarative: handlers, validator implementations, and authorization behavior remain code. The loader rejects unknown or unimplemented capabilities and writing capabilities whose execution dependencies are not ready.
 
 Skill availability is the intersection of implemented handlers, ready dependencies, service configuration, and caller authorization. A definition must not advertise execution merely because a planning language describes that operation.
 
@@ -306,11 +308,11 @@ Cancellation is cooperative: stop scheduling, check cancellation between bounded
 
 ### 7.1 Identities, discovery, and versioning
 
-Publish the frontend's **Learnosity Assessment Authoring** and **Learnosity Data Operations** services as distinct cards. Proposed frontend application paths are `/agents/learnosity/authoring` and `/agents/learnosity/data`; their exact host is a deployment decision.
+Generate Agent Cards for the public service identities selected by the installation profile, from the same definitions used by its service runtime and MCP catalog. Branding, enabled services, supported skills, and endpoint routing are installation configuration. The pilot identities and proposed paths are defined in the [Artcompiler product design](./artcompiler-a2a-design.md#7-a2a-public-identities).
 
 The cards identify frontend services that use the backend for controlled execution and result inspection. Each public identity groups a coherent responsibility and its supported skills; backend languages and internal micro-agents do not automatically receive separate cards. In this design, an A2A endpoint is a frontend protocol access point. The [A2A core concepts](https://a2a-protocol.org/latest/topics/key-concepts/) allow a remote agent to be an agent or agentic system, so an endpoint does not determine whether its implementation performs work directly or delegates internally.
 
-Use directly configured card URLs or a catalog to discover both identities on a shared host. The standard root `/.well-known/agent-card.json` returns a single Agent Card; do not put a card array there. If root discovery is required for each identity, use separate hostnames or another supported routing arrangement.
+Use directly configured card URLs or a catalog to discover multiple identities on a shared host. The standard root `/.well-known/agent-card.json` returns a single Agent Card; do not put a card array there. If root discovery is required for each identity, use separate hostnames or another supported routing arrangement.
 
 Each card describes responsibility, currently enabled skills, examples, input/output media types, security requirements, and supported interfaces. Pin an A2A release and SDK together; validate cards and payloads against that release. Keep protocol version, service-definition version, and artifact-schema version separate. The current [A2A specification](https://a2a-protocol.org/latest/specification/) defines cards, task interaction, artifacts, discovery, and transport bindings; `latest` is a research link, not a deployment version pin.
 
@@ -338,9 +340,9 @@ Status text comes from the backend's credential-free agent status representation
 
 ## 8. MCP interface and compatibility
 
-The frontend's Learnosity-specific MCP catalog uses stable, explicit names. Proposed authoring tools are `assessment_create_item`, `assessment_update_item`, and `assessment_preview_item`; add `assessment_save_item` only after provider execution is ready. Proposed data tools are `data_plan`, then `data_query`, `data_export`, and eventually `data_migrate` as their handlers mature. Shared `job_get`, `job_continue`, and `job_cancel` cover the fallback job interface.
+The shared frontend supports generic item tools and a service-tool family generated from the installation profile's selected skills. Each skill has a stable, explicit name, input/output contract, and registered handler. The profile selects which supported families each endpoint exposes. The [Artcompiler MCP product surface](./artcompiler-a2a-design.md#8-mcp-product-surface) defines the initial Learnosity tool names. Shared `job_get`, `job_continue`, and `job_cancel` cover the fallback service-job interface.
 
-Each tool accepts rich intent within its named purpose. Save requires an immutable content revision and selected connection. A planning call cannot execute merely because its description includes execution instructions. Migration cannot be hidden in a read tool. Tool descriptions and side-effect annotations must match actual behavior.
+Each tool accepts rich intent within its named purpose and enforced service scope. A planning call cannot execute merely because its description includes execution instructions. Tool descriptions and side-effect annotations must match actual behavior; profiles cannot introduce side effects absent from their registered capabilities.
 
 Filter discovery by authorization, and recheck authorization at invocation. MCP supports authorization-dependent tool catalogs; grouping into two toolsets is frontend configuration, with no assumption that every client exposes group toggles. See the [MCP tools specification](https://modelcontextprotocol.io/specification/2026-07-28/server/tools).
 
@@ -349,75 +351,17 @@ Use the [MCP Tasks extension](https://github.com/modelcontextprotocol/ext-tasks/
 The fallback tools use the same contracts as A2A:
 - `job_get` returns the job state from §6.3, with backend artifacts and agent status.
 - `job_continue` answers the current preparation question or backend interrupt, by id and revision.
-- `job_cancel` issues the stop `dispatch` once a run exists.
+- `job_cancel` follows §6.4: it requests stop for an execution the job submitted, or detaches from an adopted execution.
 
-Initially deploy one Learnosity endpoint. Split it when authoring and data operations need independent installation, administration, access arrangements, distribution, or operational isolation. A client that trusts only entire connections is a concrete reason to split. Both endpoints would retain the same service IDs and execution rules.
+Endpoint packaging is a product decision. Splitting an endpoint preserves the service IDs and shared execution contracts; the initial Artcompiler arrangement and split criteria are in its [product design](./artcompiler-a2a-design.md#8-mcp-product-surface).
 
 ## 9. Learnosity Assessment Authoring
 
-### 9.1 Supported responsibility
-
-Accept subject, audience, quantity, question and activity structure, scoring intent, feedback, accessibility requirements, metadata, and requested delivery state. Use current language descriptions and scope metadata to select content authoring or integration planning; public skill IDs must not encode a remembered language number.
-
-For content, the frontend micro-agent generates or revises language-specific code and uses the backend to compile and interpret it. The frontend evaluates structure, item/activity references, scoring configuration, and requested content constraints using the available validators and backend evidence, and provides a preview where available. Separate machine-checked validity from pedagogical quality judgments and any requested human review. A successful render does not prove the scoring model or all requested restrictions are correct.
-
-Content stages are:
-
-1. **Prepared:** the selected revision exists, required checks pass, and any warnings are explicit.
-2. **Previewed:** that revision has a usable preview; no item-bank write is implied.
-3. **Saved:** the authorized save of that revision has confirmed provider evidence and returned item/activity references.
-
-Complete against the requested stage. If the caller requested a save, preparation alone is an intermediate result. Saving does not imply publication or learner delivery.
-
-### 9.2 Save execution
-
-Prepare and validate with writes disabled. The frontend binds save to the immutable generated artifact, target connection/bank, reference mapping, overwrite policy, and requested state. The backend executes the reviewed operation through policy and broker and records the receipt. The frontend uses that evidence and supported readback to verify the resulting references and content. Any generation after review produces a new revision requiring renewed validation and action binding.
-
-Use optimistic concurrency for revisions and provider preconditions where available. When provider conditional writes are unavailable, declare the concurrency limitation and avoid claiming atomic overwrite protection.
-
-Do not reuse the frontend console's automatic write-through behavior as an implicit consequence of authoring. The service's provider action must be an explicit, constrained stage. Add tests showing that an instruction to save inside a create, revise, or preview request still cannot write.
-
-### 9.3 Authoring integration planning
-
-When a supported language models embedding an item editor, browser, or activity editor, the frontend produces a host-neutral recipe using that language. Require actual deployment facts such as serving domain, author identity, bank, and relevant references. Preserve confidence statements and unconfirmed vendor bindings carried in the recipe and validation results.
-
-A recipe completes the integration-planning job. An editor loading successfully does not establish that configuration-driven restrictions took effect; implementation verification should compare behavior with and without the relevant configuration. Keep unconfirmed restrictions visible in the deliverable.
+The product's supported responsibility, prepared/previewed/saved completion requirements, save binding, and authoring-integration recipes are defined in [Artcompiler §9](./artcompiler-a2a-design.md#9-learnosity-assessment-authoring). Its profile selects registered capabilities and validators under the shared contracts in §4–§8.
 
 ## 10. Learnosity Data Operations
 
-### 10.1 Planning and execution are separate skills
-
-Initially expose `plan_data_job` using the existing recipe capability. The deliverable states the intended operation, prerequisites, paging, write semantics, gotchas, and verification procedure. It explicitly says no live provider operation occurred.
-
-Introduce `query_records`, `export_records`, and `migrate_records` only as the corresponding backend execution handlers are implemented, broker-enforced, and verified. Names here are proposed frontend service skill IDs; actual advertised coverage follows the current implementation. Do not infer support for an operation from a neighboring vendor endpoint or from a recipe's existence.
-
-For executable jobs, require source connection/bank, record family, references or filters, projection, paging policy, limits, consistency expectations, and destination where relevant. Writes also require merge/replace semantics, preservation rules, reference conflicts, and exception handling. A migration binds separate source and destination connections and independently authorizes each.
-
-### 10.2 Reads and exports
-
-The caller must choose one page or all pages to exhaustion. A bounded sample cannot satisfy an all-records request. A record or cost limit reached before exhaustion produces an incomplete result with a resumable checkpoint, not a completed full export.
-
-Use operation-specific pagination from the supported recipe and verified provider contract. Persist the continuation, query digest, page count, processed record identities, and output checkpoints. Do not invent a universal pager across item-bank and session families. After resume, account for repeated pages or records without duplicating the output.
-
-Return an export manifest with query/scope, record count, page count, exhaustion evidence, format, digests, exceptions, and source observation time. State whether the provider supplied a snapshot or the export observed a changing bank. Without snapshot support, completion proves traversal under the documented consistency assumptions, not a point-in-time copy.
-
-Assessment results may contain personal data. Default to the minimum required fields, private artifacts, bounded retention, and redacted diagnostics. Export completion requires both traversal and a retrievable, verified artifact.
-
-### 10.3 Transformations and migrations
-
-Prepare a deterministic plan showing selection, mapping, preservation behavior, expected writes, conflicts, and verification rules. Freeze the selected source revisions or validate them again before writing. Bind execution to the plan digest and the authority granted for both banks.
-
-Never send partial records while assuming merge semantics. Confirm the modeled operation's semantics; if it replaces, retrieve and preserve required fields or reject the incomplete request. Do not use the HTTP verb as evidence of preservation behavior.
-
-Process bounded batches with per-record outcomes and stable operation keys. Checkpoint successful writes and unresolved cases. Read back or otherwise reconcile critical fields and references before reporting success. A clean HTTP response is evidence of acceptance, not necessarily of the requested preservation or completeness.
-
-The default completion contract requires all in-scope records to satisfy the declared rules. Partial success remains visible with counts and a machine-readable exception artifact. Only a request that explicitly permits defined exclusions may complete with those exclusions. No cross-bank transaction or automatic rollback is promised.
-
-### 10.4 Composition with authoring
-
-A frontend authoring service can save its own validated revision through the backend without delegating to a separate public agent. Bulk movement of a collection belongs to Data Operations even if the records originated in authoring.
-
-A request to author content and migrate it creates an explicitly coordinated frontend workflow: authoring produces pinned artifacts; Data Operations consumes their supported portable representation under its own authority. Both services use the backend under their respective execution scopes. Preserve parent/child references and aggregate completion. Internal delegation cannot widen the caller's grants or hide a failed child behind parent success.
+The product's planning/execution boundary, read and export completeness, transformation and migration requirements, and composition with authoring are defined in [Artcompiler §10](./artcompiler-a2a-design.md#10-learnosity-data-operations). Backend execution and evidence remain governed by the shared contracts; product-specific completion requirements are maintained in that one document.
 
 ## 11. Operational behavior and verification
 
@@ -434,39 +378,28 @@ Before release, demonstrate:
 - Cross-account job, context, connection, and artifact access is refused; revoked access is rechecked on resume and operation execution.
 - Lost submission responses, duplicate deliveries, worker crashes, and effect retries do not silently create fresh write invocations.
 - Clarification survives disconnects, stale answers conflict, cancellation fences further work, and unknown writes remain unresolved until reconciled.
-- One-page reads, exhausted reads, limit stops, resumed exports, replace semantics, conflicts, and partial migrations produce accurate outcomes.
+- Domain validators and artifacts satisfy the selected service definition's completion contract. The initial Learnosity acceptance cases are in [Artcompiler §11](./artcompiler-a2a-design.md#11-product-verification).
 - Cards and tool catalogs advertise only ready skills; target clients handle the selected protocol version, auth, continuation, task retrieval, and artifacts.
 
-Use deterministic provider doubles for failure injection and isolated Learnosity banks for live execution verification. Keep production data out of these checks. The existing no-external-writes baseline remains a regression gate.
+Use deterministic provider doubles for failure injection and isolated provider test environments for live execution verification. Keep production data out of these checks. The existing no-external-writes baseline remains a regression gate.
 
 ## 12. Delivery plan
 
-*The phases below are scheduled together with the backend work in the [execution observation plan](https://github.com/graffiticode/graffiticode/blob/main/docs/execution-observation-plan.md):*
-- *Phase 1 and the MCP part of Phase 2 are milestone M1, on immediate commands;*
-- *Phase 3 is M4;*
-- *Phase 4's data execution follows M2 and M3.*
+Implementation sequencing, milestones, and cross-cutting decisions are owned by the [execution observation plan](https://github.com/graffiticode/graffiticode/blob/main/docs/execution-observation-plan.md). It coordinates immediate-command service jobs, durable backend runs, operation-specific execution, and the A2A pilot. Its decisions D-1 to D-6 govern this design where applicable, including key retention, service scope, save adoption, and storage ownership.
 
-*That plan's decisions D-1, D-3 and D-5 govern this design's key retention, service scope and save adoption.*
+The [installations plan](./installations-plan.md) owns external profiles, capability selection and service-tool generation, application storage isolation, browser runtime configuration, the OAuth resource boundary, and installation-aware backend authorization. Its Artcompiler acceptance deployment remains gated on those prerequisites.
 
-**Phase 1 — Shared service contracts.** Add the frontend service registry, normalized requests/results, completion validators, and durable parent-job model. Integrate existing frontend generation jobs with writes disabled. Pin portable artifact schemas and define caller identity, scope propagation, and backend enforcement. Exit when service tests prove preparation and planning boundaries independently of either protocol.
-
-**Phase 2 — Learnosity preparation and planning.** Implement the two frontend service configurations and the Learnosity MCP catalog for content, previews, integration recipes, and data plans. Keep provider execution absent from discovery. Exit when representative jobs complete through the frontend runtime and backend compilation/interpretation path with validation and clearly labeled deliverables.
-
-**Phase 3 — A2A pilot.** Add the two frontend cards and one selected HTTP binding for a named target client. Validate discovery, auth, durable task retrieval, clarification, cancellation, and artifacts. Exit after interoperability testing; streaming and push remain separate increments.
-
-**Phase 4 — Provider execution.** First enable explicit authoring saves and bounded read/export operations after backend scope enforcement, receipts, recovery, reconciliation, and frontend completion verification pass live checks. Add transformations and migrations operation by operation. Enable each skill independently in both frontend adapters where supported; a protocol may expose a narrower supported subset without changing service semantics.
-
-**Phase 5 — Packaging and scale.** Use customer installation and administration requirements to decide whether to split MCP endpoints. Add callback delivery, larger workflows, and further domains based on demonstrated demand and measured outcomes.
+This document defines shared behavior; the [Artcompiler product design](./artcompiler-a2a-design.md) defines the pilot's service deliverables. Neither maintains an independent implementation phase schedule. A skill is advertised only after its implementation, authorization, execution, and interoperability gates in the relevant plans pass.
 
 ## 13. Review decisions still needed
 
 - Which target A2A client and protocol/SDK release define the pilot compatibility matrix?
-- What public hostnames, card URLs, and MCP distribution channel will the frontend use?
 - How will caller-agent identity map to an end-user delegation or a scoped service principal in the existing auth model?
 - What frontend scope propagation and backend policy/broker changes are required to enforce the service/job/action scope end to end, and which are deployed?
-- Which Learnosity record families and operations are the first executable Data Operations release, and what live verification is available for each?
 - What account-specific retention, size, runtime, cost, and approval policies apply to stored results and bulk writes?
 
 - When do the backend's execution observation contracts ship? Specifically: Track E1's event log, interrupts, artifact manifests, error registry and capability declarations, and E4's cursors and agent status. Can backend admission carry the service-scope claim and job deadline that §5 and §6.4 require?
+
+Product-specific choices, including public identities, distribution, and the first executable Learnosity record families, are maintained in [Artcompiler §13](./artcompiler-a2a-design.md#13-product-decisions-still-needed).
 
 These decisions gate the affected execution features. They do not prevent implementing the shared contracts, content preparation, or documentation-only planning.

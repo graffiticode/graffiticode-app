@@ -23,7 +23,8 @@ import ItemsNav from "./ItemsNav";
 import { PlusIcon } from '@heroicons/react/20/solid';
 import ItemsHeaderMenu, { DEFAULT_SORT, DEFAULT_DATE_FILTER, Sort, DateFilter } from "./items-header-menu";
 import { ClientOption, ALL_CLIENT, clientOptionForId } from "./client-selector";
-import { findLanguageByNumber } from "./language-selector";
+import { useCatalog } from "../lib/catalog";
+import { usePublicConfig } from "../lib/public-config";
 // Newest N versions of the open item. Defined next to the merge that reads it,
 // which needs to know when a history came back truncated.
 import { ITEM_VERSIONS_LIMIT } from "../utils/itemVersions";
@@ -85,6 +86,8 @@ const useTaskIdFormUrl = ({ lang, id }) => {
 };
 
 export default function Gallery({ lang, mark, setMark, hideItemsNav = false, itemId: initialItemId = null, client, setClient, sort = DEFAULT_SORT, setSort, dateFilter = DEFAULT_DATE_FILTER, setDateFilter, setLanguage }: { lang: any; mark: any; setMark?: (m: any) => void; hideItemsNav?: boolean; itemId?: string | null; client?: ClientOption; setClient?: (c: ClientOption) => void; sort?: Sort; setSort?: (s: Sort) => void; dateFilter?: DateFilter; setDateFilter?: (d: DateFilter) => void; setLanguage?: (lang: any) => void }) {
+  const { findLanguageByNumber } = useCatalog();
+  const brandName = usePublicConfig().brand.name;
   const router = useRouter();
   const isItemDetailRoute = router.pathname === '/items/[id]';
   const clientOption: ClientOption = client || ALL_CLIENT;
@@ -464,7 +467,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
       suppressFilterSelectRef.current = true;
       setLanguage(next);
     }
-  }, [directItem, initialItemId, setLanguage, lang]);
+  }, [directItem, initialItemId, setLanguage, lang, findLanguageByNumber]);
 
   // Recompute ordered/filtered items whenever loadedItems, sort, or dateFilter change.
   useEffect(() => {
@@ -727,7 +730,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
       if (result && taskId !== undefined && taskId !== currentItem.taskId && selectedItemId === itemId) {
         const write = result.lastWrite;
         setRetryWriteError(null);
-        setWriteBanner(write && write.taskId === result.taskId && describeWriteProblem(write)
+        setWriteBanner(write && write.taskId === result.taskId && describeWriteProblem(write, brandName)
           ? { itemId, taskId: result.taskId }
           : null);
       }
@@ -1025,7 +1028,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
 
   const bannerItem = writeBanner ? items.find(i => i.id === writeBanner.itemId) : null;
   const bannerWrite = bannerItem?.lastWrite?.taskId === writeBanner?.taskId ? bannerItem?.lastWrite : null;
-  const bannerProblem = writeBanner && writeBanner.itemId === selectedItemId ? describeWriteProblem(bannerWrite) : null;
+  const bannerProblem = writeBanner && writeBanner.itemId === selectedItemId ? describeWriteProblem(bannerWrite, brandName) : null;
   const bannerRetry = canRetryWrite(bannerProblem, bannerWrite, bannerItem?.connectionId);
 
   const handleRetryWrite = async () => {

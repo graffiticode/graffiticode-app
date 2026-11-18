@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MCP_ABOUT, CONSOLE_URL } from "@/lib/attribution";
+import { usePublicConfig } from "@/lib/public-config";
 
 // Slim attribution bar shown below every /form artifact view. It attributes the
 // render host — not the rendered output, which stays unwatermarked.
@@ -18,7 +18,13 @@ import { MCP_ABOUT, CONSOLE_URL } from "@/lib/attribution";
 // With no claim token (authenticated/claimed items, or a plain link) we show no
 // CTA — just the attribution. The token is read on the client and captured once,
 // before FormHarness may rewrite the URL.
+//
+// The name, MCP endpoint and console come from the installation's public
+// configuration. The endpoint is shown as the anchor text but links to the MCP
+// server's /about page: the raw /mcp JSON-RPC endpoint only returns a
+// transport error to a browser.
 export function FormFooter() {
+  const { brand, hosts, mcp } = usePublicConfig();
   const [claimToken, setClaimToken] = useState<string | null>(null);
 
   useEffect(() => {
@@ -30,25 +36,25 @@ export function FormFooter() {
     <footer className="flex h-9 shrink-0 items-center justify-between gap-3 border-t border-gray-200 bg-gray-50 px-3 text-xs text-gray-500">
       <span className="truncate">
         Made with{" "}
-        <span className="font-semibold text-gray-700">Graffiticode</span>
+        <span className="font-semibold text-gray-700">{brand.name}</span>
         <span className="hidden sm:inline"> · </span>
         <a
-          href={MCP_ABOUT}
+          href={`${hosts.mcp}/about`}
           target="_blank"
           rel="noreferrer"
           className="hidden font-mono text-blue-600 hover:underline sm:inline"
         >
-          mcp.graffiticode.org/mcp
+          {mcp.endpoint.replace(/^https?:\/\//, "")}
         </a>
       </span>
       {claimToken && (
         <a
-          href={`${CONSOLE_URL}/claim?token=${encodeURIComponent(claimToken)}&src=footer`}
+          href={`${hosts.console}/claim?token=${encodeURIComponent(claimToken)}&src=footer`}
           target="_blank"
           rel="noreferrer"
           className="shrink-0 whitespace-nowrap text-blue-600 hover:underline"
         >
-          Claim it in Graffiticode →
+          Claim it in {brand.name} →
         </a>
       )}
     </footer>

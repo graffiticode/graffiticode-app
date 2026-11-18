@@ -1,7 +1,9 @@
+import { installationBrand } from "@graffiticode-app/core/profile/brand";
+import { copy } from "./installation.js";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { randomUUID } from "node:crypto";
 import { isDiscoverable } from "@graffiticode-app/core/discovery";
-import { FREE_PLAN_ITEM_TTL_MS } from "@graffiticode-app/core/lib/free-plan-context";
+import { freePlanItemTtlHours } from "@graffiticode-app/core/lib/free-plan-context";
 import {
   getData,
   getItemWithTask as apiGetItemWithTask,
@@ -12,9 +14,9 @@ import {
   captureWorkspaceNamespace,
   type AuthContext,
   type Language,
-  CONSOLE_URL,
-  APP_URL,
-  MCP_ENDPOINT,
+  consoleUrl,
+  appUrl,
+  mcpEndpoint,
 } from "./api.js";
 import { normalizeClientKind } from "./events.js";
 import { coreBackendEnabled, coreCreateItem, coreReviseItem } from "./core-backend.js";
@@ -85,13 +87,17 @@ function buildContextualPrompt(
  */
 export const INSTRUCTIONS_HEAD_BUDGET = 2000;
 
-const INSTRUCTIONS_LEAD = `Graffiticode makes interactive content from a plain-English description: quizzes and assessment items, flashcard decks, spreadsheets, charts, surveys, concept webs, and more. When the user asks you to make one of these, make it with Graffiticode rather than writing it out in chat: call create_item(language, description), then render_item(item_id) to show it.`;
+export const INSTRUCTIONS_LEAD = `Graffiticode makes interactive content from a plain-English description: quizzes and assessment items, flashcard decks, spreadsheets, charts, surveys, concept webs, and more. When the user asks you to make one of these, make it with Graffiticode rather than writing it out in chat: call create_item(language, description), then render_item(item_id) to show it.`;
 
-const LEAD_WITH_CATALOG = `${INSTRUCTIONS_LEAD} Pick the language from the catalog below and call create_item directly — the platform re-routes a wrong guess.`;
+// The lead and body come from the installation profile when one is loaded
+// (copy keys mcp.instructions.lead / .body); these are the built-in Graffiticode text.
+const lead = () => copy("mcp.instructions.lead") ?? INSTRUCTIONS_LEAD;
+const body = () => copy("mcp.instructions.body") ?? INSTRUCTIONS_BODY;
+const leadWithCatalog = () => `${lead()} Pick the language from the catalog below and call create_item directly — the platform re-routes a wrong guess.`;
 
-const LEAD_WITHOUT_CATALOG = `${INSTRUCTIONS_LEAD} Call list_languages to find the language first.`;
+const leadWithoutCatalog = () => `${lead()} Call list_languages to find the language first.`;
 
-const INSTRUCTIONS_BODY = `FAST-PATH PATTERNS — minimize your thinking time:
+export const INSTRUCTIONS_BODY = `FAST-PATH PATTERNS — minimize your thinking time:
 
 1. PASS-THROUGH: When the user provides explicit content, pass it directly to create_item — no invention needed:
    "Create spreadsheet: Rent 1500, Food 400, Total with SUM" → create_item immediately
@@ -132,7 +138,10 @@ create_item and update_item start generation and return immediately with status 
 When you create a SECOND or later item for the same user, pass the earlier item's id as create_item's continue_from_item_id. Their items then stay together and one sign-in link saves all of them; without it, each item is saved separately.`;
 
 /** The instructions a session gets when no catalog is cached. */
-export const SERVER_INSTRUCTIONS = `${LEAD_WITHOUT_CATALOG}\n\n${INSTRUCTIONS_BODY}`;
+export const SERVER_INSTRUCTIONS = `${INSTRUCTIONS_LEAD} Call list_languages to find the language first.\n\n${INSTRUCTIONS_BODY}`;
+
+/** SERVER_INSTRUCTIONS, as the installed profile words it. */
+export const serverInstructions = () => `${leadWithoutCatalog()}\n\n${body()}`;
 
 /**
  * Instructions with the catalog inlined.
@@ -198,7 +207,7 @@ function limitSentences(hint?: string | null, maxChars = 400): string {
 
 export function buildServerInstructions(catalog?: Language[] | null): string {
   const listed = (catalog ?? []).filter((l) => isDiscoverable(l.id));
-  if (listed.length === 0) return SERVER_INSTRUCTIONS;
+  if (listed.length === 0) return serverInstructions();
   // Descriptions in the head, limits at the tail: the limit sentences run to
   // ~1KB and alone would push the catalog past the cut (see
   // INSTRUCTIONS_HEAD_BUDGET). Losing them costs little — the server's scope
@@ -210,7 +219,7 @@ export function buildServerInstructions(catalog?: Language[] | null): string {
     .filter((l) => l.limits)
     .map((l) => `L${l.id} — ${l.limits}`)
     .join("\n");
-  const head = `${LEAD_WITH_CATALOG}
+  const head = `${leadWithCatalog()}
 
 Catalog (id — what it makes):
 ${catalogLines}`;
@@ -223,7 +232,7 @@ ${catalogLines}`;
   const tail = limitLines
     ? `\n\nLanguage limits (what each one does NOT do — check before routing):\n${limitLines}`
     : "";
-  return `${head}\n\n${INSTRUCTIONS_BODY}${tail}`;
+  return `${head}\n\n${body()}${tail}`;
 }
 
 // --- Tool Definitions ---
@@ -794,27 +803,27 @@ export function reconnectHint(host: ClientHost): string {
     case "claude-code":
       return (
         "After signing in, connect this account: " +
-        `claude mcp add --transport http graffiticode ${MCP_ENDPOINT} ` +
+        `claude mcp add --transport http ${installationBrand().id} ${mcpEndpoint()} ` +
         '--header "Authorization: Bearer <api-key>" — the sign-in page issues the key.'
       );
     case "editor":
       return (
         "After signing in, add an Authorization: Bearer <api-key> header to the " +
-        "graffiticode entry in your MCP config — the sign-in page issues the key."
+        `${installationBrand().id} entry in your MCP config — the sign-in page issues the key.`
       );
     case "codex-cli":
       return (
-        "After signing in, connect this account: run codex mcp login graffiticode " +
+        `After signing in, connect this account: run codex mcp login ${installationBrand().id} ` +
         "(use the name codex mcp list shows), sign in with the same account, then restart Codex."
       );
     case "claude-app":
       return (
         "After signing in, connect this account: in Claude, open Settings → Connectors, " +
-        "disconnect Graffiticode and connect it again, then sign in with the same account."
+        `disconnect ${installationBrand().name} and connect it again, then sign in with the same account.`
       );
     case "openai":
       return OAUTH_RECONNECT_ENABLED
-        ? "After signing in, reconnect the Graffiticode connector and sign in there too, " +
+        ? `After signing in, reconnect the ${installationBrand().name} connector and sign in there too, ` +
             "so new items save to your account automatically."
         : "New items will keep starting out anonymous, so save each one with the link above; " +
             "the sign-in page explains how to connect this connector to your account.";
@@ -843,10 +852,17 @@ function stripWidgetMeta(meta: Record<string, unknown>): Record<string, unknown>
 // Graffiticode" link. Non-widget `_meta` — `securitySchemes` — is preserved for ALL
 // clients. The widget resource URI is content-hashed (the host caches by URI) and
 // computed at runtime, so it's injected here rather than baked into the static _meta.
+// A tool's description from the installation profile (copy key
+// mcp.tool.<name>.description), or the built-in one.
+function withProfileCopy(t: Tool): Tool {
+  const description = copy(`mcp.tool.${t.name}.description`);
+  return description === null ? t : ({ ...t, description } as Tool);
+}
+
 export function toolsForClient(clientName?: string, declaresUiExtension?: boolean): Tool[] {
   const route = widgetRouteFor(clientName, declaresUiExtension);
   const uiUri = widgetResourceUris().mcp;
-  return tools.map((t) => {
+  return tools.map(withProfileCopy).map((t) => {
     const rec = t as Record<string, unknown>;
     const meta = (rec._meta as Record<string, unknown>) ?? {};
     // Not widget-bearing (no openai marker): leave untouched — keeps securitySchemes.
@@ -878,8 +894,8 @@ export function toolsForClient(clientName?: string, declaresUiExtension?: boolea
       // Shown in ChatGPT while the call runs and after it returns. Generation is
       // asynchronous and routinely outlives one render_item poll, so the invoking
       // string is what a user reads for most of the wait.
-      ui["openai/toolInvocation/invoking"] = "Working in Graffiticode…";
-      ui["openai/toolInvocation/invoked"] = "Opened in Graffiticode";
+      ui["openai/toolInvocation/invoking"] = `Working in ${installationBrand().name}…`;
+      ui["openai/toolInvocation/invoked"] = `Opened in ${installationBrand().name}`;
     }
     return { ...rec, _meta: ui } as unknown as Tool;
   });
@@ -908,7 +924,7 @@ export interface ToolContext {
 // signed-in user has a session). Surfaced as `view_url` for the widget's
 // "Open in Graffiticode" link.
 function buildViewUrl(itemId: string, claimToken?: string | null): string {
-  const base = `${APP_URL}/form/${itemId}`;
+  const base = `${appUrl()}/form/${itemId}`;
   // Embed the claim token on free-plan view links so the render-host footer can
   // offer a one-click "Claim it in Graffiticode" link for this exact item. The
   // JWT is URL-safe (base64url), so no extra encoding is needed.
@@ -927,7 +943,8 @@ function buildViewUrl(itemId: string, claimToken?: string | null): string {
 // Only the console knows the effective workspace, so only the console can mint
 // this. That also retires the copy of the HS256 signing parameters this repo was
 // keeping in sync with the console's by hand.
-const FREE_PLAN_TTL_HOURS = Math.round(FREE_PLAN_ITEM_TTL_MS / 3_600_000);
+// Read at use time: the installation sets it (freePlan.itemTtlHours).
+const freePlanTtlHours = () => freePlanItemTtlHours();
 
 /**
  * Appended to `message` (the agent-facing directive) whenever there is a
@@ -961,7 +978,7 @@ export function buildClaimFields(
   // name for a different taxonomy is a collision waiting to be discovered.
   const host = classifyClientHost(clientKind);
   const claimUrlFor = (src: "chat" | "widget") =>
-    `${CONSOLE_URL}/claim?token=${claimToken}&src=${src}&agent=${host}`;
+    `${consoleUrl()}/claim?token=${claimToken}&src=${src}&agent=${host}`;
   const claim_url = claimUrlFor("chat");
   return {
     token: claimToken,
@@ -995,7 +1012,7 @@ export function buildClaimFields(
     // items vanish two days after their last edit — the person most worth
     // converting is the one losing the most, and nothing told them.
     claim_message:
-      `This item is deleted ${FREE_PLAN_TTL_HOURS} hours after its last edit. ` +
+      `This item is deleted ${freePlanTtlHours()} hours after its last edit. ` +
       `To keep it permanently, [sign in to save it](${claim_url}).\n` +
       reconnectHint(host),
   };
@@ -1244,7 +1261,7 @@ export function buildLinkDirective(viewUrl: string, mountsWidget = false): strin
   // stays the last word either way.
   if (mountsWidget) {
     return (
-      "The item is displayed above in the Graffiticode view. Reply with one short " +
+      `The item is displayed above in the ${installationBrand().name} view. Reply with one short ` +
       "sentence about it (from `summary`) and give the user this link to open it: " +
       `${viewUrl}. Do not reproduce its contents — no tables, lists or mock-ups; ` +
       "the view already shows them. A description alone is not a substitute for the link."

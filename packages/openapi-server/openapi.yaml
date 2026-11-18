@@ -496,6 +496,7 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Workspace" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
   /me:
     get:
@@ -976,4 +977,6 @@ components:
             languages:
               type: array
               items: { type: string }
+              description: With `languages_restricted` false, empty (every language is available). With it true, exactly the languages an anonymous caller may use, possibly none.
+            languages_restricted: { type: boolean }
             signup_url: { type: string, format: uri }

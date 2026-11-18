@@ -6,7 +6,7 @@ import { getItem } from "./items.js";
 import { getTask, readItemData } from "./tasks.js";
 import { resolveAuth, type RequestCredentials } from "./auth.js";
 import { startGeneration } from "./generation.js";
-import { NotFoundError } from "./errors.js";
+import { NotFoundError, ConflictError } from "./errors.js";
 
 type HelpEntry = {
   user: string;
@@ -138,12 +138,19 @@ export async function createFromDescription(
 // as their own arguments.
 export async function reviseItem(
   ctx: RequestCredentials & Record<string, unknown>,
-  { itemId, modification, client, clientKind, geoCountry, idempotency }: { itemId: string; modification: string; idempotency?: unknown } & Hints,
+  { itemId, modification, client, clientKind, geoCountry, idempotency, languages }: { itemId: string; modification: string; idempotency?: unknown; languages?: string[] } & Hints,
   trusted: { externalWrites?: false } = {},
 ) {
   const auth = await resolveAuth(ctx);
   const item: any = await getItem({ auth, id: itemId, connectionFields: false });
   if (!item) throw new NotFoundError(`Item not found: ${itemId}`);
+  // A caller allowed only some languages (a service skill) can't revise an
+  // item in another; checked after access, so it reveals nothing about items
+  // the caller can't read.
+  const itemLang = String(item.lang ?? "").replace(/^L/i, "").padStart(4, "0");
+  if (languages && !languages.map(l => l.replace(/^L/i, "").padStart(4, "0")).includes(itemLang)) {
+    throw new ConflictError("item_language_mismatch", `Item ${itemId} is an L${itemLang} item; this can revise only ${languages.map(l => `L${l}`).join(", ")} items.`);
+  }
   const currentSrc = item.taskId ? ((await getTask({ auth, id: item.taskId }))?.src ?? null) : null;
   const prompt = buildContextualPrompt(parseHelp(item.help), modification);
   const currentData = await currentDataFor(auth, item.taskId);

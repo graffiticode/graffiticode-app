@@ -9,10 +9,12 @@ import {
   FirestoreProvider,
   useFirebaseApp,
 } from "reactfire";
-import { apiFirebaseConfig } from "./firebase-config";
+import type { FirebaseWebConfig } from "./firebase-config";
 
 function FirebaseComponents({ children }: { children: ReactNode }) {
   const app = useFirebaseApp();
+  // Observable: the project the Firebase app actually initialized with.
+  React.useEffect(() => { document.documentElement.dataset.authProject = app.options.projectId ?? ""; }, [app]);
   const auth = getAuth(app);
   const firestore = getFirestore(app);
 
@@ -36,9 +38,9 @@ function FirebaseComponents({ children }: { children: ReactNode }) {
   );
 }
 
-export function FirebaseProvider({ children }: { children: ReactNode }) {
+export function FirebaseProvider({ children, firebaseConfig }: { children: ReactNode; firebaseConfig: FirebaseWebConfig }) {
   return (
-    <FirebaseAppProvider firebaseConfig={apiFirebaseConfig}>
+    <FirebaseAppProvider firebaseConfig={firebaseConfig}>
       <FirebaseComponents>{children}</FirebaseComponents>
     </FirebaseAppProvider>
   );

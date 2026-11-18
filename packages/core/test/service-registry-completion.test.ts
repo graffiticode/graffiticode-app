@@ -1,33 +1,7 @@
 // Service registry availability and completion validators.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { LEARNOSITY_AUTHORING, LEARNOSITY_DATA, availableSkills, skillAvailable } from "../src/service-registry.js";
 import { validateCompletion, type CompletionEvidence } from "../src/service-completion.js";
-
-test("only implemented skills are available; execution skills need execution readiness", () => {
-  assert.equal(skillAvailable(LEARNOSITY_AUTHORING, "author_content"), true);
-  // Not implemented until M1b, even if execution were ready.
-  assert.equal(skillAvailable(LEARNOSITY_AUTHORING, "save_revision", { executionReady: true }), false);
-  assert.deepEqual(availableSkills(LEARNOSITY_DATA).map(s => s.skillId), ["plan_data_job"]);
-});
-
-test("deployment configuration and caller authorization narrow availability", () => {
-  assert.equal(skillAvailable(LEARNOSITY_AUTHORING, "author_content", { enabled: new Set(["plan_authoring_integration"]) }), false);
-  assert.equal(skillAvailable(LEARNOSITY_AUTHORING, "author_content", { authorized: false }), false);
-  assert.equal(skillAvailable(LEARNOSITY_AUTHORING, "no_such_skill"), false);
-});
-
-test("no available skill writes externally in M1a", () => {
-  for (const def of [LEARNOSITY_AUTHORING, LEARNOSITY_DATA]) {
-    assert.ok(availableSkills(def, { executionReady: true }).every(s => !s.externalWrites));
-  }
-});
-
-test("public skill ids never encode a language number", () => {
-  for (const def of [LEARNOSITY_AUTHORING, LEARNOSITY_DATA]) {
-    for (const s of def.skills) assert.doesNotMatch(s.skillId, /\d{4}/);
-  }
-});
 
 const content = (over: Partial<CompletionEvidence> = {}): CompletionEvidence =>
   ({ deliverableKind: "content", requestedState: "prepared", taskId: "t1", checks: [], externalOutcome: "not_requested", ...over });

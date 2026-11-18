@@ -1,6 +1,7 @@
 import Link from "next/link";
 import React from "react";
 import CopyButton from "./CopyButton";
+import { usePublicConfig } from "../lib/public-config";
 
 /**
  * "Connect your agent to this account" — shown once a trial user has claimed.
@@ -42,25 +43,24 @@ export function hostTakesApiKey(host: ClientHost): boolean {
   return host === "claude-code" || host === "editor" || host === "unknown";
 }
 
-const MCP_ENDPOINT =
-  process.env.NEXT_PUBLIC_MCP_ENDPOINT || "https://mcp.graffiticode.org/mcp";
-
 const KEY_PLACEHOLDER = "<your-api-key>";
 
-function claudeCodeCommand(key: string): string {
+// `endpoint` is the installation's MCP endpoint and `name` the name its MCP
+// server registers under (its installation id), from its public configuration.
+function claudeCodeCommand(endpoint: string, name: string, key: string): string {
   return [
-    "claude mcp add --transport http graffiticode",
-    MCP_ENDPOINT,
+    `claude mcp add --transport http ${name}`,
+    endpoint,
     `--header "Authorization: Bearer ${key}"`,
   ].join(" ");
 }
 
-function editorConfig(key: string): string {
+function editorConfig(endpoint: string, name: string, key: string): string {
   return JSON.stringify(
     {
       mcpServers: {
-        graffiticode: {
-          url: MCP_ENDPOINT,
+        [name]: {
+          url: endpoint,
           headers: { Authorization: `Bearer ${key}` },
         },
       },
@@ -96,6 +96,10 @@ export default function ConnectAgentInstructions({
   creatingKey: boolean;
   keyError?: string | null;
 }) {
+  const { mcp, installation, brand } = usePublicConfig();
+  const endpoint = mcp.endpoint;
+  const serverName = installation.id;
+  const brandName = brand.name;
   const key = apiKey?.token || KEY_PLACEHOLDER;
   const needsKey = hostTakesApiKey(host);
 
@@ -132,7 +136,7 @@ export default function ConnectAgentInstructions({
       {host === "claude-code" && (
         <>
           <p className="text-sm text-gray-600 mb-2">Run this in your terminal:</p>
-          <Snippet text={claudeCodeCommand(key)} />
+          <Snippet text={claudeCodeCommand(endpoint, serverName, key)} />
         </>
       )}
 
@@ -140,10 +144,10 @@ export default function ConnectAgentInstructions({
         <>
           <p className="text-sm text-gray-600 mb-2">
             {host === "editor"
-              ? "Add the header to the graffiticode entry in your MCP config:"
+              ? `Add the header to the ${serverName} entry in your MCP config:`
               : "Most agents take a remote MCP server in a config file like this:"}
           </p>
-          <Snippet text={editorConfig(key)} />
+          <Snippet text={editorConfig(endpoint, serverName, key)} />
         </>
       )}
 
@@ -155,9 +159,9 @@ export default function ConnectAgentInstructions({
           <p className="text-sm text-gray-600 mb-2">
             Run this in your terminal, then sign in with this account in the browser window it opens:
           </p>
-          <Snippet text="codex mcp login graffiticode" />
+          <Snippet text={`codex mcp login ${serverName}`} />
           <p className="text-xs text-gray-500 mt-2">
-            If Graffiticode has a different name in <code>codex mcp list</code>, use that name. Restart
+            If {brandName} has a different name in <code>codex mcp list</code>, use that name. Restart
             Codex afterwards so it connects as you.
           </p>
         </>
@@ -171,7 +175,7 @@ export default function ConnectAgentInstructions({
           <p className="text-sm text-gray-600 mb-2">In Claude (web or desktop):</p>
           <ol className="list-decimal pl-5 text-sm text-gray-600 space-y-1">
             <li>Open <strong>Settings → Connectors</strong>.</li>
-            <li>Disconnect <strong>Graffiticode</strong>, then connect it again.</li>
+            <li>Disconnect <strong>{brandName}</strong>, then connect it again.</li>
             <li>Sign in with this account in the window that opens, and click <strong>Allow</strong>.</li>
           </ol>
           <p className="text-xs text-gray-500 mt-2">

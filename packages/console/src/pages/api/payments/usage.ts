@@ -5,6 +5,7 @@ import Stripe from 'stripe';
 import { STRIPE_API_VERSION, priceIdToPlan, effectiveIncludedItems, overageRateFor, isHardCappedFor, payAsYouGoEnabled, DEFAULT_PLAN, type PlanId } from '@graffiticode-app/core/lib/plans-config';
 import { subscriptionPeriodStart, subscriptionPeriodEnd } from '@graffiticode-app/core/lib/stripe-helpers';
 import { requireUser } from '../../../lib/api-auth';
+import { withInstallation } from "../../../lib/with-installation";
 
 // Initialize Stripe only if secret key is available
 let stripe: Stripe | null = null;
@@ -19,7 +20,7 @@ interface DailyUsage {
   count: number;
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -294,3 +295,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
+
+export default withInstallation(handler);

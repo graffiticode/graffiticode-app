@@ -1,3 +1,4 @@
+import { displayUrl, installationBrand } from "../profile/brand.js";
 import { getFirestore } from "../utils/db/index.js";
 import { FreePlanError, buildSignupUrl } from "./free-plan-context.js";
 
@@ -46,16 +47,17 @@ function intEnv(name: string, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function buildBurstError(
+export function buildBurstError(
   retryAfterSeconds: number,
   limit: number,
   windowSeconds: number,
 ): FreePlanError {
+  const b = installationBrand();
   return new FreePlanError("free_plan_rate_limit_exceeded", 429, {
     error: "free_plan_rate_limit_exceeded",
     message:
-      `The Graffiticode free plan allows ${limit} requests every ${windowSeconds} seconds. ` +
-      `Please retry in ${retryAfterSeconds}s, or create a free account at graffiticode.org/signup ` +
+      `The ${b.name} free plan allows ${limit} requests every ${windowSeconds} seconds. ` +
+      `Please retry in ${retryAfterSeconds}s, or create a free account at ${displayUrl(b.signupUrl)} ` +
       `to remove this limit.`,
     retry_after_seconds: retryAfterSeconds,
     signup_url: buildSignupUrl("rate_limit"),

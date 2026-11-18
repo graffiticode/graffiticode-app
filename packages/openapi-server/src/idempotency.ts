@@ -38,6 +38,9 @@ export async function idempotent(c: Context, caller: Caller, raw: string, run: R
       return send(c, claimed.response, true);
     case "mismatch":
       throw new ApiProblem(422, "idempotency_key_reused", "Idempotency-Key reused", { detail: "This key was used for a different request." });
+    case "revoked":
+      // Only service-job step keys are revoked; a REST key never is.
+      throw new ApiProblem(409, "idempotency_key_revoked", "Idempotency-Key revoked", { detail: "This key can no longer be used." });
     case "in_flight":
       throw new ApiProblem(409, "idempotency_key_in_use", "Request in progress", {
         detail: "A request with this Idempotency-Key is still being handled.", headers: { "Retry-After": "2" },

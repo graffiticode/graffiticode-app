@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getFirestore } from "@/server/db";
+import { coreConfig } from "@graffiticode-app/core/config";
 
 export const runtime = "nodejs";
 
-const AUTH_SERVICE_URL = process.env.NEXT_PUBLIC_GC_AUTH_URL || "https://auth.graffiticode.org";
+// The installation's auth host, read at use time (core config).
+const AUTH_SERVICE_URL = () => coreConfig().authUrl;
 const AUTH_SERVICE_INTERNAL_API_KEY =
   process.env.AUTH_SERVICE_INTERNAL_API_KEY || process.env.INTERNAL_API_KEY || "";
 
@@ -15,7 +17,7 @@ const HEX = /^[0-9a-fA-F]+$/;
 // internal key isn't configured (local dev).
 async function lookupAuthService(address: string): Promise<boolean | null> {
   if (!AUTH_SERVICE_INTERNAL_API_KEY) return null;
-  const url = `${AUTH_SERVICE_URL.replace(/\/$/, "")}/authenticate/ethereum/internal/exists/${encodeURIComponent(address)}`;
+  const url = `${AUTH_SERVICE_URL().replace(/\/$/, "")}/authenticate/ethereum/internal/exists/${encodeURIComponent(address)}`;
   const res = await fetch(url, {
     method: "GET",
     headers: { "X-Internal-API-Key": AUTH_SERVICE_INTERNAL_API_KEY },
@@ -59,7 +61,7 @@ export async function GET(req: NextRequest) {
     console.log("[user-exists] via firestore fallback", {
       address: raw,
       hasInternalKey: !!AUTH_SERVICE_INTERNAL_API_KEY,
-      authUrl: AUTH_SERVICE_URL,
+      authUrl: AUTH_SERVICE_URL(),
       exists,
     });
     return NextResponse.json({ exists });

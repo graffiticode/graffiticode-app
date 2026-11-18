@@ -1,8 +1,10 @@
 **Design recommendation — November 9, 2026**
 
-Use Graffiticode as the shared intent execution engine for two Artcompiler Learnosity services: **Assessment Authoring** and **Data Operations**. Expose those services through **two A2A Agent Cards** and, initially, **one Artcompiler for Learnosity MCP server with two bounded toolsets**.
+**Document role (updated November 17, 2026).** This brief records the product rationale. The [shared service architecture](./graffiticode-a2a-design.md) governs frontend/backend responsibilities and execution contracts; the [Artcompiler service design](./artcompiler-a2a-design.md) owns the Learnosity product contracts. The [installations plan](./installations-plan.md) and [execution observation plan](https://github.com/graffiticode/graffiticode/blob/main/docs/execution-observation-plan.md) govern implementation sequencing and readiness gates. Their current decisions supersede the earlier deployment assumptions in this brief.
 
-Maintain service definitions, capability enforcement, and execution behavior independently of either protocol. Changing how customers discover or connect to the services should not require rebuilding the underlying capabilities.
+Artcompiler runs the shared `graffiticode-app` frontend with an installation profile for two Learnosity services: **Assessment Authoring** and **Data Operations**. Expose those services through **two A2A Agent Cards** and, initially, **one Artcompiler for Learnosity MCP server with two bounded toolsets**.
+
+The Graffiticode backend provides controlled compilation and execution. Maintain service definitions, capability enforcement, and execution behavior independently of either protocol. Changing how customers discover or connect to the services should not require rebuilding the underlying capabilities.
 
 # Architectural premise
 
@@ -16,12 +18,13 @@ Artcompiler’s durable value should come from maintaining and operating special
 
 | Layer | Responsibility |
 | - | - |
-| Graffiticode platform | Provide the general machinery for translating intent into language-specific work and processing it through shared compilation, execution, and capability enforcement. |
+| Shared `graffiticode-app` frontend | Implement intent translation, language selection and composition, generation, service jobs, validators, and protocol adapters; installations select implemented capabilities through external profiles. |
+| Graffiticode backend | Compile and interpret generated work, enforce capabilities, and supply execution state, results, and settlement evidence. |
 | Artcompiler services | Define the responsibility accepted from the caller, supported requests, permitted capabilities, working context, and completion criteria. |
 | MCP interface | Expose those capabilities through named tools that can accept natural-language intent. |
 | A2A interface | Expose the services as discoverable agents with a common message, job-status, and result-exchange contract. |
 
-Multiple external agent identities can share one Graffiticode deployment. An advertised agent can use several languages or internal micro-agents, and several advertised agents can reuse the same language implementations. Public agents, internal micro-agents, languages, models, and deployments do not need to correspond one to one.
+Multiple public agent identities can share one installation of the frontend. Independent installations share implementation rather than application databases. An advertised agent can use several languages or internal micro-agents, and several advertised agents can reuse the same language implementations. Public agents, internal micro-agents, languages, models, and deployments do not need to correspond one to one.
 
 # Learnosity service boundaries
 
@@ -101,7 +104,7 @@ A request should follow this conceptual flow:
 
 2. The service resolves the request’s context and effective capabilities.
 
-3. Graffiticode selects the appropriate language-specific machinery and processes the intent within that scope.
+3. The shared frontend selects languages and generates code; the Graffiticode backend compiles and interprets it within the enforced scope.
 
 4. Shared execution state supplies any clarification requests, progress, results, and verification evidence.
 
@@ -123,8 +126,4 @@ The starting arrangement is therefore **one MCP server, two bounded toolsets, tw
 
 # Implementation priorities
 
-First, define the two service configurations and their supported operations, capability scopes, outputs, and completion criteria. Then map the existing intent-based MCP interface onto those configurations.
-
-Add A2A interfaces when a target client or integration benefits from its discovery and coordination conventions. Connect them to the same service and execution state, preserving the distinctions between generated content, requested external actions, and verified outcomes.
-
-Before committing to advanced interaction features, check the target clients’ support for clarification, asynchronous tasks, notifications, and component presentation. Keep protocol adapters and tool catalogs modular so additional interfaces or separate endpoints remain packaging changes.
+Follow the [execution observation plan](https://github.com/graffiticode/graffiticode/blob/main/docs/execution-observation-plan.md) for service-job, backend execution, and A2A milestones, and the [installations plan](./installations-plan.md) for profile integration, isolation, and Artcompiler deployment prerequisites. This brief maintains the rationale for the product and protocol choices; the plans own their implementation order and release gates.

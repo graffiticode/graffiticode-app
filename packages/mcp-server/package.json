@@ -13,6 +13,7 @@
     "clean": "rimraf dist",
     "eval:routing": "npx tsx scripts/eval-routing.ts",
     "eval:fit": "npx tsx scripts/eval-fit.ts",
+    "oauth-migration": "npx tsx scripts/oauth-migration.ts",
     "start": "node dist/server.js",
     "gcp:build": "gcloud builds submit --project graffiticode-app --config cloudbuild.yaml --substitutions=COMMIT_SHA=$(git rev-parse --short HEAD 2>/dev/null || echo 'latest')",
     "gcp:deploy": "gcloud run deploy mcp-service --project graffiticode-app --source . --port 3001 --region us-central1 --platform managed --allow-unauthenticated",

@@ -4,6 +4,7 @@ import { loadCurrentConnections, reconcileItemWrite, republishItem, retryItemWri
 import { backendForLang, normalizeLang } from '@graffiticode-app/core/lib/connectable';
 import { getCredentialBackend } from '../lib/credential-backends';
 import { canRetryWrite, describeWriteProblem } from '@graffiticode-app/core/lib/write-errors';
+import { usePublicConfig } from '../lib/public-config';
 
 // Fired after a write through a connection, so the preview (which shows the
 // stored result) reloads: a write changes that result without changing the item.
@@ -16,6 +17,7 @@ const errorText = err => String(err?.response?.errors?.[0]?.message || err?.mess
 // and the outcome is shown here with a Retry that reuses the save's idempotency
 // key, so a lost response never repeats a write. Publishing is per item.
 export default function ItemConnection({ user, itemId, lang, taskId, connectionId, publicationId, publicationConnectionId = null, publishedTaskId = null, lastWrite = null, onChanged }) {
+  const brandName = usePublicConfig().brand.name;
   const [current, setCurrent] = useState(undefined);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(null);
@@ -74,7 +76,7 @@ export default function ItemConnection({ user, itemId, lang, taskId, connectionI
   // A failed or skipped write of THIS version, through whichever connection it
   // tried (the current one may have changed since, or there was none).
   const problemWrite = lastWrite && lastWrite.taskId === taskId ? lastWrite : null;
-  const problem = taskId ? describeWriteProblem(problemWrite) : null;
+  const problem = taskId ? describeWriteProblem(problemWrite, brandName) : null;
   const showRetry = canRetryWrite(problem, problemWrite, connectionId);
   // Only a save the server says can be checked: uncertain or partial, with its key recorded.
   const showCheck = Boolean(problemWrite?.checkable);

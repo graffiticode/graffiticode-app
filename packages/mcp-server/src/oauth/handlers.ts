@@ -2,8 +2,10 @@
  * OAuth 2.1 Endpoint Handlers for MCP Server
  */
 
+import { installationHosts } from "@graffiticode-app/core/profile/runtime";
 import type { IncomingMessage, ServerResponse } from "http";
 import { oauthStore } from "./firestore-store.js";
+import { CredentialRefused, StoreUnavailable, LEGACY_ISSUER, LEGACY_RESOURCE } from "@graffiticode-app/core/oauth/records";
 import { verifyPKCE, generateRandomString } from "./pkce.js";
 import { redeemOAuthGrant, OAuthGrantError } from "@graffiticode-app/core/oauth-grants";
 import type {
@@ -18,22 +20,36 @@ import type {
   OAuthError,
 } from "./types.js";
 
-// Environment configuration
-const MCP_SERVER_URL = process.env.MCP_SERVER_URL || "https://mcp.graffiticode.org";
-const CONSOLE_URL = process.env.CONSOLE_URL || "https://console.graffiticode.org";
+// Where this installation lives, resolved at use time (core/src/profile/hosts.ts).
+// The issuer serves the authorization endpoints; the resources are what tokens
+// are bound to. The issuer is still the MCP host (the resolver checks it).
+const hosts = () => installationHosts();
 const FIREBASE_API_KEY = "AIzaSyAoVuUNi8ElnS7cn6wc3D8XExML-URLw0I";
 
 // Token expiration (55 minutes to match Firebase token lifetime with buffer)
 const TOKEN_EXPIRES_IN = 55 * 60;
 
-// The resources (audiences) this authorization server issues tokens for: this
-// MCP server, and the Graffiticode REST API, which validates its tokens through
-// /oauth/introspect (oauth/introspection.ts). A token is bound to the one it was
-// authorized for.
-const RESOURCE = `${MCP_SERVER_URL}/mcp`;
-export const OPENAPI_RESOURCE = (process.env.OPENAPI_RESOURCE || "https://openapi.graffiticode.org/v1").replace(/\/$/, "");
-const ALLOWED_RESOURCES = [RESOURCE, OPENAPI_RESOURCE];
-export const isAllowedResource = (resource: string) => ALLOWED_RESOURCES.includes(resource);
+// The resources (audiences) this authorization server issues tokens for: the
+// ones the installation declares (hosts().resources), normally its MCP server
+// and its REST API, which validates tokens through /oauth/introspect
+// (oauth/introspection.ts). A token is bound to the one it was authorized for.
+const mcpResource = () => hosts().mcpResource;
+export const openapiResource = () => hosts().openapiResource;
+const allowedResources = () => hosts().resources;
+export const isAllowedResource = (resource: string) => allowedResources().includes(resource);
+
+// The OAuth store is still shared by every installation (the auth service; the
+// installations plan's OAuth-store handover moves it). So each record carries
+// the installation it belongs to, and an installation acts only on its own:
+//   - a token, code or pending authorization by its resource;
+//   - a client by the issuer it registered with.
+// Records written before installations name neither. They are Graffiticode's:
+// its issuer and its MCP resource, exactly as they were served then, so its
+// existing clients and tokens keep working there and nowhere else.
+export { LEGACY_ISSUER, LEGACY_RESOURCE };
+export const boundResource = (record: { resource?: string }) => record.resource || LEGACY_RESOURCE;
+export const clientIssuer = (client: Pick<OAuthClient, "issuer">) => client.issuer || LEGACY_ISSUER;
+const isOwnClient = (client: OAuthClient | undefined): client is OAuthClient => !!client && clientIssuer(client) === hosts().issuer;
 // The single scope we grant. Requests may only ask for this (or nothing).
 const SUPPORTED_SCOPE = "graffiticode";
 
@@ -76,7 +92,7 @@ function reasonDescription(reason: OAuthInvalidReason): string {
  * point ChatGPT at protected-resource metadata to trigger reauthorization.
  */
 export function buildWwwAuthenticate(reason: OAuthInvalidReason): string {
-  const metadataUrl = `${MCP_SERVER_URL}/.well-known/oauth-protected-resource`;
+  const metadataUrl = `${hosts().mcp}/.well-known/oauth-protected-resource`;
   return `Bearer resource_metadata="${metadataUrl}", error="invalid_token", error_description="${reasonDescription(reason)}"`;
 }
 
@@ -116,6 +132,16 @@ function sendJson(res: ServerResponse, status: number, data: unknown): void {
  */
 function sendError(res: ServerResponse, status: number, error: OAuthError): void {
   sendJson(res, status, error);
+}
+
+/**
+ * The store couldn't decide yet (an unknown outcome at the legacy store during
+ * the migration): nothing was decided against the credential, so the client
+ * retries the same request.
+ */
+function unavailable(res: ServerResponse): void {
+  res.writeHead(503, { "Content-Type": "application/json", "Retry-After": "2", "Cache-Control": "no-store" });
+  res.end(JSON.stringify({ error: "temporarily_unavailable", error_description: "Try again shortly." }));
 }
 
 /**
@@ -174,8 +200,8 @@ export function handleProtectedResourceMetadata(
   res: ServerResponse
 ): void {
   const metadata: ProtectedResourceMetadata = {
-    resource: `${MCP_SERVER_URL}/mcp`,
-    authorization_servers: [MCP_SERVER_URL],
+    resource: mcpResource(),
+    authorization_servers: [hosts().issuer],
   };
   sendJson(res, 200, metadata);
 }
@@ -189,10 +215,10 @@ export function handleAuthServerMetadata(
   res: ServerResponse
 ): void {
   const metadata: AuthorizationServerMetadata = {
-    issuer: MCP_SERVER_URL,
-    authorization_endpoint: `${MCP_SERVER_URL}/oauth/authorize`,
-    token_endpoint: `${MCP_SERVER_URL}/oauth/token`,
-    registration_endpoint: `${MCP_SERVER_URL}/oauth/register`,
+    issuer: hosts().issuer,
+    authorization_endpoint: `${hosts().issuer}/oauth/authorize`,
+    token_endpoint: `${hosts().issuer}/oauth/token`,
+    registration_endpoint: `${hosts().issuer}/oauth/register`,
     response_types_supported: ["code"],
     grant_types_supported: ["authorization_code", "refresh_token"],
     code_challenge_methods_supported: ["S256"],
@@ -259,6 +285,7 @@ export async function handleClientRegistration(
     response_types: responseTypes,
     token_endpoint_auth_method: "none",
     client_id_issued_at: now,
+    issuer: hosts().issuer,
   };
 
   await oauthStore.registerClient(client);
@@ -294,7 +321,7 @@ export async function handleAuthorize(
   const state = params.get("state");
   const codeChallenge = params.get("code_challenge");
   const codeChallengeMethod = params.get("code_challenge_method");
-  const resource = params.get("resource") || RESOURCE;
+  const resource = params.get("resource") || mcpResource();
 
   // Validate required parameters
   if (!clientId) {
@@ -336,13 +363,14 @@ export async function handleAuthorize(
   // The resource (audience) must be one we issue for. OpenAI flows the resource
   // through authorization; anything else is a misconfigured/hostile client.
   if (!isAllowedResource(resource)) {
-    sendError(res, 400, { error: "invalid_target", error_description: `resource must be one of ${ALLOWED_RESOURCES.join(", ")}` });
+    sendError(res, 400, { error: "invalid_target", error_description: `resource must be one of ${allowedResources().join(", ")}` });
     return;
   }
 
-  // Validate client exists
+  // The client must be registered with this installation's issuer. Another
+  // installation's client reads as unknown here.
   const client = await oauthStore.getClient(clientId);
-  if (!client) {
+  if (!isOwnClient(client)) {
     sendError(res, 400, { error: "invalid_client", error_description: "Unknown client_id" });
     return;
   }
@@ -375,8 +403,8 @@ export async function handleAuthorize(
   await oauthStore.savePendingAuth(pending);
 
   // Build consent page URL
-  const consentUrl = new URL("/oauth/consent", CONSOLE_URL);
-  consentUrl.searchParams.set("callback_url", `${MCP_SERVER_URL}/oauth/callback`);
+  const consentUrl = new URL("/oauth/consent", hosts().console);
+  consentUrl.searchParams.set("callback_url", `${hosts().issuer}/oauth/callback`);
   consentUrl.searchParams.set("state", internalState);
   consentUrl.searchParams.set("app_name", client.client_name || "MCP Client");
 
@@ -406,10 +434,10 @@ export async function handleCallback(
 
   // Check for error from consent page
   if (error) {
-    const pending = state ? await oauthStore.getPendingAuth(state) : null;
+    const peeked = state ? await oauthStore.getPendingAuth(state) : null;
+    const pending = peeked && isAllowedResource(boundResource(peeked)) ? await oauthStore.takePendingAuth(state!) : undefined;
     if (pending) {
       const clientState = (pending as any).client_state;
-      await oauthStore.deletePendingAuth(state!);
 
       const redirectUrl = new URL(pending.redirect_uri);
       redirectUrl.searchParams.set("error", error);
@@ -435,15 +463,23 @@ export async function handleCallback(
     return;
   }
 
-  // Look up pending auth
-  const pending = await oauthStore.getPendingAuth(state);
+  // Look up pending auth: only this installation's (by its resource). Another
+  // installation's is left where it is. Used once: of two callbacks for the
+  // same state, one gets it.
+  let pending: PendingAuth | undefined;
+  try {
+    const peeked = await oauthStore.getPendingAuth(state);
+    pending = peeked && isAllowedResource(boundResource(peeked)) ? await oauthStore.takePendingAuth(state) : undefined;
+  } catch (err) {
+    if (err instanceof StoreUnavailable) return unavailable(res);
+    throw err;
+  }
   if (!pending) {
     sendError(res, 400, { error: "invalid_request", error_description: "Invalid or expired state" });
     return;
   }
 
   const clientState = (pending as any).client_state;
-  await oauthStore.deletePendingAuth(state);
 
   // Generate authorization code
   const code = generateRandomString(64);
@@ -456,7 +492,7 @@ export async function handleCallback(
     code_challenge_method: pending.code_challenge_method,
     grant,
     grant_state: state,
-    resource: pending.resource,
+    resource: boundResource(pending),
     expires_at: Date.now() + 10 * 60 * 1000, // 10 minutes
     used: false,
   };
@@ -665,8 +701,16 @@ async function handleAuthorizationCodeGrant(
   }
 
   // Look up authorization code
-  const authCode = await oauthStore.getAuthCode(code);
-  if (!authCode) {
+  // Only this installation's codes (by resource). Another installation's code
+  // reads as unknown and is left unused.
+  let authCode: AuthorizationCode | undefined;
+  try {
+    authCode = await oauthStore.getAuthCode(code);
+  } catch (err) {
+    if (err instanceof StoreUnavailable) return unavailable(res);
+    throw err;
+  }
+  if (!authCode || !isAllowedResource(boundResource(authCode))) {
     sendError(res, 400, { error: "invalid_grant", error_description: "Invalid or expired authorization code" });
     return;
   }
@@ -696,8 +740,9 @@ async function handleAuthorizationCodeGrant(
     return;
   }
 
-  // If the client re-sends resource at exchange, it must match what it authorized.
-  if (resource && resource !== authCode.resource) {
+  // If the client re-sends resource at exchange, it must match what it authorized
+  // (a legacy code's being Graffiticode's MCP resource).
+  if (resource && resource !== boundResource(authCode)) {
     sendError(res, 400, { error: "invalid_target", error_description: "resource mismatch" });
     return;
   }
@@ -708,8 +753,18 @@ async function handleAuthorizationCodeGrant(
     return;
   }
 
-  // Mark code as used
-  await oauthStore.markAuthCodeUsed(code);
+  // Use the code up: of two exchanges, one gets tokens.
+  let won: boolean;
+  try {
+    won = await oauthStore.consumeAuthCode(code);
+  } catch (err) {
+    if (err instanceof StoreUnavailable) return unavailable(res);
+    throw err;
+  }
+  if (!won) {
+    sendError(res, 400, { error: "invalid_grant", error_description: "Authorization code already used" });
+    return;
+  }
 
   try {
     // Redeem the consent for a Firebase ID token + refresh token.
@@ -736,7 +791,7 @@ async function handleAuthorizationCodeGrant(
       firebase_refresh_token: firebaseRefreshToken,
       firebase_token_expires_at: expiresAt,
       access_token_expires_at: issuedAt + TOKEN_EXPIRES_IN * 1000,
-      resource: authCode.resource,
+      resource: boundResource(authCode),
       created_at: issuedAt,
     };
 
@@ -793,8 +848,19 @@ async function handleRefreshTokenGrant(
 
   try {
     // Look up token by refresh token (now async)
+    // Only this installation's tokens (by resource), for its own clients.
+    // Anything else reads as unknown and is left as it is.
     const tokenEntry = await oauthStore.getTokenByRefreshToken(refreshToken);
-    if (!tokenEntry) {
+    const resourceBound = tokenEntry ? boundResource(tokenEntry) : null;
+    if (!tokenEntry || !resourceBound || !isAllowedResource(resourceBound)) {
+      sendError(res, 400, { error: "invalid_grant", error_description: "Invalid refresh_token" });
+      return;
+    }
+    // The client's record must exist and be this installation's. Nothing
+    // deletes clients, so no legacy token lacks one; a missing record is refused
+    // everywhere, Graffiticode included.
+    const owner = await oauthStore.getClient(tokenEntry.client_id);
+    if (!isOwnClient(owner)) {
       sendError(res, 400, { error: "invalid_grant", error_description: "Invalid refresh_token" });
       return;
     }
@@ -807,7 +873,7 @@ async function handleRefreshTokenGrant(
 
     // Resource is inherited from the original grant; if the client re-sends it, it
     // must match. It is never widened on refresh.
-    if (resource && resource !== tokenEntry.resource) {
+    if (resource && resource !== resourceBound) {
       sendError(res, 400, { error: "invalid_target", error_description: "resource mismatch" });
       return;
     }
@@ -841,22 +907,33 @@ async function handleRefreshTokenGrant(
       firebase_refresh_token: firebaseRefreshToken,
       firebase_token_expires_at: firebaseExpiresAt,
       access_token_expires_at: issuedAt + TOKEN_EXPIRES_IN * 1000,
-      resource: tokenEntry.resource,
+      // The binding it was granted, made explicit for a legacy token.
+      resource: resourceBound,
       created_at: issuedAt,
     };
 
-    // Rotate tokens in Firestore (delete old, create new)
-    await oauthStore.rotateTokens(refreshToken, newTokenEntry);
+    // Rotate: what the store issues may be a decision already made for this
+    // refresh token (a migration's recorded pair), not newTokenEntry.
+    const issued = await oauthStore.rotateTokens(refreshToken, newTokenEntry);
 
-    // Return token response with full expiration time (since we refreshed)
+    // The lifetime left on what was issued: a replayed pair is older than this
+    // request. One already expired is never handed out; the client's retry
+    // rotates past it.
+    const expiresIn = Math.floor(((accessTokenExpiry(issued) ?? 0) - Date.now()) / 1000);
+    if (expiresIn <= 0) return unavailable(res);
     sendJson(res, 200, {
-      access_token: newAccessToken,
+      access_token: issued.access_token,
       token_type: "Bearer",
-      expires_in: TOKEN_EXPIRES_IN,
-      refresh_token: newRefreshToken,
-      scope: tokenEntry.scope,
+      expires_in: expiresIn,
+      refresh_token: issued.refresh_token,
+      scope: issued.scope,
     });
   } catch (error) {
+    if (error instanceof CredentialRefused) {
+      sendError(res, 400, { error: "invalid_grant", error_description: "Invalid refresh_token" });
+      return;
+    }
+    if (error instanceof StoreUnavailable) return unavailable(res);
     console.error("Token refresh error:", error);
     sendError(res, 500, {
       error: "server_error",
@@ -920,17 +997,16 @@ export function evaluateTokenValidity(
   entry: Pick<TokenEntry, "access_token_expires_at" | "resource" | "scope" | "created_at">,
   expectedResource: string,
   now: number,
-  // Strict: the entry must name this resource. Entries from before resources
-  // were recorded carry none and stay valid for /mcp only (the default).
-  strictResource = false,
 ): OAuthInvalidReason | null {
   // Enforce the advertised OAuth access-token expiry.
   const expiresAt = accessTokenExpiry(entry);
   if (expiresAt === null || now > expiresAt) {
     return "expired";
   }
-  // Audience binding: the token must have been issued for this resource.
-  if ((entry.resource || strictResource) && entry.resource !== expectedResource) {
+  // Audience binding: the token must have been issued for this resource. An
+  // entry from before resources were recorded is bound to Graffiticode's MCP
+  // resource (boundResource).
+  if (boundResource(entry) !== expectedResource) {
     return "resource";
   }
   // Scope: must include the one scope we grant.
@@ -943,15 +1019,18 @@ export function evaluateTokenValidity(
 
 export async function resolveOAuthAccessToken(
   accessToken: string,
-  expectedResource: string = RESOURCE,
-  strictResource = false,
+  expectedResource: string = mcpResource(),
 ): Promise<OAuthResolution> {
+  // Only for a resource this installation declares.
+  if (!isAllowedResource(expectedResource)) {
+    return { status: "invalid", reason: "resource" };
+  }
   const tokenEntry = await oauthStore.getTokenByAccessToken(accessToken);
   if (!tokenEntry) {
     return { status: "invalid", reason: "revoked" };
   }
 
-  const reason = evaluateTokenValidity(tokenEntry, expectedResource, Date.now(), strictResource);
+  const reason = evaluateTokenValidity(tokenEntry, expectedResource, Date.now());
   if (reason) {
     return { status: "invalid", reason };
   }

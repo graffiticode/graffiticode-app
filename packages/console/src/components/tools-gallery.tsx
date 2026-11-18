@@ -2,11 +2,11 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import useGraffiticodeAuth from '@graffiticode/auth-react';
-import { selectLanguages } from './language-selector';
+import { useCatalog, useCatalogDomain } from '../lib/catalog';
+import { usePublicConfig } from '../lib/public-config';
 import { countItems, loadItemNames, loadItems } from '../utils/swr/fetchers';
 import ToolsThumbnailGrid from './tools-thumbnail-grid';
 import SignIn from './SignIn';
-import { getTitle } from '../lib/utils';
 
 // The dialect that renders an item's form view to a PNG; its items are named after the
 // source item id they snapped. Same constant as lib/generate-thumbnail.ts.
@@ -21,14 +21,14 @@ function classNames(...classes) {
 }
 
 export default function ToolsGallery({ language, setLanguage }) {
+  const { selectLanguages } = useCatalog();
   const { user } = useGraffiticodeAuth();
   const router = useRouter();
-  const queryDomain = router.query.domain;
-  const queryDomainStr = Array.isArray(queryDomain) ? queryDomain[0] : queryDomain;
-  const storedDomain = typeof window !== 'undefined' ? sessionStorage.getItem('graffiticode:domain') : null;
-  const rawDomain = queryDomainStr || storedDomain || getTitle();
-  const domain = rawDomain.toLowerCase() === 'graffiticode' ? undefined : rawDomain;
+  // An explicitly chosen domain, else the whole offered catalog (lib/catalog.ts).
+  const domain = useCatalogDomain();
   const languages = selectLanguages(domain);
+  // Each language's server, from the installation's host pattern.
+  const languageServerPattern = usePublicConfig().hosts.languageServer;
 
   const [selectedLang, setSelectedLang] = useState<string | null>(language?.name || null);
 
@@ -56,7 +56,7 @@ export default function ToolsGallery({ language, setLanguage }) {
   const selectedLanguage = selectedLang ? languages.find(l => l.name === selectedLang) : null;
   const selectedLangId = selectedLanguage?.id ?? null;
   const { data: langInfo } = useSWR(
-    selectedLangId ? `https://l${selectedLangId}.graffiticode.org/language-info.json` : null,
+    selectedLangId ? `${languageServerPattern.replace('{id}', selectedLangId)}/language-info.json` : null,
     (url) => fetch(url).then(r => r.ok ? r.json() : null),
   );
 

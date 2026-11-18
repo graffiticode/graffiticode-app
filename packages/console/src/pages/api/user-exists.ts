@@ -1,6 +1,8 @@
 import { getFirestore } from '@graffiticode-app/core/utils/db/index';
+import { coreConfig } from "@graffiticode-app/core/config";
 
-const AUTH_SERVICE_URL = process.env.NEXT_PUBLIC_GC_AUTH_URL || 'https://auth.graffiticode.org';
+// The installation's auth host, read at use time (core config).
+const AUTH_SERVICE_URL = () => coreConfig().authUrl;
 const AUTH_SERVICE_INTERNAL_API_KEY =
   process.env.AUTH_SERVICE_INTERNAL_API_KEY || process.env.INTERNAL_API_KEY || '';
 
@@ -14,7 +16,7 @@ const HEX = /^[0-9a-fA-F]+$/;
 // check in graffiticode-app so the UX still works.
 async function lookupAuthService(address: string): Promise<boolean | null> {
   if (!AUTH_SERVICE_INTERNAL_API_KEY) return null;
-  const url = `${AUTH_SERVICE_URL.replace(/\/$/, '')}/authenticate/ethereum/internal/exists/${encodeURIComponent(address)}`;
+  const url = `${AUTH_SERVICE_URL().replace(/\/$/, '')}/authenticate/ethereum/internal/exists/${encodeURIComponent(address)}`;
   const res = await fetch(url, {
     method: 'GET',
     headers: { 'X-Internal-API-Key': AUTH_SERVICE_INTERNAL_API_KEY },

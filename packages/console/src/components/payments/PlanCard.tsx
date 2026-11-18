@@ -1,5 +1,4 @@
-import { Plan, PlanId, BillingInterval, isUpgrade, isDowngrade, getButtonLabel, perItem } from '@/utils/plans';
-import { defaultOverageCapUsd } from '@graffiticode-app/core/lib/plans-config';
+import { Plan, PlanId, BillingInterval, perItem, usePlanDisplay } from '@/utils/plans';
 
 interface PlanCardProps {
   plan: Plan;
@@ -25,6 +24,7 @@ export default function PlanCard({
   highlightedPlan, pendingCancelPlan, processing, selectedPlan,
   onHighlight, onResetPendingCancel, onCancelClick, onSubscribe,
 }: PlanCardProps) {
+  const { isUpgrade, isDowngrade, getButtonLabel, defaultOverageCapUsd } = usePlanDisplay();
   const price = billingInterval === 'monthly' ? plan.monthlyPrice : plan.annualPrice;
   const isFree = !!plan.isFree;
   const isContactSales = !!plan.contactSales;

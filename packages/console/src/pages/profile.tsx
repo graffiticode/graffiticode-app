@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import Head from 'next/head';
 import { mutate } from 'swr';
 import { UserCircleIcon, CameraIcon } from '@heroicons/react/24/outline';
 import useGraffiticodeAuth from '@graffiticode/auth-react';
-import { getTitle, getPageTitle } from '../lib/utils';
 import SignIn from '../components/SignIn';
+import { PageTitle } from '../lib/document-metadata';
 
 interface UserData {
   uid?: string;
@@ -318,9 +317,7 @@ export default function Profile() {
 
   return (
     <>
-      <Head>
-        <title>{getPageTitle('Profile')}</title>
-      </Head>
+      <PageTitle suffix="Profile" />
 
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-4xl mx-auto py-12 px-4 sm:px-6 lg:px-8">

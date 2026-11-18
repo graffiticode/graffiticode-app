@@ -7,8 +7,10 @@
 // confirmed to exist: IDs are not secret, and a typo should fail rather than
 // wait forever.
 import { createHash } from "crypto";
+import { coreConfig } from "@graffiticode-app/core/config";
 
-const AUTH_SERVICE_URL = process.env.NEXT_PUBLIC_GC_AUTH_URL || "https://auth.graffiticode.org";
+// The installation's auth host, read at use time (core config).
+const AUTH_SERVICE_URL = () => coreConfig().authUrl;
 const INTERNAL_API_KEY = process.env.AUTH_SERVICE_INTERNAL_API_KEY || process.env.INTERNAL_API_KEY || "";
 
 export const normalizeEmail = (email: string) => email.trim().toLowerCase();
@@ -29,7 +31,7 @@ export const isAccountId = (id: unknown): id is string =>
 export async function accountExists(accountId: string): Promise<boolean> {
   if (!INTERNAL_API_KEY) throw new Error("Account lookup is not configured on this server.");
   const res = await fetch(
-    `${AUTH_SERVICE_URL.replace(/\/$/, "")}/authenticate/ethereum/internal/exists/${normalizeAccountId(accountId)}`,
+    `${AUTH_SERVICE_URL().replace(/\/$/, "")}/authenticate/ethereum/internal/exists/${normalizeAccountId(accountId)}`,
     { headers: { "X-Internal-API-Key": INTERNAL_API_KEY } },
   );
   if (!res.ok) throw new Error("Could not look up that account right now. Try again.");
@@ -47,7 +49,7 @@ export const accountLabel = (accountId: string) => {
 // shares. Empty when the auth service cannot be reached.
 export async function verifiedEmailHashes(userToken: string): Promise<string[]> {
   try {
-    const res = await fetch(`${AUTH_SERVICE_URL.replace(/\/$/, "")}/linked-emails`, { headers: { Authorization: userToken } });
+    const res = await fetch(`${AUTH_SERVICE_URL().replace(/\/$/, "")}/linked-emails`, { headers: { Authorization: userToken } });
     if (!res.ok) return [];
     const body = await res.json();
     const emails: any[] = body?.data?.emails || [];

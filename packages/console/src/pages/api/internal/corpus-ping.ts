@@ -36,8 +36,9 @@ import {
   shouldSend,
 } from "../../../lib/corpus-ping";
 import { sendSms } from "@graffiticode-app/core/lib/alert-sms";
+import { withInstallation } from "../../../lib/with-installation";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const dry = req.query.dry === "1";
 
   if (!dry && req.method !== "POST") {
@@ -90,3 +91,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: err?.message || String(err) });
   }
 }
+
+export default withInstallation(handler);

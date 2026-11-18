@@ -6,6 +6,8 @@
     "create_item",
     "update_item",
     "get_item",
+    "render_item",
+    "get_spec",
     "list_languages",
     "get_language_info"
   ],

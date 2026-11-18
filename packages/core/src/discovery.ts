@@ -2,6 +2,9 @@
 // /v1/languages). Moved from the MCP server so both front doors agree. Hidden
 // languages stay usable by id: info and creation still answer for them.
 
+import { installedProfile, type InstalledProfile } from "./profile/current.js";
+import { isLanguageOffered } from "./lib/languages.js";
+
 /**
  * The oldest language `list_languages` will show. Everything below it is either
  * not a content-authoring target at all — `L0000` (root), `L0003` (primitives
@@ -49,8 +52,25 @@ const BELOW_FLOOR_KEEP = new Set(["0159"]);
  */
 const ABOVE_FLOOR_HIDE = new Set(["0171", "0172", "0174"]);
 
-/** Catalog ids are bare, zero-padded and numeric ("0166"); anything else can't be compared to the floor. */
-export function isDiscoverable(id: string): boolean {
+/**
+ * Catalog ids are bare, zero-padded and numeric ("0166"); anything else can't be compared to the floor.
+ *
+ * With an installation profile, its `catalog.discovery` replaces the policy
+ * above (the floor and its two exception lists), and only languages the
+ * installation offers are discoverable. A profile without `discovery` shows
+ * every offered language.
+ */
+export function isDiscoverable(id: string, installed: InstalledProfile | null = installedProfile()): boolean {
+  if (installed) {
+    if (!isLanguageOffered(id, installed)) return false;
+    const d = installed.profile.catalog?.discovery;
+    if (!d) return true;
+    const ids = (list?: string[]) => new Set((list ?? []).map(x => x.replace(/^L/i, "").padStart(4, "0")));
+    if (ids(d.exclude).has(id)) return false;
+    if (ids(d.include).has(id)) return true;
+    const n = Number(id);
+    return Number.isFinite(n) && n >= d.minLanguage;
+  }
   if (ABOVE_FLOOR_HIDE.has(id)) return false;
   if (BELOW_FLOOR_KEEP.has(id)) return true;
   const n = Number(id);

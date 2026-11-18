@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useAuth } from 'reactfire';
 import { signOut } from 'firebase/auth';
 import useGraffiticodeAuth, { useEmailSignIn } from '@graffiticode/auth-react';
 import AuthMethodDialog from '../../components/AuthMethodDialog';
 import WalletSelectionDialog from '../../components/WalletSelectionDialog';
-import { getPageTitle } from '../../lib/utils';
 import { claimedRecently } from '../../lib/recent-claim';
 import { accountLabel } from '../../lib/account-label';
+import { PageTitle } from '../../lib/document-metadata';
+import { usePublicConfig } from '../../lib/public-config';
 
 // The OAuth consent step for agents connecting to Graffiticode (Codex, Claude,
 // ChatGPT…). The MCP server's /oauth/authorize sends the browser here with
@@ -36,20 +36,12 @@ interface Wallet {
   provider: any;
 }
 
-// Allowlisted callback URL patterns: the MCP server's own origins (and local dev).
-const ALLOWED_CALLBACK_PATTERNS = [
-  /^https:\/\/[^/]*\.graffiticode\.org(\/|$)/,
-  /^https:\/\/graffiticode\.org(\/|$)/,
-  /^https:\/\/[^/]*\.run\.app(\/|$)/,
-  /^http:\/\/localhost(:\d+)?(\/|$)/,
-  /^http:\/\/127\.0\.0\.1(:\d+)?(\/|$)/,
-];
-
-function isValidCallbackUrl(url: string): boolean {
+// Whether the installation lets this page send a grant to the callback: the
+// server decides (core/oauth-callbacks.ts, and /api/oauth/grant enforces it).
+async function isValidCallbackUrl(url: string): Promise<boolean> {
   try {
-    const parsed = new URL(url);
-    if (!['http:', 'https:'].includes(parsed.protocol)) return false;
-    return ALLOWED_CALLBACK_PATTERNS.some((pattern) => pattern.test(url));
+    const res = await fetch(`/api/oauth/callback-check?url=${encodeURIComponent(url)}`);
+    return res.ok && (await res.json())?.allowed === true;
   } catch {
     return false;
   }
@@ -91,6 +83,7 @@ function postToCallback(callbackUrl: string, fields: Record<string, string>) {
 }
 
 export default function OAuthConsent() {
+  const brandName = usePublicConfig().brand.name;
   const router = useRouter();
   const auth = useAuth();
   const { user, loading, beginEthereumSignIn, confirmEthereumSignIn } = useGraffiticodeAuth();
@@ -140,26 +133,31 @@ export default function OAuthConsent() {
     if (!router.isReady) return;
     const callbackUrl = first(router.query.callback_url);
     const state = first(router.query.state);
-    let next: ConsentParams | null = null;
-    if (callbackUrl || state) {
-      if (!callbackUrl || !state) {
-        setValidationError('This sign-in link is incomplete. Start connecting from your agent again.');
-      } else if (!isValidCallbackUrl(callbackUrl)) {
-        setValidationError('This sign-in link is not valid.');
-      } else {
-        next = { callbackUrl, state, appName: first(router.query.app_name) || 'An application' };
-        try {
-          sessionStorage.setItem(CONSENT_KEY, JSON.stringify(next));
-        } catch {
-          // Without storage a sign-in remount loses the request; nothing to do here.
+    let live = true;
+    (async () => {
+      let next: ConsentParams | null = null;
+      if (callbackUrl || state) {
+        if (!callbackUrl || !state) {
+          setValidationError('This sign-in link is incomplete. Start connecting from your agent again.');
+        } else if (!(await isValidCallbackUrl(callbackUrl))) {
+          setValidationError('This sign-in link is not valid.');
+        } else {
+          next = { callbackUrl, state, appName: first(router.query.app_name) || 'An application' };
+          try {
+            sessionStorage.setItem(CONSENT_KEY, JSON.stringify(next));
+          } catch {
+            // Without storage a sign-in remount loses the request; nothing to do here.
+          }
         }
+      } else {
+        next = readStash();
+        if (!next) setValidationError('This sign-in link is missing its details. Start connecting from your agent again.');
       }
-    } else {
-      next = readStash();
-      if (!next) setValidationError('This sign-in link is missing its details. Start connecting from your agent again.');
-    }
-    setParams(next);
-    setParamsChecked(true);
+      if (!live) return;
+      setParams(next);
+      setParamsChecked(true);
+    })();
+    return () => { live = false; };
   }, [router.isReady, router.query.callback_url, router.query.state, router.query.app_name]);
 
   // Keyed on the uid: the auth hook builds a new user object on every render.
@@ -202,7 +200,7 @@ export default function OAuthConsent() {
       const res = await fetch('/api/oauth/grant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: idToken },
-        body: JSON.stringify({ state: params.state }),
+        body: JSON.stringify({ state: params.state, callbackUrl: params.callbackUrl }),
       });
       const body = await res.json().catch(() => ({}));
       if (res.status === 401 && body?.error === 'sign_in_required') {
@@ -318,7 +316,7 @@ export default function OAuthConsent() {
 
   const shell = (body: React.ReactNode) => (
     <>
-      <Head><title>{getPageTitle('Connect')}</title></Head>
+      <PageTitle suffix="Connect" />
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-100px)] px-4 py-8">
         <div className="w-full max-w-sm flex flex-col items-center text-center">{body}</div>
       </div>
@@ -352,7 +350,7 @@ export default function OAuthConsent() {
       <>
         <h1 className="text-xl font-semibold text-gray-900 mb-2">Connect {params.appName}</h1>
         <p className="text-sm text-gray-600 mb-1">
-          {params.appName} wants to create and edit items in this Graffiticode account:
+          {params.appName} wants to create and edit items in this {brandName} account:
         </p>
         <p className="text-sm font-medium text-gray-900 mb-5 break-all">{account}</p>
         {error && <p className="text-sm text-red-700 mb-4">{error}</p>}
@@ -389,7 +387,7 @@ export default function OAuthConsent() {
     return shell(
       <>
         <h1 className="text-xl font-semibold text-gray-900 mb-2">Create a new account?</h1>
-        <p className="text-sm text-gray-600 mb-1">No Graffiticode account uses this {newAccount.kind}:</p>
+        <p className="text-sm text-gray-600 mb-1">No {brandName} account uses this {newAccount.kind}:</p>
         <p className="text-sm font-medium text-gray-900 mb-3 break-all">{who}</p>
         <p className="text-sm text-gray-600 mb-5">
           Create a free account with it and connect {params.appName}? If you already have an account,
@@ -424,7 +422,7 @@ export default function OAuthConsent() {
       <>
         <h1 className="text-xl font-semibold text-gray-900 mb-2">No account found</h1>
         <p className="text-sm text-gray-600 mb-5">
-          No Graffiticode account uses that {noAccount === 'email' ? 'email' : 'wallet'}. Sign in with the
+          No {brandName} account uses that {noAccount === 'email' ? 'email' : 'wallet'}. Sign in with the
           email or wallet you used when you saved your items.
         </p>
         <button
@@ -443,7 +441,7 @@ export default function OAuthConsent() {
 
   return (
     <>
-      <Head><title>{getPageTitle('Connect')}</title></Head>
+      <PageTitle suffix="Connect" />
       {error && (
         <p className="pt-8 text-center text-sm text-red-700">{error}</p>
       )}

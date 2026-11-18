@@ -22,10 +22,15 @@
  *   }
  */
 
+import { installationBrand } from "@graffiticode-app/core/profile/brand";
+import { SURFACE_FAMILIES } from "@graffiticode-app/core/surfaces";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { handleIntrospect } from "./oauth/introspection.js";
+import { oauthStoreStatus } from "./oauth/firestore-store.js";
 import { coreReadiness } from "@graffiticode-app/core/readiness";
 import { coreBackendEnabled } from "./core-backend.js";
+import { assertServiceCatalogsWriteFree, handleServiceMcp, serviceSurfaces } from "./service-tools.js";
+import { copy, document, installationHosts, installationSecurityHeaders, loadInstallation, profile } from "./installation.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
   CallToolRequestSchema,
@@ -435,7 +440,6 @@ function geoFromHeaders(headers: IncomingMessage["headers"]): SessionMeta {
   return meta;
 }
 
-const MCP_SERVER_URL = process.env.MCP_SERVER_URL || "https://mcp.graffiticode.org";
 
 // How often to write a comment into an open SSE stream, keeping it under the CDN's
 // 100s idle timeout (see src/sse-keepalive.ts). 30s leaves a wide margin; 0 disables.
@@ -480,8 +484,8 @@ Disallow: /oauth/
 `;
 
 const MCP_DISCOVERY = {
-  mcp_endpoint: `${MCP_SERVER_URL}/mcp`,
-  site: MCP_SERVER_URL,
+  mcp_endpoint: "https://mcp.graffiticode.org/mcp",
+  site: "https://mcp.graffiticode.org",
   description:
     "Graffiticode is a universal MCP server of smart tools for AI agents and the people who use them. Each tool is one domain language wrapped by a specialized AI; call list_languages to discover what is available.",
   tools: [
@@ -499,13 +503,38 @@ const MCP_DISCOVERY = {
   github_url: "https://github.com/graffiticode",
 };
 
+// The discovery document. With an installation profile it is built from the
+// profile; the key order and the item tools' order match MCP_DISCOVERY, so the
+// Graffiticode profile reproduces it byte for byte.
+// The item tools, as the release's surface registry lists them.
+const ITEM_TOOL_NAMES = [...SURFACE_FAMILIES.items.tools];
+
+function mcpDiscovery() {
+  const p = profile();
+  // Without a profile, the endpoint follows MCP_SERVER_URL as before.
+  if (!p) return { ...MCP_DISCOVERY, mcp_endpoint: installationHosts().mcpResource, site: installationHosts().mcp };
+  // Where this release serves the item tools; the profile validator requires
+  // the profile to select them there.
+  const itemsPath = SURFACE_FAMILIES.items.path!;
+  return {
+    mcp_endpoint: `${p.hosts.mcp}${itemsPath}`,
+    site: p.hosts.mcp,
+    description: copy("mcp.discovery.description") ?? "",
+    tools: ITEM_TOOL_NAMES,
+    product_url: p.brand.links?.product,
+    console_url: p.hosts.console,
+    forum_url: p.brand.links?.forum,
+    github_url: p.brand.links?.source,
+  };
+}
+
 function handleMcpDiscovery(res: ServerResponse): void {
   res.writeHead(200, {
     "Content-Type": "application/json",
     "Access-Control-Allow-Origin": "*",
     "Cache-Control": "public, max-age=300",
   });
-  res.end(JSON.stringify(MCP_DISCOVERY, null, 2));
+  res.end(JSON.stringify(mcpDiscovery(), null, 2));
 }
 
 function extractBearerToken(req: IncomingMessage): string | null {
@@ -584,7 +613,7 @@ function createMcpServer(authProvider: AuthProvider, sessionMeta: SessionMeta = 
   let sessionStartLogged = false;
   const server = new Server(
     {
-      name: "graffiticode",
+      name: profile()?.installation.id ?? "graffiticode",
       version: "1.0.0",
     },
     {
@@ -870,7 +899,7 @@ function createMcpServer(authProvider: AuthProvider, sessionMeta: SessionMeta = 
           content: [
             {
               type: "text",
-              text: "Your Graffiticode session has expired. Please reconnect your account to continue.",
+              text: `Your ${installationBrand().name} session has expired. Please reconnect your account to continue.`,
             },
           ],
           isError: true,
@@ -910,7 +939,7 @@ function createMcpServer(authProvider: AuthProvider, sessionMeta: SessionMeta = 
       const uris = widgetResourceUris();
       resources.push({
         uri: uris.mcp,
-        name: "Graffiticode Form Widget",
+        name: `${installationBrand().name} Form Widget`,
         mimeType: CLAUDE_WIDGET_MIME_TYPE,
         description: "Interactive item widget for MCP Apps hosts such as Claude",
         _meta: widgetResourceMeta(),
@@ -1125,7 +1154,11 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       return;
     }
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ status: "ok" }));
+    // The installation receipt, when a profile is loaded (until gc-deploy
+    // records it with the release; docs/installations-plan.md).
+    // The OAuth store, unless it is today's (so legacy's answer is unchanged).
+    const store = oauthStoreStatus();
+    res.end(JSON.stringify({ status: "ok", ...(installationReceipt ? { installation: installationReceipt } : {}), ...(store.mode !== "legacy" ? { oauthStore: store } : {}) }));
     return;
   }
 
@@ -1143,28 +1176,35 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       "Content-Type": "text/plain; charset=utf-8",
       "Cache-Control": "public, max-age=86400",
     });
-    res.end(ROBOTS_TXT);
+    res.end(copy("mcp.robots") ?? ROBOTS_TXT);
     return;
   }
 
+  // The HTML pages below carry the installation's security headers (with a
+  // profile; without one, as before): core/src/profile/security-headers.ts.
+  const htmlPageHeaders = () => ({
+    "Content-Type": "text/html; charset=utf-8",
+    ...Object.fromEntries(installationSecurityHeaders("mcp-page")),
+  });
+
   // About
   if (url.pathname === "/about") {
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    res.end(ABOUT_HTML);
+    res.writeHead(200, htmlPageHeaders());
+    res.end(document("about") ?? ABOUT_HTML);
     return;
   }
 
   // Privacy policy
   if (url.pathname === "/privacy") {
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    res.end(PRIVACY_HTML);
+    res.writeHead(200, htmlPageHeaders());
+    res.end(document("privacy") ?? PRIVACY_HTML);
     return;
   }
 
   // Terms of service
   if (url.pathname === "/terms") {
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    res.end(TERMS_HTML);
+    res.writeHead(200, htmlPageHeaders());
+    res.end(document("terms") ?? TERMS_HTML);
     return;
   }
 
@@ -1236,6 +1276,14 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
 
   if (url.pathname === "/oauth/token" && req.method === "POST") {
     await handleToken(req, res);
+    return;
+  }
+
+  // The installation's service surfaces (service-tools.ts): catalogs of
+  // service-job tools generated from its profile, each at its own path.
+  const serviceSurface = serviceSurfaces().find(s => s.path === url.pathname);
+  if (serviceSurface) {
+    await handleServiceMcp(serviceSurface, req, res, extractBearerToken(req), isOAuthAccessToken);
     return;
   }
 
@@ -1567,7 +1615,29 @@ const httpServer = createServer((req, res) => {
   });
 });
 
+// The installation profile (PROFILE_DIR), loaded and validated before the
+// first request. An invalid profile stops the start.
+// Storage is required in core mode, where this server reads and writes Firestore,
+// and whenever the OAuth store is the installation's own (OAUTH_STORE).
+const ownOAuthStore = (process.env.OAUTH_STORE ?? "legacy").trim() !== "legacy" && (process.env.OAUTH_STORE ?? "").trim() !== "";
+const installationReceipt = loadInstallation(process.env, { requireStorage: coreBackendEnabled() || ownOAuthStore });
+if (installationReceipt) console.log(`[installation] ${JSON.stringify(installationReceipt)}`);
+
+// The OAuth store: an invalid OAUTH_STORE configuration stops the start.
+console.log(`[oauth-store] ${JSON.stringify(oauthStoreStatus())}`);
+
+// Service surfaces run their jobs in-process (core mode), and none may expose
+// a skill that writes before execution is ready: fail at startup, not on a call.
+if (serviceSurfaces().length) {
+  if (!coreBackendEnabled()) throw new Error("The installation serves service tools, which need GRAFFITICODE_BACKEND=core.");
+  assertServiceCatalogsWriteFree();
+}
+
 httpServer.listen(PORT, () => {
+  // A parent that started this server with an IPC channel (tests, with PORT=0)
+  // learns the port the OS actually bound. In production there is no channel.
+  const bound = httpServer.address();
+  if (process.send && bound && typeof bound === "object") process.send({ type: "listening", port: bound.port });
   // The catalog is warmed by the first request, not here — see warmCatalogOnRequest.
   console.log(`Graffiticode MCP Server (hosted) running on http://localhost:${PORT}`);
   console.log(`\nEndpoints:`);
@@ -1583,7 +1653,7 @@ httpServer.listen(PORT, () => {
     console.log(`  - ${tool.name}`);
   });
   console.log(`\nFor Claude Desktop: Add via Settings > Connectors with URL:`);
-  console.log(`  ${MCP_SERVER_URL}/mcp`);
+  console.log(`  ${installationHosts().mcpResource}`);
   console.log(`\nFor API key auth (legacy):`);
   console.log(JSON.stringify({
     mcpServers: {

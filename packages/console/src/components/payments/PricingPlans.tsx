@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import useGraffiticodeAuth from '@graffiticode/auth-react';
 import { paymentsGet, paymentsPost } from '../../utils/payments-client';
-import { plans, PlanId, BillingInterval, isUpgrade } from '@/utils/plans';
+import { PlanId, BillingInterval, usePlanDisplay } from '@/utils/plans';
 import PlanCard from './PlanCard';
 
 interface PricingPlansProps {
@@ -27,6 +27,7 @@ const defaultSubState: SubscriptionState = {
 };
 
 export default function PricingPlans({ onSubscriptionChange }: PricingPlansProps) {
+  const { plans, isUpgrade } = usePlanDisplay();
   const { user } = useGraffiticodeAuth();
   const [billingInterval, setBillingInterval] = useState<BillingInterval>('monthly');
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);

@@ -29,13 +29,19 @@ export type ClaimResult =
   | { kind: "replay"; response: StoredResponse }
   | { kind: "bound"; op: IdempotencyOp; claim: IdempotencyClaim }
   | { kind: "in_flight" }
-  | { kind: "mismatch" };
+  | { kind: "mismatch" }
+  // The key's authority to reserve was revoked (a service-job step whose job
+  // ended without a reservation, service-runner.ts): nothing may be made under it.
+  | { kind: "revoked" };
 
 export const idempotencyRef = (scope: string, key: string) =>
   db().doc(`idempotency-keys/${createHash("sha256").update(`${scope}:${key}`).digest("hex")}`);
 
-export async function claimIdempotencyKey({ scope, key, fingerprint, now = Date.now() }: {
-  scope: string; key: string; fingerprint: string; now?: number;
+// `ttlMs`: how long the claim and its record last (default 24 hours). A
+// service-job step's claim is its reservation's recovery record, so it lasts
+// as long as the job can (service-runner.ts).
+export async function claimIdempotencyKey({ scope, key, fingerprint, now = Date.now(), ttlMs = IDEMPOTENCY_TTL_MS }: {
+  scope: string; key: string; fingerprint: string; now?: number; ttlMs?: number;
 }): Promise<ClaimResult> {
   const ref = idempotencyRef(scope, key);
   return db().runTransaction(async (tx) => {
@@ -44,10 +50,11 @@ export async function claimIdempotencyKey({ scope, key, fingerprint, now = Date.
     const live = d && (d.expiresAt?.toMillis?.() ?? Number(d.expiresAt)) > now;
     const claim = () => {
       const claimToken = randomUUID();
-      tx.set(ref, { fingerprint, state: "claimed", claimToken, claimedAt: now, expiresAt: new Date(now + IDEMPOTENCY_TTL_MS) });
+      tx.set(ref, { fingerprint, state: "claimed", claimToken, claimedAt: now, expiresAt: new Date(now + ttlMs) });
       return { kind: "claimed", ref, claimToken } as ClaimResult;
     };
     if (!live) return claim();
+    if (d.state === "revoked") return { kind: "revoked" } as ClaimResult;
     if (d.fingerprint !== fingerprint) return { kind: "mismatch" } as ClaimResult;
     if (d.state === "completed") return { kind: "replay", response: d.response } as ClaimResult;
     if (d.state === "bound") return { kind: "bound", op: d.op, claim: { ref, claimToken: d.claimToken } } as ClaimResult;

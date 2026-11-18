@@ -6,18 +6,37 @@ import { mintSessionToken } from "@graffiticode-app/core/lib/free-plan-session-t
 import { deriveSessionNamespace } from "@graffiticode-app/core/lib/free-plan-context";
 import { checkItemCreateAllowed } from "@graffiticode-app/core/lib/usage-service";
 import { getPlan } from "@graffiticode-app/core/lib/plans-config";
-import { freePlanLanguageIds } from "@graffiticode-app/core/lib/languages";
-import { FREE_PLAN_ITEM_TTL_MS } from "@graffiticode-app/core/lib/free-plan-context";
+import { freePlanScope } from "@graffiticode-app/core/lib/languages";
+import { buildFreePlanDisabledError, freePlanEnabled, freePlanItemTtlHours } from "@graffiticode-app/core/lib/free-plan-context";
 import { db } from "@graffiticode-app/core/db";
-import { callerFor } from "../auth.js";
+import { callerFor, freePlanDisabledProblem } from "../auth.js";
 import { languageId } from "../http.js";
+import { profile } from "@graffiticode-app/core/profile/runtime";
 
 // A workspace token lasts as long as the session token MCP mints (48h).
 const WORKSPACE_TTL_MS = 48 * 60 * 60_000;
 const SIGNUP_URL = "https://graffiticode.org/signup";
 
+// Where a free-plan caller signs up.
+export const signupUrl = () => profile()?.brand.links?.signup ?? SIGNUP_URL;
+
+// What /me tells a free-plan caller about the free plan.
+export const freePlanSummary = () => {
+  const scope = freePlanScope();
+  return {
+    item_ttl_hours: freePlanItemTtlHours(),
+    // Empty with languages_restricted false: every language this installation
+    // offers. With it true: exactly these (possibly none).
+    languages: scope.ids.map(languageId),
+    languages_restricted: scope.restricted,
+    signup_url: signupUrl(),
+  };
+};
+
 export function accountRoutes(app: Hono) {
   app.post("/workspaces", async (c) => {
+    // No workspaces where there's no free plan: one couldn't be used.
+    if (!freePlanEnabled()) throw freePlanDisabledProblem((buildFreePlanDisabledError() as any).payload);
     const uuid = randomUUID();
     const workspace = await mintSessionToken({ sessionNamespace: deriveSessionNamespace(uuid), sessionUuid: uuid });
     c.header("Cache-Control", "no-store");
@@ -35,11 +54,7 @@ export function accountRoutes(app: Hono) {
     if (auth.freePlan) {
       return c.json({
         account: "free_plan",
-        free_plan: {
-          item_ttl_hours: Math.round(FREE_PLAN_ITEM_TTL_MS / 3_600_000),
-          languages: freePlanLanguageIds().map(languageId),
-          signup_url: SIGNUP_URL,
-        },
+        free_plan: freePlanSummary(),
       });
     }
     const [gate, user] = await Promise.all([

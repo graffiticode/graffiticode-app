@@ -1,0 +1,138 @@
+{
+  "plans": {
+    "demo": {
+      "id": "demo",
+      "displayName": "Bronze",
+      "basePriceMonthly": 0,
+      "basePriceAnnual": 0,
+      "includedItems": 25,
+      "overageRatePerItem": 0.4,
+      "hardCap": true,
+      "defaultCapUsd": 10,
+      "tier": 0,
+      "stripe": {
+        "baseMonthlyPriceIdEnv": "STRIPE_FREE_MONTHLY_PRICE_ID",
+        "meterPriceIdEnv": "STRIPE_FREE_METER_PRICE_ID",
+        "meterEventName": "item_created"
+      }
+    },
+    "starter": {
+      "id": "starter",
+      "displayName": "Starter",
+      "basePriceMonthly": 10,
+      "basePriceAnnual": 100,
+      "includedItems": 500,
+      "overageRatePerItem": 0.1,
+      "hardCap": false,
+      "tier": 1,
+      "stripe": {
+        "baseMonthlyPriceIdEnv": "STRIPE_STARTER_MONTHLY_PRICE_ID",
+        "baseAnnualPriceIdEnv": "STRIPE_STARTER_ANNUAL_PRICE_ID"
+      }
+    },
+    "pro": {
+      "id": "pro",
+      "displayName": "Silver",
+      "basePriceMonthly": 100,
+      "basePriceAnnual": 1000,
+      "includedItems": 500,
+      "overageRatePerItem": 0.2,
+      "hardCap": false,
+      "tier": 2,
+      "stripe": {
+        "baseMonthlyPriceIdEnv": "STRIPE_PRO_MONTHLY_PRICE_ID",
+        "baseAnnualPriceIdEnv": "STRIPE_PRO_ANNUAL_PRICE_ID",
+        "meterPriceIdEnv": "STRIPE_PRO_METER_PRICE_ID",
+        "meterEventName": "item_created"
+      }
+    },
+    "teams": {
+      "id": "teams",
+      "displayName": "Gold",
+      "basePriceMonthly": 1000,
+      "basePriceAnnual": 10000,
+      "includedItems": 10000,
+      "overageRatePerItem": 0.1,
+      "hardCap": false,
+      "tier": 3,
+      "stripe": {
+        "baseMonthlyPriceIdEnv": "STRIPE_TEAMS_MONTHLY_PRICE_ID",
+        "baseAnnualPriceIdEnv": "STRIPE_TEAMS_ANNUAL_PRICE_ID",
+        "meterPriceIdEnv": "STRIPE_TEAMS_METER_PRICE_ID",
+        "meterEventName": "item_created"
+      }
+    },
+    "platinum": {
+      "id": "platinum",
+      "displayName": "Platinum",
+      "basePriceMonthly": 10000,
+      "basePriceAnnual": 100000,
+      "includedItems": 200000,
+      "overageRatePerItem": 0.05,
+      "hardCap": false,
+      "tier": 4,
+      "stripe": {
+        "baseMonthlyPriceIdEnv": "STRIPE_PLATINUM_MONTHLY_PRICE_ID",
+        "baseAnnualPriceIdEnv": "STRIPE_PLATINUM_ANNUAL_PRICE_ID",
+        "meterPriceIdEnv": "STRIPE_PLATINUM_METER_PRICE_ID",
+        "meterEventName": "item_created"
+      }
+    },
+    "unknown": {
+      "id": "demo",
+      "displayName": "Bronze",
+      "basePriceMonthly": 0,
+      "basePriceAnnual": 0,
+      "includedItems": 25,
+      "overageRatePerItem": 0.4,
+      "hardCap": true,
+      "defaultCapUsd": 10,
+      "tier": 0,
+      "stripe": {
+        "baseMonthlyPriceIdEnv": "STRIPE_FREE_MONTHLY_PRICE_ID",
+        "meterPriceIdEnv": "STRIPE_FREE_METER_PRICE_ID",
+        "meterEventName": "item_created"
+      }
+    }
+  },
+  "included": {
+    "demo": 25,
+    "starter": 500,
+    "pro": 500,
+    "teams": 10000,
+    "platinum": 200000
+  },
+  "upgrades": [
+    "demo>starter",
+    "demo>pro",
+    "demo>teams",
+    "demo>platinum",
+    "starter>pro",
+    "starter>teams",
+    "starter>platinum",
+    "pro>teams",
+    "pro>platinum",
+    "teams>platinum"
+  ],
+  "downgrades": [
+    "starter<demo",
+    "pro<demo",
+    "pro<starter",
+    "teams<demo",
+    "teams<starter",
+    "teams<pro",
+    "platinum<demo",
+    "platinum<starter",
+    "platinum<pro",
+    "platinum<teams"
+  ],
+  "meterEvents": {
+    "demo": "item_created",
+    "starter": null,
+    "pro": "item_created",
+    "teams": "item_created",
+    "platinum": "item_created"
+  },
+  "defaultPlan": "demo",
+  "freePlanItemTtlMs": 172800000
+}

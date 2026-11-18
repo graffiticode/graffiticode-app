@@ -2,6 +2,8 @@
 // resources, plus listing, rename, archive, versions, src/data, retry and an
 // event stream. Everything runs through core in-process, except get_spec,
 // which calls a model and so runs in the console.
+import { installationHosts } from "@graffiticode-app/core/profile/runtime";
+import { profile } from "@graffiticode-app/core/profile/runtime";
 import type { Context, Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { createFromDescription, reviseItem } from "@graffiticode-app/core/revise";
@@ -21,8 +23,8 @@ import { db } from "@graffiticode-app/core/db";
 import { mintSessionToken } from "@graffiticode-app/core/lib/free-plan-session-token";
 import type { Validate, ValidateBody } from "../app.js";
 
-const APP_URL = () => process.env.GRAFFITICODE_APP_URL || "https://app.graffiticode.org";
-const CONSOLE_URL = () => process.env.GRAFFITICODE_CONSOLE_BASE_URL || "https://console.graffiticode.org";
+const APP_URL = () => installationHosts().app;
+const CONSOLE_URL = () => installationHosts().console;
 const CLIENT = "openapi";
 const MAX_WAIT_S = 45;
 const POLL_MS = 1000;
@@ -136,6 +138,13 @@ async function run<T>(fn: () => Promise<T>): Promise<T> {
     throw fromCoreError(err);
   }
 }
+
+// Who an oEmbed response names as the provider, and an untitled item's title.
+export const oembedProvider = () => {
+  const p = profile();
+  if (!p) return { name: "Graffiticode", url: "https://graffiticode.org", untitled: "Graffiticode item" };
+  return { name: p.brand.name, url: p.brand.links?.product ?? p.hosts.app, untitled: `${p.brand.name} item` };
+};
 
 export function itemRoutes(app: Hono, validate: Validate, validateBody: ValidateBody) {
   app.post("/items", async (c) => {
@@ -298,10 +307,11 @@ export function itemRoutes(app: Hono, validate: Validate, validateBody: Validate
     const width = Math.min(query.maxwidth ?? 800, 4000);
     const height = Math.min(query.maxheight ?? 600, 4000);
     const src = String(item.view_url).replace(/"/g, "&quot;");
-    const title = String(item.name ?? "Graffiticode item").replace(/[<>&"]/g, ch => `&#${ch.charCodeAt(0)};`);
+    const provider = oembedProvider();
+    const title = String(item.name ?? provider.untitled).replace(/[<>&"]/g, ch => `&#${ch.charCodeAt(0)};`);
     return c.json({
-      version: "1.0", type: "rich", title: item.name ?? "Graffiticode item",
-      provider_name: "Graffiticode", provider_url: "https://graffiticode.org",
+      version: "1.0", type: "rich", title: item.name ?? provider.untitled,
+      provider_name: provider.name, provider_url: provider.url,
       html: `<iframe src="${src}" title="${title}" width="${width}" height="${height}" style="border:0" loading="lazy" allow="clipboard-write"></iframe>`,
       width, height,
     });

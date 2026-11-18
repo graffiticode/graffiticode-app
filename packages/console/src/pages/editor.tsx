@@ -1,15 +1,16 @@
 import { useRouter } from 'next/router';
-import Head from 'next/head';
 import { useEffect, useState, useRef } from 'react';
 import { useAuth } from 'reactfire';
 import { signInWithCustomToken } from 'firebase/auth';
 import useGraffiticodeAuth from "@graffiticode/auth-react";
 import { createItem } from '../utils/swr/fetchers';
-import { getPageTitle } from '../lib/utils';
 import SignIn from '../components/SignIn';
 import Gallery from '../components/gallery';
+import { usePublicConfig } from '../lib/public-config';
+import { PageTitle } from '../lib/document-metadata';
 
 export default function Editor({ language, setLanguage, mark }) {
+  const { brand, hosts } = usePublicConfig();
   const router = useRouter();
   const { lang: rawLang, itemId: rawItemId, mode, origin, token: rawToken } = router.query;
   const lang = Array.isArray(rawLang) ? rawLang[0] : rawLang;
@@ -201,9 +202,7 @@ export default function Editor({ language, setLanguage, mark }) {
   if (!router.isReady || authLoading || isTokenSigningIn || (token && !user)) {
     return (
       <>
-        <Head>
-          <title>{getPageTitle('Signing In')}</title>
-        </Head>
+        <PageTitle suffix="Signing In" />
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
@@ -218,23 +217,21 @@ export default function Editor({ language, setLanguage, mark }) {
   if (!user) {
     return (
       <>
-        <Head>
-          <title>{getPageTitle('Editor')}</title>
-        </Head>
+        <PageTitle suffix="Editor" />
         <div className="min-h-screen flex items-center justify-center">
           <div className="max-w-md w-full">
             <h2 className="text-center text-2xl font-bold mb-4">Sign in to continue</h2>
             <p className="text-center text-gray-600 mb-8">
-              Graffiticode account required to create or edit questions.
+              {brand.name} account required to create or edit questions.
               <br />
               New here? Create a free account by signing in with an Ethereum wallet. No blockchain fees required.
             </p>
             <div className="flex justify-center">
               <button
-                onClick={() => window.open('https://graffiticode.com', '_blank')}
+                onClick={() => window.open(brand.links.product ?? hosts.console, '_blank')}
                 className="px-6 py-3 bg-gray-600 text-white rounded-none hover:bg-gray-700 transition-colors font-medium"
               >
-                Open Graffiticode to Sign In
+                Open {brand.name} to Sign In
               </button>
             </div>
           </div>
@@ -247,9 +244,7 @@ export default function Editor({ language, setLanguage, mark }) {
   if (createdItemId || (mode === 'editor' && itemId)) {
     return (
       <>
-        <Head>
-          <title>{getPageTitle('Editor')}</title>
-        </Head>
+        <PageTitle suffix="Editor" />
         <Gallery
           lang={lang}
           mark={mark}
@@ -264,9 +259,7 @@ export default function Editor({ language, setLanguage, mark }) {
   if (isCreating) {
     return (
       <>
-        <Head>
-          <title>{getPageTitle('Creating Item')}</title>
-        </Head>
+        <PageTitle suffix="Creating Item" />
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
@@ -281,9 +274,7 @@ export default function Editor({ language, setLanguage, mark }) {
   if (error) {
     return (
       <>
-        <Head>
-          <title>{getPageTitle('Error')}</title>
-        </Head>
+        <PageTitle suffix="Error" />
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
             <h2 className="text-xl font-bold text-red-600 mb-4">Error</h2>
@@ -303,10 +294,7 @@ export default function Editor({ language, setLanguage, mark }) {
   // Default loading state
   return (
     <>
-      <Head>
-        <title>{getPageTitle('Loading')}</title>
-        <link rel="icon" type="image/png" href="favicon.png" />
-      </Head>
+      <PageTitle suffix="Loading" />
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
       </div>

@@ -28,7 +28,7 @@ import { resolveAuth, type Principal } from "./auth.js";
 import { dispatchGenerationTask } from "./lib/generation-queue.js";
 import { generateCodeForRequest } from "./lib/code-generation/generate-for-request.js";
 import { getTask } from "./tasks.js";
-import { FREE_PLAN_ITEM_TTL_MS } from "./lib/free-plan-context.js";
+import { freePlanItemTtlMs } from "./lib/free-plan-context.js";
 import { buildEventPayload, actor } from "./lib/funnel-events.js";
 import { contentScript } from "./lib/prompt-language.js";
 import { dailyDocRef } from "./lib/free-plan-quota.js";
@@ -497,7 +497,7 @@ export async function completeJob(generationId: string, owner: string, auth: Pri
     }
     if (lang !== item.lang) updates.lang = lang;
     if (Array.isArray(result.upstreamLangs)) updates.upstreamLangs = upstreamLangs;
-    if (auth.freePlan) updates.expiresAt = (updates.updated || item.updated || now) + FREE_PLAN_ITEM_TTL_MS;
+    if (auth.freePlan) updates.expiresAt = (updates.updated || item.updated || now) + freePlanItemTtlMs();
 
     if (taskIdChanged) {
       if (versionSnap?.exists) {

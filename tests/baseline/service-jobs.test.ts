@@ -3,15 +3,29 @@
 // no provider writes are involved.
 import { test, before, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { start, type Harness } from "./harness";
+import { cpSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { start, PROJECT, type Harness } from "./harness";
 
 let h: Harness;
 let jobs: typeof import("@graffiticode-app/core/service-jobs");
+let runtime: typeof import("@graffiticode-app/core/profile/runtime");
 before(async () => {
   h = await start();
   jobs = await import("@graffiticode-app/core/service-jobs");
+  runtime = await import("@graffiticode-app/core/profile/runtime");
+  // Services come from the installation's profile (plan P4): the services
+  // fixture, at the harness's project and mock hosts.
+  const dir = mkdtempSync(join(tmpdir(), "profile-services-"));
+  cpSync(new URL("../../packages/core/test/fixtures/installation-services", import.meta.url).pathname, dir, { recursive: true });
+  const p = JSON.parse(readFileSync(join(dir, "profile.json"), "utf8"));
+  p.installation.project = PROJECT;
+  Object.assign(p.hosts, { api: process.env.NEXT_PUBLIC_GC_API_URL, auth: process.env.NEXT_PUBLIC_GC_AUTH_URL, console: process.env.CONSOLE_URL });
+  writeFileSync(join(dir, "profile.json"), JSON.stringify(p));
+  runtime.loadInstallation({ ...process.env, PROFILE_DIR: dir });
 });
-after(async () => { await h?.stop(); });
+after(async () => { runtime?.resetInstallation(); await h?.stop(); });
 beforeEach(async () => { await h.resetFirestore(); });
 
 const HOUR = 60 * 60_000;

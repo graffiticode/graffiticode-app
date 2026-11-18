@@ -9,7 +9,7 @@
 import { coreConfig } from "./config.js";
 import { effectiveProtocol } from "./generation-protocol.js";
 import { getAccessToken } from "./lib/gcp-token.js";
-import { getFreePlanCredentials } from "./lib/free-plan-context.js";
+import { freePlanEnabled, getFreePlanCredentials } from "./lib/free-plan-context.js";
 
 export type Readiness = { ok: boolean; effectiveProtocol: number | null; minProtocol: number | null; checks: Record<string, string> };
 
@@ -54,7 +54,8 @@ export async function coreReadiness({ queue = true, freePlan = true }: { queue?:
       if (!granted.includes("cloudtasks.tasks.create")) throw new Error("cannot create tasks on the generation queue");
     });
   }
-  if (freePlan) {
+  // Trial credentials are needed only where anonymous use is allowed.
+  if (freePlan && freePlanEnabled()) {
     await check(checks, "freePlan", async () => { await getFreePlanCredentials(); });
   }
   const p = protocol as Awaited<ReturnType<typeof effectiveProtocol>> | null;

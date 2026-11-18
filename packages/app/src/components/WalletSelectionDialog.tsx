@@ -4,6 +4,7 @@ import { Fragment, useState, useEffect } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import { CheckIcon } from "@heroicons/react/20/solid";
 import { XMarkIcon } from "@heroicons/react/24/outline";
+import { usePublicConfig } from "@/lib/public-config";
 
 interface Wallet {
   name: string;
@@ -31,6 +32,7 @@ export default function WalletSelectionDialog({
   onClose,
   onSelectWallet,
 }: WalletSelectionDialogProps) {
+  const brandName = usePublicConfig().brand.name;
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [selectedWallet, setSelectedWallet] = useState<Wallet | null>(null);
   const [loading, setLoading] = useState(true);
@@ -139,7 +141,7 @@ export default function WalletSelectionDialog({
                   ) : wallets.length === 0 ? (
                     <div className="text-sm text-gray-500">
                       No wallet detected. Please install an Ethereum wallet such as MetaMask or
-                      Coinbase. These are free to install and free to use for Graffiticode
+                      Coinbase. These are free to install and free to use for {brandName}
                       authentication.
                     </div>
                   ) : wallets.length === 1 ? (

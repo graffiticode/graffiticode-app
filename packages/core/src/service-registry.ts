@@ -1,10 +1,18 @@
-// Service registry (A2A design §4.1-4.2; execution observation plan, W6).
-// Reviewed, versioned definitions of the frontend's services. A card or tool
-// catalog is generated from the same definition the runtime uses, so a skill
-// is advertised only when it is actually available.
+// Service registry (A2A design §4.1-4.2; installations plan, P4). The
+// installation's services, from its profile: reviewed, versioned definitions
+// that select capabilities from the registry in code (capabilities.ts). A
+// tool catalog, A2A declarations and the runtime all read the same definition
+// (service-catalog.ts), so a skill is advertised only when it is available.
+//
+// What a skill can do (whether it is implemented, writes to a provider, needs
+// execution, and which authorization it requires) comes from its capability,
+// never from the profile. Without a profile there are no services.
 //
 // Public skill ids never encode a language number. Languages are an internal
 // detail of a skill and may change without changing the skill.
+import { capability, capabilityRefusal, EXECUTION_READY, withdrawnCapabilities, type CapabilityAuthorization, type OperationId } from "./capabilities.js";
+import { installedProfile } from "./profile/current.js";
+import type { ProfileService } from "./profile/schema.js";
 
 export type DeliverableKind = "content" | "integration_recipe" | "data_plan" | "operation_result";
 
@@ -12,23 +20,25 @@ export type DeliverableKind = "content" | "integration_recipe" | "data_plan" | "
 // the requested state (service-completion.ts).
 export type DeliveryState = "prepared" | "previewed" | "saved" | "planned" | "exported" | "applied";
 
+export type SkillTool = { operation: OperationId; name: string };
+
 export type SkillDefinition = {
   skillId: string;
   name: string;
   description: string;
+  // The capability it selects (capabilities.ts), and that capability's facts.
+  capability: string;
   deliverableKind: DeliverableKind;
   deliveryStates: DeliveryState[];
-  // Needs backend execution (a command or run), not just generation.
   requiresExecution: boolean;
-  // May write to a provider. Never true for a skill reachable from the
-  // write-free MCP authoring tools.
   externalWrites: boolean;
-  // A handler exists in this codebase. A definition must not advertise a skill
-  // merely because a planning language describes the operation.
   implemented: boolean;
+  authorization: CapabilityAuthorization;
   examples: string[];
   // Internal: languages the skill may generate. Not part of any public id.
   languages: string[];
+  // The operations it exposes, as tools.
+  tools: SkillTool[];
 };
 
 export type ServiceLimits = {
@@ -49,122 +59,71 @@ export type ServiceDefinition = {
   limits: ServiceLimits;
 };
 
-const DAY = 24 * 60 * 60_000;
-
-export const LEARNOSITY_AUTHORING: ServiceDefinition = {
-  serviceId: "learnosity-assessment-authoring",
-  version: 1,
-  name: "Learnosity Assessment Authoring",
-  responsibility: "Create and revise assessment content, validate it, provide previews, and (when enabled) save an explicitly selected revision through an authorized connection.",
-  exclusions: ["learner delivery", "reporting", "bulk data operations", "unrestricted item bank administration"],
-  limits: { deadlineMs: 45 * 60_000, retryWindowMs: 30 * DAY, maxGenerationAttempts: 3 },
-  skills: [
-    {
-      skillId: "author_content",
-      name: "Author assessment content",
-      description: "Create or revise questions, scoring, feedback and activities, validated and previewable. Never writes to an item bank.",
-      deliverableKind: "content",
-      deliveryStates: ["prepared", "previewed"],
-      requiresExecution: false,
-      externalWrites: false,
-      implemented: true,
-      examples: ["Five multiple-choice questions on photosynthesis for grade 7, with feedback."],
-      languages: ["0176"],
-    },
-    {
-      skillId: "plan_authoring_integration",
-      name: "Plan an authoring integration",
-      description: "A host-neutral recipe for embedding Learnosity's authoring UI. Requires real deployment facts.",
-      deliverableKind: "integration_recipe",
-      deliveryStates: ["prepared"],
-      requiresExecution: false,
-      externalWrites: false,
-      implemented: true,
-      examples: ["How do I embed the item editor restricted to multiple-choice questions?"],
-      languages: ["0177"],
-    },
-    {
-      skillId: "save_revision",
-      name: "Save a revision to an item bank",
-      description: "Save an explicitly selected, validated revision through an authorized connection.",
-      deliverableKind: "content",
-      deliveryStates: ["saved"],
-      requiresExecution: true,
-      externalWrites: true,
-      // M1b: needs service bounds (plan D-3) and the save head (D-5).
-      implemented: false,
-      examples: ["Save the current revision to the Science bank."],
-      languages: ["0176"],
-    },
-  ],
-};
-
-export const LEARNOSITY_DATA: ServiceDefinition = {
-  serviceId: "learnosity-data-operations",
-  version: 1,
-  name: "Learnosity Data Operations",
-  responsibility: "Plan, and when enabled execute, bounded reads, exports, transformations and migrations of assessment records.",
-  exclusions: ["content authoring", "learner delivery", "unbounded administration"],
-  limits: { deadlineMs: 45 * 60_000, retryWindowMs: 30 * DAY, maxGenerationAttempts: 3 },
-  skills: [
-    {
-      skillId: "plan_data_job",
-      name: "Plan a data job",
-      description: "A recipe stating the operation, prerequisites, paging, write semantics, gotchas and verification. No live provider operation occurs.",
-      deliverableKind: "data_plan",
-      deliveryStates: ["planned"],
-      requiresExecution: false,
-      externalWrites: false,
-      implemented: true,
-      examples: ["Plan an export of all sessions for activity X, all pages."],
-      languages: ["0178"],
-    },
-    ...["query_records", "export_records", "migrate_records"].map((skillId): SkillDefinition => ({
-      skillId,
-      name: skillId.replace("_", " "),
-      description: "Executes against a provider. Not yet available.",
-      deliverableKind: "operation_result",
-      deliveryStates: skillId === "export_records" ? ["exported"] : ["applied"],
-      requiresExecution: true,
-      externalWrites: skillId === "migrate_records",
-      // M3: needs durable runs (plan W2-W5).
-      implemented: false,
-      examples: [],
-      languages: ["0188"],
-    })),
-  ],
-};
-
-const DEFINITIONS = new Map<string, ServiceDefinition>(
-  [LEARNOSITY_AUTHORING, LEARNOSITY_DATA].map(d => [d.serviceId, d]),
-);
-
-export function serviceDefinition(serviceId: string): ServiceDefinition | null {
-  return DEFINITIONS.get(serviceId) ?? null;
+// A profile's service, with each skill's facts taken from its capability. A
+// skill naming an unknown capability is unavailable (the validator refuses
+// such a profile; this never trusts that it ran).
+export function definitionFromProfile(s: ProfileService): ServiceDefinition {
+  return {
+    serviceId: s.serviceId,
+    version: s.version,
+    name: s.name,
+    responsibility: s.responsibility,
+    exclusions: s.exclusions ?? [],
+    limits: s.limits,
+    skills: s.skills.map((k): SkillDefinition => {
+      const c = capability(k.capability);
+      return {
+        skillId: k.skillId,
+        name: k.name,
+        description: k.description,
+        capability: k.capability,
+        deliverableKind: k.deliverableKind,
+        deliveryStates: k.deliveryStates,
+        requiresExecution: c?.requiresExecution ?? true,
+        externalWrites: c?.externalWrites ?? true,
+        implemented: c?.implemented ?? false,
+        authorization: c?.authorization ?? "connection",
+        examples: k.examples ?? [],
+        languages: k.languages,
+        tools: k.tools ?? (c?.operations.some(o => o.op === "create") ? [{ operation: "create", name: k.skillId }] : []),
+      };
+    }),
+  };
 }
 
 export function listServices(): ServiceDefinition[] {
-  return [...DEFINITIONS.values()];
+  return (installedProfile()?.profile.services ?? []).map(definitionFromProfile);
+}
+
+export function serviceDefinition(serviceId: string): ServiceDefinition | null {
+  return listServices().find(d => d.serviceId === serviceId) ?? null;
 }
 
 export type SkillContext = {
-  // Skills switched on by deployment configuration. Absent: every implemented skill.
-  enabled?: ReadonlySet<string>;
-  // Backend execution is ready for this deployment (M1b and later).
+  // Backend execution is ready for this deployment. Default: this release's.
   executionReady?: boolean;
+  // Capabilities an operator has withdrawn. Default: CAPABILITIES_WITHDRAWN.
+  withdrawn?: ReadonlySet<string>;
   // The caller is authorized to use the skill.
   authorized?: boolean;
 };
 
-// Skill availability is the intersection of an implemented handler, ready
-// dependencies, deployment configuration and caller authorization.
-export function skillAvailable(def: ServiceDefinition, skillId: string, ctx: SkillContext = {}): boolean {
+// Why a skill can't start new work, or null if it can: the intersection of a
+// selected skill, an implemented capability, ready dependencies, the
+// operator's switch and caller authorization.
+export function skillRefusal(def: ServiceDefinition, skillId: string, ctx: SkillContext = {}): string | null {
   const skill = def.skills.find(s => s.skillId === skillId);
-  if (!skill || !skill.implemented) return false;
-  if (skill.requiresExecution && !ctx.executionReady) return false;
-  if (ctx.enabled && !ctx.enabled.has(skillId)) return false;
-  return ctx.authorized !== false;
+  if (!skill) return `skill ${skillId} isn't offered by ${def.serviceId}`;
+  const c = capability(skill.capability);
+  if (!c) return `skill ${skillId} names an unknown capability`;
+  const refusal = capabilityRefusal(c, { executionReady: ctx.executionReady ?? EXECUTION_READY });
+  if (refusal) return `skill ${skillId}: its capability is ${refusal}`;
+  if ((ctx.withdrawn ?? withdrawnCapabilities()).has(c.id)) return `skill ${skillId}: its capability ${c.id} has been withdrawn`;
+  if (ctx.authorized === false) return `skill ${skillId} isn't available to this caller`;
+  return null;
 }
+
+export const skillAvailable = (def: ServiceDefinition, skillId: string, ctx: SkillContext = {}) => skillRefusal(def, skillId, ctx) === null;
 
 export function availableSkills(def: ServiceDefinition, ctx: SkillContext = {}): SkillDefinition[] {
   return def.skills.filter(s => skillAvailable(def, s.skillId, ctx));

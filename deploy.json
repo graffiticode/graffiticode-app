@@ -58,6 +58,7 @@
         }
       ],
       "env": {
+        "GOOGLE_CLOUD_PROJECT": "graffiticode-app",
         "GENERATION_PROTOCOL": "v2",
         "FREE_PLAN_UID": "4b7045a1d379c4bfc98a3f036931afd0a82ffeed",
         "ANTHROPIC_FEDERATION_RULE_ID": "fdrl_015e3sipxUnp5R2KC9Cpkng5",
@@ -145,6 +146,7 @@
         }
       ],
       "env": {
+        "GOOGLE_CLOUD_PROJECT": "graffiticode-app",
         "GRAFFITICODE_BACKEND": "core",
         "GENERATION_PROTOCOL": "v2",
         "GENERATION_JOB_URL": "https://console-cfdwwd7ega-uc.a.run.app/api/generate-job",
@@ -215,7 +217,9 @@
           ]
         }
       ],
-      "env": {},
+      "env": {
+        "GOOGLE_CLOUD_PROJECT": "graffiticode-app"
+      },
       "secrets": {
         "INTERNAL_API_KEY": "INTERNAL_API_KEY:2",
         "PRIVY_APP_SECRET": "PRIVY_APP_SECRET:1"
@@ -270,6 +274,7 @@
         }
       ],
       "env": {
+        "GOOGLE_CLOUD_PROJECT": "graffiticode-app",
         "OPENAPI_PUBLIC_URL": "https://openapi.graffiticode.org/v1",
         "GENERATION_PROTOCOL": "v2",
         "GRAFFITICODE_CONSOLE_URL": "https://console-cfdwwd7ega-uc.a.run.app/api",

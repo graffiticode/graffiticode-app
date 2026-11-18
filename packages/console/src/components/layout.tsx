@@ -1,7 +1,5 @@
-import Head from 'next/head';
 import Image from 'next/image';
 import { Fragment, useEffect, useState } from 'react';
-import logo from '@/images/logos/logo.png';
 import { Disclosure, Menu, Transition } from '@headlessui/react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -14,11 +12,14 @@ import {
 } from '@heroicons/react/24/outline'
 import { ChevronDownIcon } from '@heroicons/react/20/solid'
 import SignIn from '../components/SignIn'
-import { getTitle, getPageTitle } from '../lib/utils';
+import { usePublicConfig } from '../lib/public-config';
+import { useCatalogDomain } from '../lib/catalog';
 
+// The installation's image at its fixed URL (served by api/brand-image), and its name.
 export function Logo(props) {
+  const { brand } = usePublicConfig();
   return (
-    <Image src={logo} alt='Graffiticode logo' width={30} height={30} unoptimized />
+    <Image src="/logo.png" alt={`${brand.name} logo`} width={30} height={30} unoptimized />
   );
 }
 
@@ -49,20 +50,8 @@ export default function Layout({ children, language, setLanguage, mark, setMark 
   const { user } = useGraffiticodeAuth();
   const router = useRouter();
   const pathName = router.pathname.split('/').filter(Boolean)[0] || '';
-  const queryDomain = router.query.domain;
-  const queryDomainStr = Array.isArray(queryDomain) ? queryDomain[0] : queryDomain;
-
-  // Store domain in sessionStorage when first seen from URL
-  if (queryDomainStr && typeof window !== 'undefined') {
-    sessionStorage.setItem('graffiticode:domain', queryDomainStr);
-  }
-
-  const storedDomain = typeof window !== 'undefined' ? sessionStorage.getItem('graffiticode:domain') : null;
-  const rawDomain = queryDomainStr || storedDomain || getTitle();
-  const domain = rawDomain.toLowerCase() === 'graffiticode' ? undefined : rawDomain;
-  useEffect(() => {
-    document.title = getPageTitle();
-  }, []);
+  // An explicitly chosen domain, else the whole offered catalog (lib/catalog.ts).
+  const domain = useCatalogDomain();
 
   // Track the last-selected item / task so the top-nav Items + Tasks links
   // jump straight to their detail URLs instead of bouncing through the index.
@@ -117,9 +106,6 @@ export default function Layout({ children, language, setLanguage, mark, setMark 
         <body class="h-full">
         ```
       */}
-      <Head>
-        <title>{getPageTitle()}</title>
-      </Head>
       <div className="min-h-full">
         <Disclosure as="nav" className="bg-gray-800 sticky top-0 z-50 shadow-lg">
           {({ open }) => (

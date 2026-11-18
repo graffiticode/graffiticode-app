@@ -2,25 +2,25 @@
  * Graffiticode GraphQL API client
  */
 
+import { installationBrand } from "@graffiticode-app/core/profile/brand";
 import { AsyncLocalStorage } from "async_hooks";
 import { FreePlanLimitError, parseFreePlanError, parseFreePlanErrorBody } from "./free-plan-limit.js";
 import { coreBackendEnabled, coreHandles, coreExecute } from "./core-backend.js";
 
-const CONSOLE_API_URL = process.env.GRAFFITICODE_CONSOLE_URL || "https://console.graffiticode.org/api";
+import { installationHosts } from "@graffiticode-app/core/profile/runtime";
 
-// Graffiticode API host. Serves language templates.
-export const API_URL = process.env.GRAFFITICODE_API_URL || "https://api.graffiticode.org";
-
-// Bare-host URLs used to construct user-facing links (claim_url, view_url)
-// surfaced on trial-mode tool responses. Distinct from CONSOLE_API_URL above,
-// which already ends in /api.
-export const CONSOLE_URL = process.env.GRAFFITICODE_CONSOLE_BASE_URL || "https://console.graffiticode.org";
-export const APP_URL = process.env.GRAFFITICODE_APP_URL || "https://app.graffiticode.org";
-
-// This server's own public MCP endpoint, quoted verbatim in the connect instructions
-// we hand users. server.ts and oauth/handlers.ts each hold their own MCP_SERVER_URL
-// copy; this reads the same env var so all three agree on the address we publish.
-export const MCP_ENDPOINT = `${process.env.MCP_SERVER_URL || "https://mcp.graffiticode.org"}/mcp`;
+// Hosts are resolved at use time, after the installation profile is loaded
+// (core/src/profile/hosts.ts), so every surface agrees on where it lives.
+// The console's API (internal wiring; ends in /api).
+const consoleApiUrl = () => installationHosts().consoleApi;
+// The API host. Serves language templates.
+export const apiUrl = () => installationHosts().api;
+// Bare hosts for user-facing links (claim_url, view_url).
+export const consoleUrl = () => installationHosts().console;
+export const appUrl = () => installationHosts().app;
+// This server's public MCP endpoint, quoted verbatim in the connect instructions
+// we hand users: the MCP resource tokens are bound to.
+export const mcpEndpoint = () => installationHosts().mcpResource;
 
 export type AuthContext =
   // `source` records how the bearer was resolved (see server.ts resolveBearer):
@@ -141,7 +141,7 @@ async function graphqlRequest<T>(
     : null;
 
   try {
-    const response = await fetch(CONSOLE_API_URL, {
+    const response = await fetch(consoleApiUrl(), {
       method: "POST",
       headers: {
         ...buildAuthHeaders(auth),
@@ -716,15 +716,16 @@ export async function warmCatalog(auth: AuthContext): Promise<void> {
 
 /** The one error list_languages surfaces: worded so a model tells the user rather than retrying. */
 class CatalogUnavailable extends Error {}
-function catalogUnavailable(err: unknown): CatalogUnavailable | FreePlanLimitError {
+export function catalogUnavailable(err: unknown): CatalogUnavailable | FreePlanLimitError {
   // A free-plan refusal is not an outage: pass it through so it reads as ours.
   if (err instanceof FreePlanLimitError) return err;
   const why = (err as Error)?.message ?? String(err);
+  const name = installationBrand().name;
   return new CatalogUnavailable(
-    "The Graffiticode language catalog is temporarily unavailable " +
+    `The ${name} language catalog is temporarily unavailable ` +
       `(${why}). This is a transient upstream problem, not a ` +
       "problem with your request. Do NOT retry list_languages — tell the user " +
-      "Graffiticode can't be reached right now and ask them to try again shortly."
+      `${name} can't be reached right now and ask them to try again shortly.`
   );
 }
 
@@ -950,7 +951,7 @@ export async function getTemplate(language: string): Promise<string | null> {
   const langId = language.replace(/^L/i, "");
   const startedAt = Date.now();
   try {
-    const response = await fetch(`${API_URL}/L${langId}/template.gc`);
+    const response = await fetch(`${apiUrl()}/L${langId}/template.gc`);
     recordUpstream(startedAt);
     if (!response.ok) return null;
     const text = await response.text();

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useAuth } from 'reactfire';
 import { signOut } from 'firebase/auth';
@@ -14,7 +13,7 @@ import ConnectAgentInstructions, {
   type ClientHost,
 } from '../components/ConnectAgentInstructions';
 import { client } from '../lib/auth';
-import { getPageTitle } from '../lib/utils';
+import { PageTitle } from '../lib/document-metadata';
 
 interface Wallet {
   name: string;
@@ -284,7 +283,7 @@ export default function Claim() {
   if (!token) {
     return (
       <>
-        <Head><title>{getPageTitle('Claim')}</title></Head>
+        <PageTitle suffix="Claim" />
         <div className="flex flex-col items-center justify-center h-[calc(100vh-100px)] px-4">
           <h1 className="text-xl font-semibold text-gray-900 mb-2">Invalid claim link</h1>
           <p className="text-sm text-gray-600 text-center max-w-sm">
@@ -299,7 +298,7 @@ export default function Claim() {
   if (user && claimed) {
     return (
       <>
-        <Head><title>{getPageTitle('Claim')}</title></Head>
+        <PageTitle suffix="Claim" />
         <div className="flex flex-col items-center justify-center min-h-[calc(100vh-100px)] px-4 py-8">
           <div className="w-full max-w-md flex flex-col">
             <h1 className="text-xl font-semibold text-gray-900 mb-1 text-center">
@@ -345,7 +344,7 @@ export default function Claim() {
     const account = user.email || user.uid;
     return (
       <>
-        <Head><title>{getPageTitle('Claim')}</title></Head>
+        <PageTitle suffix="Claim" />
         <div className="flex flex-col items-center justify-center h-[calc(100vh-100px)] px-4">
           {claiming && (
             <>
@@ -412,7 +411,7 @@ export default function Claim() {
 
   return (
     <>
-      <Head><title>{getPageTitle('Claim')}</title></Head>
+      <PageTitle suffix="Claim" />
       {/* Only one Headless UI Dialog may be open at a time: two open at the same
           z-index make the underlying one fire onClose (which here navigates to
           '/'). Closing the auth dialog when the wallet picker opens avoids that

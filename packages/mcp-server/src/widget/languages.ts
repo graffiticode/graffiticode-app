@@ -1,3 +1,5 @@
+import { installationHosts } from "@graffiticode-app/core/profile/runtime";
+import { languageServerOrigin } from "@graffiticode-app/core/profile/hosts";
 /**
  * The language registry: the single source of truth for which languages the
  * widget renders natively.
@@ -154,13 +156,15 @@ export interface FramedLanguage {
   origin: string;
 }
 
-export const FRAMED_LANGUAGES: FramedLanguage[] = [
-  { id: "L0176", origin: process.env.L0176_FORM_ORIGIN || "https://l0176.graffiticode.org" },
+// The framed languages, with each origin from the installation's language
+// server pattern; L0176_FORM_ORIGIN overrides it (wiring, for a staging form host).
+export const framedLanguages = (): FramedLanguage[] => [
+  { id: "L0176", origin: process.env.L0176_FORM_ORIGIN || languageServerOrigin(installationHosts(), "L0176") },
 ];
 
 export function framedLanguage(lang: string): FramedLanguage | undefined {
   const id = normalizeLanguageId(lang);
-  return FRAMED_LANGUAGES.find((l) => l.id === id);
+  return framedLanguages().find((l) => l.id === id);
 }
 
 /** Normalize `0166` / `l0166` / `L0166` to `L0166`. */

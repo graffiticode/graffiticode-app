@@ -1,7 +1,9 @@
 import { PrivyClient } from '@privy-io/server-auth';
 import { buildSetSsoCookie } from '@graffiticode/auth-react/server';
+import { coreConfig } from "@graffiticode-app/core/config";
 
-const AUTH_SERVICE_URL = process.env.NEXT_PUBLIC_GC_AUTH_URL || 'https://auth.graffiticode.org';
+// The installation's auth host, read at use time (core config).
+const AUTH_SERVICE_URL = () => coreConfig().authUrl;
 const AUTH_SERVICE_INTERNAL_API_KEY = process.env.AUTH_SERVICE_INTERNAL_API_KEY || process.env.INTERNAL_API_KEY || '';
 const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID || '';
 const PRIVY_APP_SECRET = process.env.PRIVY_APP_SECRET || '';
@@ -37,7 +39,7 @@ async function signInByEmail(email: string, userAgent: string | undefined): Prom
     console.warn('[email-signin/resolve] auth-service internal key not configured; returning no match');
     return null;
   }
-  const url = `${AUTH_SERVICE_URL.replace(/\/$/, '')}/linked-emails/internal/sign-in`;
+  const url = `${AUTH_SERVICE_URL().replace(/\/$/, '')}/linked-emails/internal/sign-in`;
   const res = await fetch(url, {
     method: 'POST',
     headers: {

@@ -15,21 +15,12 @@
 import { useState } from 'react'
 import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid'
 import { Combobox } from '@headlessui/react'
-import { getTitle } from '../lib/utils';
-import { LANGUAGES, selectLanguages as selectLangs, findLanguageById, type Language } from '@graffiticode-app/core/lib/languages';
+import { useCatalog, type Language } from '../lib/catalog';
+
+export type { Language };
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
-}
-
-export function findLanguageByNumber(num: string): Language | undefined {
-  return findLanguageById(num);
-}
-
-// The console lists languages newest first (descending id). Sorted here, not in
-// core's selectLanguages, so the MCP catalog order (listLanguages) is unchanged.
-export function selectLanguages(domain?: string): Language[] {
-  return [...selectLangs(domain)].sort((a, b) => b.id.localeCompare(a.id));
 }
 
 interface LanguageSelectorProps {
@@ -40,6 +31,8 @@ interface LanguageSelectorProps {
 
 export default function LanguageSelector({ domain, language, setLanguage }: LanguageSelectorProps) {
   const [query, setQuery] = useState('')
+  // The installation's catalog, newest first (lib/catalog).
+  const { selectLanguages } = useCatalog();
   const domainLanguages = selectLanguages(domain);
   // Normalize the query to ensure it has the leading "L" if it's just numbers
   const normalizedQuery = query && /^\d+$/.test(query) ? `L${query}` : query;

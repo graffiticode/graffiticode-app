@@ -1,184 +1,84 @@
-# Artcompiler A2A services and Learnosity agents
+# Artcompiler Learnosity service contracts and A2A/MCP profile
 
-Status: Draft for review  
-Date: November 11, 2026  
+Status: Draft for review\
+Date: November 11, 2026\
+Updated: November 17, 2026\
+Scope: Artcompiler's Learnosity services, implemented by an installation of `graffiticode-app`\
 Basis: [MCP/A2A design brief](./mcp-a2a-design-brief.md)
 
 ## 1. Decision
 
-**Artcompiler builds and operates specialized micro-agents. Graffiticode supplies the platform for the controlled execution of their work and inspection of the results.**
+**Artcompiler builds and operates specialized services using the shared `graffiticode-app` frontend and the Graffiticode execution backend.**
 
-Each Artcompiler service accepts responsibility for a bounded outcome. Artcompiler is responsible for the service's domain expertise, generated work, and completion contract. Its micro-agents use Graffiticode's shared intent translation, language composition, generation, compilation, execution, capability enforcement, and result inspection mechanisms. A2A and MCP are interfaces to these Artcompiler services.
+Artcompiler owns the services' domain responsibilities, requested deliverables, completion requirements, and customer-facing presentation. The shared frontend implements intent translation, language selection and composition, generation, validation, service jobs, and protocol adapters. The backend supplies controlled compilation, interpretation, capability enforcement, and execution evidence.
 
 For Learnosity, define two services:
 
 - **Assessment Authoring:** create and revise assessment content, validate it, provide previews, and eventually save an explicitly selected revision through an authorized connection.
 - **Data Operations:** plan and eventually execute bounded reads, exports, transformations, and migrations of assessment records and collections.
 
-Expose two A2A Agent Cards and initially one **Artcompiler for Learnosity** MCP endpoint with two bounded toolsets. Keep the existing general Graffiticode MCP product and its no-external-writes contract intact. The proposed Learnosity MCP endpoint is a distinct product surface; adding it does not silently add writes to existing tools.
+Expose two A2A Agent Cards and initially one **Artcompiler for Learnosity** MCP endpoint with two bounded toolsets. Graffiticode's general-purpose MCP interface retains its existing no-external-writes contract.
 
-Define service scope, execution contracts, and verification once. Both adapters call these definitions directly. An A2A request does not need an additional model that forwards it through MCP.
-
-The initial release offers only capabilities that can be demonstrated end to end. Data-job recipes can ship before data execution; a recipe is a completed planning deliverable, never evidence of a completed provider operation.
+This document owns Artcompiler's product and service contracts. The [shared service architecture](./graffiticode-a2a-design.md) owns the runtime, authorization, job lifecycle, outcomes, recovery, and A2A/MCP translation rules. The [installations plan](./installations-plan.md) defines deployment and profile boundaries. Their implementation order and gates are referenced in §12.
 
 ## 2. Goals and boundaries
 
-The general architecture must support additional Artcompiler domains without rebuilding authentication, job tracking, clarification, artifact delivery, or recovery. A new service should primarily supply its supported intents, language constraints, provider operations, and completion validators.
+Artcompiler supplies maintained Learnosity expertise, useful generated work, bounded provider operations, and evidence that the requested deliverable is complete. A planning recipe can be a completed service deliverable before provider execution is available; it never proves a live operation occurred.
 
-Artcompiler earns delegation by supplying maintained capability: appropriate generation, reliable execution, constrained provider access, and evidence of the outcome. A2A itself does not make the underlying work more intelligent or reliable.
+Authorized customers must be able to inspect the selected revision or plan, validation findings, artifacts, and provider evidence. Machine-checked validity, pedagogical quality judgments, and requested human review remain distinct.
 
-The micro-agents exist to do useful work that is **secure, transparent, and accessible**:
+Learner delivery, human-facing reporting, and unrestricted Learnosity administration are outside the initial scope. Embedding Learnosity's authoring UI is an authoring integration-planning skill when supported by an implemented capability; it does not require a third public agent identity.
 
-- **Secure:** Artcompiler defines each service's scope; execution is constrained by that scope, the caller's grants, and connection policy, with protected operations enforced by policy and broker.
-- **Transparent:** authorized users can inspect the selected revision or plan, output artifacts, validation results, provenance, and provider evidence where applicable. Uncertainty and incomplete outcomes remain visible.
-- **Accessible:** clients can discover and use supported capabilities through A2A and MCP, obtain clarification when needed, and retrieve usable results through documented contracts.
+Public identities group coherent responsibilities. They need not correspond one to one with languages, models, internal agents, or deployments. Cross-service workflows are explicit compositions under the shared runtime (§10.4).
 
-An Artcompiler micro-agent is defined here by its bounded responsibility and observable results. Internal composition and delegation are implementation choices. This design does not require one model, language, internal micro-agent, or deployment per public agent. It does not introduce a general autonomous multi-agent scheduler. Cross-service workflows begin as explicit compositions with recorded child jobs and authority boundaries.
+## 3. Installation and implementation boundary
 
-Learner delivery, human-facing reporting, and unrestricted Learnosity administration are outside the initial service scope. Embedding Learnosity's authoring UI is an authoring integration-planning skill when supported by a current language; it does not require a third public identity.
+Artcompiler runs the same frontend release as other installations, with its own application database, billing configuration, queues, storage, and credentials under the [installations plan](./installations-plan.md#context). The profile lives in an external, versioned repository. `artcompiler-app` is superseded by this installation model.
 
-## 3. Current foundation and implementation gaps
+The profile supplies branding, legal content, public hosts, service and skill definitions, allowed languages, supported deliverables, limits, and protocol exposure. It selects registered capabilities and their supported parameters. Capability handlers, validator implementations, tier behavior, and security enforcement remain code in the shared release. New behavior requires an implemented capability before a profile can select it.
 
-This section describes repository evidence, not production deployment status.
+The [Learnosity skill](../packages/skills/learnosity/SKILL.md) distinguishes content authoring, authoring-UX integration recipes, and data-job recipes. Its recipe capability does not hold provider credentials or execute data jobs. Advertised execution requires the corresponding frontend handlers and backend operations to be implemented, authorized, and verified.
 
-The app already has a shared domain package, [`packages/core`](../packages/core/package.json), used by protocol-facing code. Its generation lifecycle provides durable job envelopes, leases, recovery, revision checks, version records, and effect intents. See [`generation-jobs.ts`](../packages/core/src/generation-jobs.ts), [`effects.ts`](../packages/core/src/effects.ts), and [`idempotency.ts`](../packages/core/src/idempotency.ts). Reuse these mechanisms rather than introducing a second generation engine.
+Repository code or a draft definition is not proof of production readiness. Apply the deployment and execution gates in §12 before enabling a skill.
 
-The existing MCP authoring backend passes a trusted `externalWrites: false` argument. The generation worker skips connection lookup and connection-write effects for these jobs regardless of language routing. [`core-backend.ts`](../packages/mcp-server/src/core-backend.ts) and the [baseline contract tests](../tests/baseline/mcp-no-external-writes.test.ts) make this an explicit guarantee. Existing `create_item` and `update_item` must retain it.
+## 4. Service definitions and deliverables
 
-The repository's [Learnosity skill](../packages/skills/learnosity/SKILL.md) distinguishes content authoring, authoring-UX integration recipes, and data-job recipes. In particular, the data-job language does not hold credentials or call Learnosity. Existing generation cannot be relabeled as a data execution service.
+Use the shared [service-definition contract](./graffiticode-a2a-design.md#42-service-definition) and [normalized request/result contract](./graffiticode-a2a-design.md#43-normalized-request-and-result). Artcompiler's versioned definitions select implemented capabilities, constrain their languages and resources, and parameterize registered completion validators for these deliverables:
 
-Connection writes and reconciliation already have app-tier integration points in [`writes.ts`](../packages/core/src/writes.ts). The [policy design as built](../packages/console/docs/capability-policy-as-built.md) describes compiler admission checks, policy snapshots, execution tokens, broker receipts, and private artifacts across companion repositories. That document contains historical branch and release caveats; it is architectural context, not proof that every prerequisite is deployed today.
+- **Content:** the selected assessment revision, validation findings, and the requested prepared, previewed, or saved delivery state (§9).
+- **Integration recipe:** a host-neutral authoring-UI integration plan, with prerequisites, verification steps, and unconfirmed bindings (§9.3).
+- **Data plan:** a bounded operation recipe that explicitly states no live provider operation occurred (§10.1).
+- **Operation result:** evidence of the requested read, export, transformation, or migration, including scope, exceptions, and verification (§10).
 
-New work includes service definitions and enforced scope attenuation, a durable service-job lifecycle above generation jobs, A2A adapters, a Learnosity-specific MCP catalog, and operation-specific execution and verification for Data Operations. Deployment readiness of policy, broker, registry, compiler, and gateway must be demonstrated before enabling provider execution.
+These requirements drive the same service definitions used by the runtime, MCP catalog, and A2A cards. Public skill IDs describe stable responsibilities rather than language numbers.
 
-## 4. General service architecture
+## 5. Product action boundaries
 
-### 4.1 Components and ownership
+Apply the shared [authorization and action boundaries](./graffiticode-a2a-design.md#5-authorization-and-action-boundaries). Artcompiler's definitions narrow each operation to its requested delivery state and selected Learnosity connection, bank, record family, and target scope.
 
-**Artcompiler service registry.** Stores reviewed, versioned service definitions. Owns stable service and skill identifiers, supported requests, allowed language compositions, maximum provider capabilities, output contracts, and completion criteria. Deployment configuration enables a subset of implemented skills.
+Preparing, revising, previewing, or planning cannot implicitly save or migrate. Saving requires an immutable selected revision, target bank, reference mapping, and overwrite policy. A migration specifies and independently authorizes source and destination. Product-specific requirements are in §9 and §10; the shared architecture governs admission, approvals, scope propagation, and enforcement.
 
-**Protocol adapters.** Authenticate requests, resolve the selected service, validate protocol payloads, and translate messages, job state, and artifacts. They own transport behavior and client compatibility. They do not contain Learnosity business logic.
+## 6. Shared job and outcome contracts
 
-**Artcompiler service runtime.** Resolves caller context, interprets the requested outcome, requests missing information, constructs a bounded plan, reserves work, and evaluates completion. The runtime may use existing generation and routing. Every resulting language and operation remains constrained by service scope.
+Artcompiler uses the shared [durable service-job contracts](./graffiticode-a2a-design.md#6-durable-service-jobs) without a separate lifecycle or persistence design. Those contracts govern identifiers, event cursors, interrupts, answer submissions, key retention, save adoption, retries, cancellation, deadlines, and observer jobs.
 
-**Graffiticode platform.** Supplies shared intent translation, language composition, generation, compilation, controlled execution, and capability enforcement machinery for Artcompiler's micro-agents. Job records, artifacts, and verification evidence support authorized inspection of the work and results. Compilation is one stage of a service job. Its successful completion alone does not prove a provider write or a complete export; Artcompiler evaluates the resulting evidence against the service's completion contract.
+Use the shared [external-outcome and service-success rules](./graffiticode-a2a-design.md#43-normalized-request-and-result). Backend evidence determines provider outcomes; registered frontend validators assess the requested Artcompiler deliverable against §9 and §10. Timeout and deadline handling comes from [shared §6.4](./graffiticode-a2a-design.md#64-retry-cancellation-and-partial-execution), including pending settlement and adopted executions.
 
-**Policy and broker.** Enforce provider access at the operation boundary and perform credentialed calls. The console remains the place for detailed connection and capability management. Artcompiler stores connection references, not provider secrets in prompts or job artifacts.
+## 7. A2A public identities
 
-**Job and artifact stores.** Persist the service-level conversation, requested deliverable, child generation jobs, execution checkpoints, results, and evidence. Workers and adapters operate against this durable state; an open HTTP stream is never its source of truth.
+Publish **Artcompiler Learnosity Assessment Authoring** and **Artcompiler Learnosity Data Operations** as distinct cards. Proposed application paths are `/agents/learnosity/authoring` and `/agents/learnosity/data`; their exact hosts and supported routing are installation choices.
 
-The request path is: adapter → Artcompiler service runtime → controlled Graffiticode execution → policy/broker operations → verification → durable, inspectable result → adapter. A card or tool catalog is generated from the same service definition used by the runtime.
+Generate cards from the same selected service definitions as the MCP catalog. Each identity describes its responsibility, currently available skills, examples, accepted inputs, expected outputs, and connection requirements. A shared host does not widen either service's scope.
 
-### 4.2 Service definition
+Discovery, protocol/SDK version pinning, submission, task retrieval, continuation, cancellation, optional streaming/push, and artifact translation follow the [shared A2A interface](./graffiticode-a2a-design.md#7-a2a-interface). The product's public identities do not introduce additional execution semantics.
 
-Each definition contains:
+## 8. MCP product surface
 
-- Stable `serviceId`, definition version, public name, responsibility, and explicit exclusions.
-- Skills with stable IDs, examples, required context, input schemas, output schemas, and deliverable kinds.
-- Allowed languages and composition rules, plus protected functions and broker operations available to each skill.
-- Supported connection backends and resource constraints, including bank and record scope where enforceable.
-- Completion validators and required evidence for each requested delivery state.
-- Limits for elapsed time, generation attempts, records, bytes, provider calls, and cost.
-- Protocol exposure settings and deployment feature gates.
+Start with one **Artcompiler for Learnosity** MCP endpoint with two bounded toolsets. Proposed authoring tools are `assessment_create_item`, `assessment_update_item`, and `assessment_preview_item`; add `assessment_save_item` only when provider execution is ready. Proposed data tools are `data_plan`, then `data_query`, `data_export`, and eventually `data_migrate` as their handlers become available.
 
-Skill availability is the intersection of implemented handlers, ready dependencies, service configuration, and caller authorization. A definition must not advertise execution merely because a planning language describes that operation.
+Shared `job_get`, `job_continue`, and `job_cancel` and any negotiated MCP Tasks support follow the [shared MCP interface](./graffiticode-a2a-design.md#8-mcp-interface-and-compatibility). Tool names and descriptions come from the profile's selected skills; annotations and available tools must match implemented behavior and current authorization.
 
-Pin the definition version for an accepted job. Recheck live authorization when work resumes and at protected operations. Version pinning preserves interpretation; it does not freeze grants after revocation.
-
-### 4.3 Normalized request and result
-
-The internal request carries `serviceId`, authenticated principal and account boundary, optional conversation and job references, intent, input artifact references, requested deliverable, connection reference, constraints, and an idempotency key. Account identity is derived from verified authentication, never accepted from message text.
-
-`deliverableKind` distinguishes `content`, `integration_recipe`, `data_plan`, and `operation_result`. An operation request further specifies its required delivery state, such as prepared, saved, or exported. These are Artcompiler domain fields, not claimed A2A standard fields.
-
-A result carries a concise summary, artifact references, scope processed, verification evidence, warnings, and unresolved exceptions. Persist an explicit external outcome such as `not_requested`, `not_started`, `applied`, `partially_applied`, or `unknown`. Never translate an unknown provider outcome into success.
-
-## 5. Authorization and action boundaries
-
-Use the brief's rule:
-
-**Effective capabilities = service scope ∩ console grants ∩ connection policy.**
-
-For each operation, narrow this further to the requested action and target resources. A preview request remains unable to save even if the principal owns a connection with write permission. A Data Operations identity cannot invoke every broker operation just because the caller's connection permits them.
-
-The existing trusted `externalWrites: false` argument demonstrates a useful restriction but is not a complete service policy. Provider-enabled jobs need a trusted, server-created execution scope bound to service, job, principal, connection, permitted actions, resource limits, and policy version. Carry that binding through the execution context to policy and broker enforcement. If downstream policy cannot enforce the restriction, that execution skill remains disabled. Prompt instructions and filtered catalogs are insufficient.
-
-Resolve and bind a connection before execution. Never switch to a newly selected default connection during recovery. Check ownership or delegation, provider account, active status, and operation permissions. Authentication of a calling agent does not by itself establish authority to act for an end user; use an existing verified delegated identity or a separately scoped service principal.
-
-Calls to read, resume, cancel, or retrieve artifacts require the same account and service ownership checks as submission. Job IDs, A2A context IDs, and artifact URLs are identifiers, not grants. Public cards reveal no tenant-specific bank details. Shared contexts do not imply shared authorization.
-
-Content preparation cannot become a provider write through natural-language revision. For a write-capable service, explicit requested delivery state and permitted scope authorize the action. If connection policy requires additional approval, pause with a concrete plan identifying target bank, revision, scope, and expected changes. Existing authorization can satisfy this requirement; avoid redundant approvals. Bind any approval to the plan digest and invalidate it when material scope changes.
-
-## 6. Durable service jobs
-
-### 6.1 Distinct identifiers
-
-An **Artcompiler service job** tracks responsibility for an outcome. An **A2A task** is that job's protocol representation. An **MCP extension task**, when supported, is another representation. A **generation job** runs one generation or revision stage. A Graffiticode **Task = (lang, code)** identifies language work.
-
-Persist explicit mappings; do not overload `taskId`. A service job may reference several generation jobs, Graffiticode tasks, provider invocations, and artifacts. Protocol IDs are scoped to the relevant adapter, account, and service.
-
-### 6.2 Persistence
-
-Introduce a service-job record, provisionally `service-jobs/{jobId}`, with:
-
-- Immutable service/version, principal/account, accepted intent, deliverable, connection, limits, input digests, and creation time.
-- Mutable state and revision, deadline, cancellation request, waiting question and continuation token, and current plan revision.
-- Child-generation references, provider invocation IDs, operation checkpoints, and artifact manifests.
-- Completion or failure details, verification results, and external outcome.
-
-Persist events with monotonic per-job sequence numbers. Commit transitions and their dispatch intents atomically, then use the existing outbox/lease pattern for delivery. Generation remains in `generation-jobs`; the parent job does not copy or independently mutate its dispatch state.
-
-Do not store bearer tokens for replay. Resume work using the existing bounded grant model where applicable and current policy checks. Inputs and outputs containing assessment results require access-controlled storage, configured retention, and deletion behavior.
-
-### 6.3 Lifecycle and clarification
-
-Internal lifecycle: `accepted` → `working` → `completed` or `failed`. `working` may pause at `input_required` or `auth_required`, then resume. `rejected` describes a task-level refusal under the selected protocol; malformed or unauthenticated requests can fail before job creation. `canceled` is terminal only after work has stopped or been safely fenced.
-
-Clarification records the specific missing fact, expected answer shape, affected plan revision, and expiry. Answers must name the existing job and current question, pass ownership checks, and be applied once. Missing bank identity or deployment details must not be guessed. New requirements that change a completed deliverable create a new job linked to the same conversation.
-
-A2A maps these states through the selected SDK's task-state enum. MCP Tasks-extension execution maps to its supported states; authentication handling remains in the MCP adapter. Without the extension, return a domain job handle and use explicit status/continuation tools. Do not claim those handles are MCP protocol tasks. A status result must preserve the original requested deliverable and any unresolved external outcome.
-
-### 6.4 Retry, cancellation, and partial execution
-
-Scope idempotency to account, principal, service, operation, and client key, and bind it to an input digest. The same key and digest returns the existing job; different input is a conflict. A retry through another interface reaches the same job only when the caller explicitly supplies the shared domain key and passes ownership checks. Conversation IDs alone do not deduplicate work.
-
-Assign deterministic child-step identities and provider operation keys. Reuse them after worker crashes or lost responses. Reuse existing gateway and broker invocation/receipt semantics where available. Exactly-once external execution is not assumed.
-
-A provider timeout after submission can mean the write happened. Mark the operation unknown, reconcile using provider references and supported readback, and block blind replay. Reconciliation itself requires authorization. A new key must never be silently generated to get past an uncertain receipt.
-
-Cancellation is cooperative: stop scheduling, check cancellation between bounded operations, and report committed changes. It does not undo provider writes. Keep the job nonterminal while an in-flight effect can still commit. If an effect cannot be resolved before the job deadline, terminate as failed with external outcome unknown and preserve the reconciliation path. Compensation requires an explicit, separately authorized plan.
-
-## 7. A2A interface
-
-### 7.1 Identities, discovery, and versioning
-
-Publish **Artcompiler Learnosity Assessment Authoring** and **Artcompiler Learnosity Data Operations** as distinct cards. Proposed application paths are `/agents/learnosity/authoring` and `/agents/learnosity/data`; their exact host is a deployment decision.
-
-The cards identify the services Artcompiler builds and operates. Graffiticode is their execution and result inspection platform. Each public identity groups a coherent responsibility and its supported skills; internal languages and micro-agents do not automatically receive separate cards. An A2A endpoint is a protocol access point. The [A2A core concepts](https://a2a-protocol.org/latest/topics/key-concepts/) allow a remote agent to be an agent or agentic system, so an endpoint does not determine whether its implementation performs work directly or delegates internally.
-
-Use directly configured card URLs or a catalog to discover both identities on a shared host. The standard root `/.well-known/agent-card.json` returns a single Agent Card; do not put an Artcompiler card array there. If root discovery is required for each identity, use separate hostnames or another supported routing arrangement.
-
-Each card describes responsibility, currently enabled skills, examples, input/output media types, security requirements, and supported interfaces. Pin an A2A release and SDK together; validate cards and payloads against that release. Keep protocol version, service-definition version, and artifact-schema version separate. The current [A2A specification](https://a2a-protocol.org/latest/specification/) defines cards, task interaction, artifacts, discovery, and transport bindings; `latest` is a research link, not a deployment version pin.
-
-Start with one HTTP binding, durable task retrieval, multi-turn continuation, and cancellation. Add streaming when a target client needs it; add push after authenticated callback delivery and retry behavior are implemented. Advertise optional features only after interoperability checks. Hosting both identities together does not grant either identity the other's scope.
-
-### 7.2 Messages and artifacts
-
-Accept natural-language intent with optional structured domain input. Return messages for clarification and progress; return artifacts for deliverables. Use plain text or Markdown for recipes and summaries, JSON for structured assessment payloads and manifests, and downloadable files for exports. Preview links are optional authenticated conveniences; completion must remain understandable to clients without Graffiticode widgets.
-
-Domain artifact manifests include schema version, content type, digest, provenance, service-job ID, relevant content revision, delivery state, and verification references. Resolve artifacts through authorized retrieval or narrowly scoped expiring URLs. Do not expose language-private ASTs as a general cross-service contract; use a platform-neutral spec when moving intent between languages.
-
-## 8. MCP interface and compatibility
-
-The Learnosity-specific MCP catalog uses stable, explicit names. Proposed authoring tools are `assessment_create_item`, `assessment_update_item`, and `assessment_preview_item`; add `assessment_save_item` only after provider execution is ready. Proposed data tools are `data_plan`, then `data_query`, `data_export`, and eventually `data_migrate` as their handlers mature. Shared `job_get`, `job_continue`, and `job_cancel` cover the fallback job interface.
-
-Each tool accepts rich intent within its named purpose. Save requires an immutable content revision and selected connection. A planning call cannot execute merely because its description includes execution instructions. Migration cannot be hidden in a read tool. Tool descriptions and side-effect annotations must match actual behavior.
-
-Filter discovery by authorization, and recheck authorization at invocation. MCP supports authorization-dependent tool catalogs; grouping into two toolsets is Artcompiler configuration, with no assumption that every client exposes group toggles. See the [MCP tools specification](https://modelcontextprotocol.io/specification/2026-07-28/server/tools).
-
-Use the [MCP Tasks extension](https://github.com/modelcontextprotocol/ext-tasks/blob/main/specification/2026-07-28/tasks.md) only when negotiated and implemented. Client compatibility determines whether clarification uses elicitation, task-associated interactions, or explicit continuation. These are adapter choices over one service job.
-
-Initially deploy one Learnosity endpoint. Split it when authoring and data operations need independent installation, administration, access arrangements, distribution, or operational isolation. A client that trusts only entire connections is a concrete reason to split. Both endpoints would retain the same service IDs and execution rules.
+Split the product into separate MCP endpoints when authoring and data operations require independent customer installation, administration, access arrangements, distribution, or operational isolation. A client that trusts only entire connections is a concrete reason to split. The service IDs and shared execution contracts remain the same.
 
 ## 9. Learnosity Assessment Authoring
 
@@ -186,7 +86,7 @@ Initially deploy one Learnosity endpoint. Split it when authoring and data opera
 
 Accept subject, audience, quantity, question and activity structure, scoring intent, feedback, accessibility requirements, metadata, and requested delivery state. Use current language descriptions and scope metadata to select content authoring or integration planning; public skill IDs must not encode a remembered language number.
 
-For content, the Artcompiler micro-agent generates or revises through Graffiticode, validates structure, item/activity references, scoring configuration, and requested content constraints, and provides a preview where available. Separate machine-checked validity from pedagogical quality judgments and any requested human review. A successful render does not prove the scoring model or all requested restrictions are correct.
+For content, the frontend micro-agent generates or revises language-specific code and uses the backend to compile and interpret it. The frontend evaluates structure, item/activity references, scoring configuration, and requested content constraints using the available validators and backend evidence, and provides a preview where available. Separate machine-checked validity from pedagogical quality judgments and any requested human review. A successful render does not prove the scoring model or all requested restrictions are correct.
 
 Content stages are:
 
@@ -198,15 +98,15 @@ Complete against the requested stage. If the caller requested a save, preparatio
 
 ### 9.2 Save execution
 
-Prepare and validate with writes disabled. Bind save to the immutable generated artifact, target connection/bank, reference mapping, overwrite policy, and requested state. Execute the reviewed operation through policy and broker, persist the receipt, and verify the resulting references and content where provider support permits. Any generation after review produces a new revision requiring renewed validation and action binding.
+Prepare and validate with writes disabled. The frontend binds save to the immutable generated artifact, target connection/bank, reference mapping, overwrite policy, and requested state. The backend executes the reviewed operation through policy and broker and records the receipt. The frontend uses that evidence and supported readback to verify the resulting references and content. Any generation after review produces a new revision requiring renewed validation and action binding.
 
 Use optimistic concurrency for revisions and provider preconditions where available. When provider conditional writes are unavailable, declare the concurrency limitation and avoid claiming atomic overwrite protection.
 
-Do not reuse the console's automatic write-through behavior as an implicit consequence of authoring. The service's provider action must be an explicit, constrained stage. Add tests showing that an instruction to save inside a create, revise, or preview request still cannot write.
+Do not reuse the frontend console's automatic write-through behavior as an implicit consequence of authoring. The service's provider action must be an explicit, constrained stage. Add tests showing that an instruction to save inside a create, revise, or preview request still cannot write.
 
 ### 9.3 Authoring integration planning
 
-When a supported language models embedding an item editor, browser, or activity editor, produce a host-neutral recipe. Require actual deployment facts such as serving domain, author identity, bank, and relevant references. Preserve the backend's confidence statements and unconfirmed vendor bindings.
+When a supported language models embedding an item editor, browser, or activity editor, the frontend produces a host-neutral recipe using that language. Require actual deployment facts such as serving domain, author identity, bank, and relevant references. Preserve confidence statements and unconfirmed vendor bindings carried in the recipe and validation results.
 
 A recipe completes the integration-planning job. An editor loading successfully does not establish that configuration-driven restrictions took effect; implementation verification should compare behavior with and without the relevant configuration. Keep unconfirmed restrictions visible in the deliverable.
 
@@ -216,7 +116,7 @@ A recipe completes the integration-planning job. An editor loading successfully 
 
 Initially expose `plan_data_job` using the existing recipe capability. The deliverable states the intended operation, prerequisites, paging, write semantics, gotchas, and verification procedure. It explicitly says no live provider operation occurred.
 
-Introduce `query_records`, `export_records`, and `migrate_records` only as broker-backed handlers are implemented and verified. Names here are proposed service skill IDs; actual advertised coverage follows the current implementation. Do not infer support for an operation from a neighboring vendor endpoint or from a recipe's existence.
+Introduce `query_records`, `export_records`, and `migrate_records` only as the corresponding backend execution handlers are implemented, broker-enforced, and verified. Names here are proposed frontend service skill IDs; actual advertised coverage follows the current implementation. Do not infer support for an operation from a neighboring vendor endpoint or from a recipe's existence.
 
 For executable jobs, require source connection/bank, record family, references or filters, projection, paging policy, limits, consistency expectations, and destination where relevant. Writes also require merge/replace semantics, preservation rules, reference conflicts, and exception handling. A migration binds separate source and destination connections and independently authorizes each.
 
@@ -242,49 +142,39 @@ The default completion contract requires all in-scope records to satisfy the dec
 
 ### 10.4 Composition with authoring
 
-An authoring service can save its own validated revision without delegating to a separate public agent. Bulk movement of a collection belongs to Data Operations even if the records originated in authoring.
+A frontend authoring service can save its own validated revision through the backend without delegating to a separate public agent. Bulk movement of a collection belongs to Data Operations even if the records originated in authoring.
 
-A request to author content and migrate it creates an explicitly coordinated workflow: authoring produces pinned artifacts; Data Operations consumes their supported portable representation under its own authority. Preserve parent/child references and aggregate completion. Internal delegation cannot widen the caller's grants or hide a failed child behind parent success.
+A request to author content and migrate it creates an explicitly coordinated frontend workflow: authoring produces pinned artifacts; Data Operations consumes their supported portable representation under its own authority. Both services use the backend under their respective execution scopes. Preserve parent/child references and aggregate completion. Internal delegation cannot widen the caller's grants or hide a failed child behind parent success.
 
-## 11. Operational behavior and verification
+## 11. Product verification
 
-Record service/job IDs, definition version, adapter, generation references, policy decisions, operation/receipt IDs, state transitions, verification outcomes, and resource usage. Keep secrets, full prompts, assessment answers, and result payloads out of routine logs. Provide tenant-scoped audit access separately from operational metrics.
+Apply the [shared operational and failure-recovery verification](./graffiticode-a2a-design.md#11-operational-behavior-and-verification). In addition, demonstrate the Artcompiler completion contracts:
 
-Measure completion against requested delivery state, clarification rate, latency, provider errors, unknown outcomes, reconciliation age, records processed, and cost per verified outcome. Generation success alone is an insufficient service metric.
+- Prepared content satisfies the requested structure, scoring, references, and content constraints; preview and saved states have their required evidence.
+- Instructions to save inside a create, revise, or preview request cannot cause an item-bank write. Data planning cannot invoke a provider operation.
+- Integration recipes preserve unconfirmed configuration restrictions and specify how to verify them.
+- One-page reads, exhaustive reads, limit stops, and resumed exports report the actual processed scope and produce retrievable, verified artifacts.
+- Merge/replace behavior, preservation rules, reference conflicts, exclusions, and partial migrations are tested against the requested contract.
+- An authoring-and-data workflow preserves pinned artifacts and authority boundaries and cannot hide a failed child behind parent success.
+- Equivalent requests through MCP and A2A produce the same domain validation findings and completion evidence.
 
-Apply per-account and per-connection concurrency and provider rate limits. Persist deadlines and budgets. A dependency failure disables affected execution skills without preventing safe preparation or planning. Roll back an adapter or disable a skill while preserving durable jobs and their pinned definition handlers until those jobs drain or are explicitly failed.
+Use deterministic provider doubles for failure injection and isolated Learnosity banks for live provider verification. Keep production data out of these checks. Apply the minimum-field, private-artifact, and retention requirements in §10 to assessment results.
 
-Before release, demonstrate:
+## 12. Delivery dependencies
 
-- Equivalent service requests through MCP and A2A produce the same authorization decision and completion evidence.
-- Preview, content revision, and data planning cannot invoke writes, including after routing or language composition.
-- Cross-account job, context, connection, and artifact access is refused; revoked access is rechecked on resume and operation execution.
-- Lost submission responses, duplicate deliveries, worker crashes, and effect retries do not silently create fresh write invocations.
-- Clarification survives disconnects, stale answers conflict, cancellation fences further work, and unknown writes remain unresolved until reconciled.
-- One-page reads, exhausted reads, limit stops, resumed exports, replace semantics, conflicts, and partial migrations produce accurate outcomes.
-- Cards and tool catalogs advertise only ready skills; target clients handle the selected protocol version, auth, continuation, task retrieval, and artifacts.
+Implementation scheduling and readiness gates live in two plans:
 
-Use deterministic provider doubles for failure injection and isolated Learnosity banks for live execution verification. Keep production data out of these checks. The existing no-external-writes baseline remains a regression gate.
+- The [execution observation plan](https://github.com/graffiticode/graffiticode/blob/main/docs/execution-observation-plan.md) governs shared service jobs, backend observation and execution dependencies, and the A2A pilot. Its D-1 to D-6 decisions apply through the shared architecture.
+- The [installations plan](./installations-plan.md) governs external profiles, capability selection, service-tool generation, storage and authorization isolation, and deployment of the Artcompiler installation. P4 covers the generic service-tool family; P6 defines the Artcompiler acceptance deployment and its P5 prerequisites.
 
-## 12. Delivery plan
+These plans determine when preparation, planning, A2A, and individual execution skills can ship. This product document defines what each service must deliver; it does not maintain a parallel phase schedule. Recipe capability never opens an execution gate.
 
-**Phase 1 — Shared service contracts.** Add the registry, normalized requests/results, completion validators, and durable parent-job model. Integrate existing generation jobs with writes disabled. Pin portable artifact schemas and define caller identity and service-scope enforcement. Exit when service tests prove preparation and planning boundaries independently of either protocol.
+## 13. Product decisions still needed
 
-**Phase 2 — Learnosity preparation and planning.** Implement the two service configurations and the Learnosity MCP catalog for content, previews, integration recipes, and data plans. Keep provider execution absent from discovery. Exit when representative jobs complete with validation and clearly labeled deliverables through the shared runtime.
-
-**Phase 3 — A2A pilot.** Add the two cards and one selected HTTP binding for a named target client. Validate discovery, auth, durable task retrieval, clarification, cancellation, and artifacts. Exit after interoperability testing; streaming and push remain separate increments.
-
-**Phase 4 — Provider execution.** First enable explicit authoring saves and bounded read/export operations after scope enforcement, receipts, recovery, reconciliation, and live verification pass. Add transformations and migrations operation by operation. Enable each skill independently in both adapters where supported; a protocol may expose a narrower supported subset without changing service semantics.
-
-**Phase 5 — Packaging and scale.** Use customer installation and administration requirements to decide whether to split MCP endpoints. Add callback delivery, larger workflows, and further domains based on demonstrated demand and measured outcomes.
-
-## 13. Review decisions still needed
-
-- Which target A2A client and protocol/SDK release define the pilot compatibility matrix?
+- Which target A2A client and integration scenario should the Artcompiler pilot serve, under the shared protocol compatibility requirements?
 - What public hostnames, card URLs, and MCP distribution channel will Artcompiler use?
-- How will caller-agent identity map to an end-user delegation or a scoped service principal in the existing auth model?
-- What policy/broker changes are required to carry and enforce the service/job/action scope end to end, and which are deployed?
-- Which Learnosity record families and operations are the first executable Data Operations release, and what live verification is available for each?
-- What account-specific retention, size, runtime, cost, and approval policies apply to stored results and bulk writes?
+- Which Learnosity record families and operations form the first executable Data Operations release, and what live verification is available for each?
+- What customer-specific retention, size, runtime, cost, consistency, and approval requirements apply to stored results and bulk operations?
+- When do customer trust or administration requirements justify separate authoring and data MCP endpoints?
 
-These decisions gate the affected execution features. They do not prevent implementing the shared contracts, content preparation, or documentation-only planning.
+Shared identity delegation, service-scope enforcement, backend prerequisites, and protocol decisions remain in the [shared design's open decisions](./graffiticode-a2a-design.md#13-review-decisions-still-needed) and the implementation plans. Affected skills stay gated until their dependencies and product requirements are resolved.

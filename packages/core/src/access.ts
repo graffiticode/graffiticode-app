@@ -3,7 +3,8 @@ import { isFreePlanItemExpired } from "./lib/workspace-adoption.js";
 import { checkItemCreateAllowed } from "./lib/usage-service.js";
 import { emitEvent, actor } from "./lib/funnel-events.js";
 import { assertWithinDailyPace, buildMonthlyQuotaError, buildRevisionLimitError, buildScopeError, maybeAlertBudget } from "./lib/free-plan-quota.js";
-import { freePlanLanguageIds, isLanguageInFreePlanScope, isLanguageSponsored } from "./lib/languages.js";
+import { NotFoundError } from "./errors.js";
+import { freePlanLanguageIds, isLanguageInFreePlanScope, isLanguageOffered, isLanguageSponsored } from "./lib/languages.js";
 import { trialItemRevisionLimit } from "./lib/plans-config.js";
 import { db } from "./db.js";
 import type { AuthArg } from "./types.js";
@@ -49,6 +50,12 @@ export function isExpiredForFreePlan(data: any, auth: AuthArg, now = Date.now())
  * no user to notify if the check itself breaks.
  */
 export async function assertItemCreateAllowed(auth: AuthArg, lang?: string): Promise<void> {
+  // A language the installation doesn't offer can't start a new item. Existing
+  // items in it keep working, and an offered language may still compose the
+  // upstream languages it's permitted to (composesWith).
+  if (lang && !isLanguageOffered(lang)) {
+    throw new NotFoundError(`Language L${String(lang).replace(/^L/i, "")} isn't available here.`);
+  }
   if (auth.freePlan && !isLanguageInFreePlanScope(lang)) {
     throw buildScopeError(lang, freePlanLanguageIds());
   }

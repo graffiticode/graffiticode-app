@@ -5,6 +5,7 @@
  * Persists detailed metrics to Firestore for analysis and fine-tuning.
  */
 
+import { db } from "../db.js";
 import admin from "firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 
@@ -164,33 +165,17 @@ export interface RAGAnalyticsRecord {
 // Analytics service class
 export class RAGAnalyticsService {
   private static instance: RAGAnalyticsService;
-  private db: FirebaseFirestore.Firestore;
+  // The installation's Firestore, resolved on every use (storage.ts), never
+  // cached: this service is created at import, before the installation is
+  // initialized. A resolution failure throws inside each method's try/catch.
+  private get db(): FirebaseFirestore.Firestore {
+    return db();
+  }
   private collection: string = "rag_analytics";
   private activeRequests: Map<string, Partial<RAGAnalyticsRecord>>;
   private stageTiming: Map<string, StageTiming[]>;
 
   private constructor() {
-    try {
-      // Initialize Firebase Admin if needed
-      if (!admin.apps.length) {
-        admin.initializeApp();
-      }
-
-      this.db = admin.firestore();
-
-      // Enable ignoreUndefinedProperties to handle undefined values
-      // Wrap in try-catch as settings might already be set
-      try {
-        this.db.settings({ ignoreUndefinedProperties: true });
-      } catch (e) {
-        // Settings already set, ignore
-      }
-    } catch (error) {
-      console.warn("Failed to initialize Firestore for RAG Analytics:", error.message);
-      // Create a mock db that won't crash but won't persist
-      this.db = null as any;
-    }
-
     this.activeRequests = new Map();
     this.stageTiming = new Map();
   }
@@ -448,8 +433,10 @@ export class RAGAnalyticsService {
 
       // Update existing record with feedback
       const docRef = this.db.collection(this.collection).doc(requestId);
+      // Cleaned like every record: undefined fields are dropped here, not by a
+      // handle-wide setting.
       await docRef.update({
-        feedback,
+        feedback: this.cleanForFirestore(feedback),
         "metadata.hasFeedback": true,
       });
     } catch (error) {
@@ -473,7 +460,7 @@ export class RAGAnalyticsService {
       }
       const docRef = this.db.collection(this.collection).doc(requestId);
       await docRef.update({
-        judge,
+        judge: this.cleanForFirestore(judge),
         "metadata.hasJudge": true,
       });
     } catch (error) {
