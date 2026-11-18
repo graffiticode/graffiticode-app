@@ -76,6 +76,9 @@ export const LEGACY_ISSUER = "https://mcp.graffiticode.org";
 export const LEGACY_RESOURCE = "https://mcp.graffiticode.org/mcp";
 export const LEGACY_INSTALLATION_ID = "graffiticode";
 
+// The prefix of every access token the authorization server issues.
+export const ACCESS_TOKEN_PREFIX = "gcmcp_at_";
+
 // A credential is referred to by its hash wherever it's a key: in a document
 // id, in the migration contract, in a log.
 export const credentialHash = (credential: string) => createHash("sha256").update(credential).digest("hex");

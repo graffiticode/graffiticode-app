@@ -83,6 +83,7 @@ async function outcomeCall(path: string, init: RequestInit): Promise<Outcome> {
   return out;
 }
 const post = (body: unknown): RequestInit => ({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+const operator = (init: RequestInit): RequestInit => ({ ...init, headers: { ...(init.headers as Record<string, string>), "X-Migration-Operator-Key": process.env.OAUTH_MIGRATION_OPERATOR_KEY ?? "" } });
 
 export class FirestoreOAuthStore implements LegacySource {
   // ============ Generic OAuth flow record helpers (auth service) ============
@@ -344,7 +345,7 @@ export class FirestoreOAuthStore implements LegacySource {
     const migration = token.migration?.mode && token.migration?.claim_id
       ? { mode: token.migration.mode as MigrationMode, claimId: String(token.migration.claim_id) }
       : null;
-    return { revoked: token.revoked === true, migration, entry: this.mapEntry(token) };
+    return { revoked: token.revoked === true, migration, accessUsable: token.access_usable !== false, entry: this.mapEntry(token) };
   }
 
   private mapEntry(token: any): TokenEntry {
@@ -398,13 +399,15 @@ export class FirestoreOAuthStore implements LegacySource {
   }
 
   // The operator's fence; the contract suite sets it on a disposable service.
+  // The fence and the seal also need the operator's own key
+  // (OAUTH_MIGRATION_OPERATOR_KEY), which no service holds.
   async fence(installation: string): Promise<void> {
-    await contractCall("fence", post({ installation }));
+    await contractCall("fence", operator(post({ installation })));
   }
 
   // The operator's seal, which hands revocation over to the installation.
   async seal(installation: string): Promise<void> {
-    await contractCall("seal", post({ installation }));
+    await contractCall("seal", operator(post({ installation })));
   }
 
   // ==================== Shutdown ====================

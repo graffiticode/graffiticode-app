@@ -62,14 +62,16 @@ export function defineLegacyContractSuite(test: Test, harness: () => Promise<Con
 
   test("before the fence: ordinary writes work and migration operations are refused", async () => {
     await h.source.registerClient(client);
-    for (const t of Object.values(T)) await h.source.saveToken("uid", "", t);
+    // One user each: the store keeps one token per user and client.
+    for (const [n, t] of Object.entries(T)) await h.source.saveToken(`uid-${run}-${n}`, "", t);
     for (const c of Object.values(C)) await h.source.saveAuthCode(c);
     await h.source.savePendingAuth(pending);
     assert.deepEqual(await h.source.markMigrated(h.installation, tokenKey(T.a), "rotation", "early"), refused("not_fenced"));
     assert.deepEqual(await h.source.consume(h.installation, "code", credentialHash(C.a.code), "early"), refused("not_fenced"));
+    assert.deepEqual(await h.source.revoke(h.installation, tokenKey(T.a)), refused("not_fenced"));
     const read = await h.source.getTokenByRefreshToken(T.a.refresh_token!);
     assert.equal(read?.entry.access_token, T.a.access_token);
-    assert.deepEqual([read?.revoked, read?.migration], [false, null]);
+    assert.deepEqual([read?.revoked, read?.migration, read?.accessUsable], [false, null, true]);
   });
 
   test("the fence refuses every ordinary write; reads keep working", async () => {
@@ -82,7 +84,7 @@ export function defineLegacyContractSuite(test: Test, harness: () => Promise<Con
       ["saveAuthCode", () => h.source.saveAuthCode(code("late"))],
       ["markAuthCodeUsed", () => h.source.markAuthCodeUsed(C.b.code)],
       ["deleteAuthCode", () => h.source.deleteAuthCode(C.b.code)],
-      ["saveToken", () => h.source.saveToken("uid", "", token("late"))],
+      ["saveToken", () => h.source.saveToken(`uid-${run}-late`, "", token("late"))],
       ["rotateTokens", () => h.source.rotateTokens(T.b.refresh_token!, token("rotated"))],
       ["updateToken", () => h.source.updateToken(T.b.access_token, { firebase_id_token: "x" })],
       ["deleteToken", () => h.source.deleteToken(T.b.access_token)],
@@ -150,6 +152,6 @@ export function defineLegacyContractSuite(test: Test, harness: () => Promise<Con
     assert.equal((await h.source.getTokenByRefreshToken(T.e.refresh_token!))?.revoked, false, "a refused revocation leaves no mark");
     assert.deepEqual(await h.source.markMigrated(h.installation, tokenKey(T.e), "import", "claim-e"), refused("sealed"));
     assert.deepEqual(await h.source.consume(h.installation, "code", credentialHash(C.b.code), "claim-b"), refused("sealed"));
-    await assert.rejects(h.source.saveToken("uid", "", token("after-seal")), LegacyFenced, "still fenced");
+    await assert.rejects(h.source.saveToken(`uid-${run}-after-seal`, "", token("after-seal")), LegacyFenced, "still fenced");
   });
 }
