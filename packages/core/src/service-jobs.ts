@@ -25,9 +25,11 @@ import { ConflictError, NotFoundError } from "./errors.js";
 import type { JobPrincipal } from "./generation-jobs.js";
 import type { ExecutionRef, ExternalOutcome } from "./service-outcomes.js";
 import { isTerminalJobState, type CompletionVerdict, type JobState } from "./service-job-state.js";
-import { serviceDefinition, skillAvailable, type DeliverableKind, type DeliveryState, type SkillContext } from "./service-registry.js";
+import { serviceDefinition, skillRefusal, type DeliverableKind, type DeliveryState, type SkillContext } from "./service-registry.js";
+import { pinSkill, type PinnedSkill } from "./service-catalog.js";
 
-export const SERVICE_JOB_ENVELOPE_VERSION = 1;
+// 2: the envelope carries the skill's pinned definition and its digest.
+export const SERVICE_JOB_ENVELOPE_VERSION = 2;
 
 export type ServiceJobEnvelope = {
   envelopeVersion: number;
@@ -43,10 +45,21 @@ export type ServiceJobEnvelope = {
   // Correlation only: grants no access and doesn't deduplicate (A2A design §6.1).
   contextId: string | null;
   inputDigest: string;
+  // The skill's definition as it was when the job started (service-catalog.ts
+  // pinSkill), and its digest. The job is judged and continued under this,
+  // whatever the profile or registry says later.
+  definition: PinnedSkill;
+  definitionDigest: string;
+  // What was asked, as validated when the job was created: the surface and
+  // tool it came through, the operation and its normalized input. A retry
+  // resumes this, never whatever the tool means now.
+  request: ServiceJobRequest | null;
   createdAt: number;
   deadlineAt: number;
   retryWindowMs: number;
 };
+
+export type ServiceJobRequest = { surface: string; tool: string; operation: string; input: Record<string, string> };
 
 export type ServiceJobStep = {
   stepId: string;
@@ -56,8 +69,12 @@ export type ServiceJobStep = {
   // Submitted by this job, or adopted from another execution (an observer).
   owned: boolean;
   ref: ExecutionRef | null;
+  // A generation step's job, once its reservation is bound (service-runner.ts).
+  generation?: GenerationRef | null;
   createdAt: number;
 };
+
+export type GenerationRef = { itemId: string; generationId: string };
 
 export type ServiceJobStatus = {
   state: JobState;
@@ -111,6 +128,7 @@ export type CreateServiceJob = {
   // different digest is a conflict, never a replay.
   inputDigest: string;
   idempotencyKey?: string | null;
+  request?: ServiceJobRequest | null;
   skillContext?: SkillContext;
   now?: number;
   jobId?: string;
@@ -118,17 +136,25 @@ export type CreateServiceJob = {
 
 export type CreateResult = { kind: "created" | "existing"; job: ServiceJobDoc };
 
+// Admission (installations plan, P4). A request with an idempotency key whose
+// binding is live gets that job back, whatever the profile or registry says
+// now: deselecting a skill never strands a retry. Only new work is checked
+// against the current definition, the registry and the operator's switch, and
+// it starts under that definition, pinned.
 export async function createServiceJob(req: CreateServiceJob): Promise<CreateResult> {
   const now = req.now ?? Date.now();
-  const def = serviceDefinition(req.serviceId);
-  if (!def) throw new NotFoundError(`Unknown service: ${req.serviceId}`);
-  const skill = def.skills.find(s => s.skillId === req.skillId);
-  if (!skill || !skillAvailable(def, req.skillId, req.skillContext)) {
-    throw new ConflictError("skill_unavailable", `Skill ${req.skillId} is not available for ${req.serviceId}.`);
-  }
-  if (skill.deliverableKind !== req.deliverable.kind || !skill.deliveryStates.includes(req.deliverable.requestedState)) {
-    throw new ConflictError("deliverable_unsupported", `Skill ${req.skillId} does not deliver ${req.deliverable.kind}/${req.deliverable.requestedState}.`);
-  }
+  // Checked only when there is no live binding (inside the transaction).
+  const admit = () => {
+    const def = serviceDefinition(req.serviceId);
+    if (!def) throw new NotFoundError(`Unknown service: ${req.serviceId}`);
+    const refusal = skillRefusal(def, req.skillId, req.skillContext);
+    if (refusal) throw new ConflictError("skill_unavailable", `Skill ${req.skillId} is not available for ${req.serviceId}: ${refusal}.`);
+    const skill = def.skills.find(s => s.skillId === req.skillId)!;
+    if (skill.deliverableKind !== req.deliverable.kind || !skill.deliveryStates.includes(req.deliverable.requestedState)) {
+      throw new ConflictError("deliverable_unsupported", `Skill ${req.skillId} does not deliver ${req.deliverable.kind}/${req.deliverable.requestedState}.`);
+    }
+    return pinSkill(def, req.skillId)!;
+  };
 
   const jobId = req.jobId ?? randomUUID();
   const keyId = req.idempotencyKey ? serviceJobKeyId(req.scope, req.idempotencyKey) : null;
@@ -147,10 +173,11 @@ export async function createServiceJob(req: CreateServiceJob): Promise<CreateRes
         throw new ConflictError("idempotency_key_orphaned", "This idempotency key refers to a job that no longer exists.");
       }
     }
+    const pinned = admit();
     const envelope: ServiceJobEnvelope = {
       envelopeVersion: SERVICE_JOB_ENVELOPE_VERSION,
-      serviceId: def.serviceId,
-      serviceVersion: def.version,
+      serviceId: pinned.definition.serviceId,
+      serviceVersion: pinned.definition.serviceVersion,
       skillId: req.skillId,
       principal: req.principal,
       scope: req.scope,
@@ -159,9 +186,12 @@ export async function createServiceJob(req: CreateServiceJob): Promise<CreateRes
       connectionId: req.connectionId ?? null,
       contextId: req.contextId ?? null,
       inputDigest: req.inputDigest,
+      definition: pinned.definition,
+      definitionDigest: pinned.digest,
+      request: req.request ?? null,
       createdAt: now,
-      deadlineAt: now + def.limits.deadlineMs,
-      retryWindowMs: def.limits.retryWindowMs,
+      deadlineAt: now + pinned.definition.limits.deadlineMs,
+      retryWindowMs: pinned.definition.limits.retryWindowMs,
     };
     const job: ServiceJobDoc = {
       jobId,
@@ -175,10 +205,21 @@ export async function createServiceJob(req: CreateServiceJob): Promise<CreateRes
       keyId,
     };
     tx.create(serviceJobRef(jobId), job);
-    writeEvent(tx, jobId, 1, "created", { serviceId: envelope.serviceId, skillId: envelope.skillId, deliverable: envelope.deliverable }, now);
+    writeEvent(tx, jobId, 1, "created", { serviceId: envelope.serviceId, skillId: envelope.skillId, deliverable: envelope.deliverable, definitionDigest: envelope.definitionDigest }, now);
     if (keyId) tx.set(keyRef(keyId), { fingerprint: req.inputDigest, jobId, createdAt: now, expiresAt: null });
     return { kind: "created", job } as CreateResult;
   });
+}
+
+// The job a live idempotency binding refers to, for a retry that can no
+// longer be admitted (its skill was deselected since): the same key and the
+// same request get the recorded job back. A different request is refused, as
+// in createServiceJob; no binding, or an expired one, is null.
+export async function findLiveServiceJob(scope: string, key: string, inputDigest: string, { now = Date.now() } = {}): Promise<ServiceJobDoc | null> {
+  const k = (await keyRef(serviceJobKeyId(scope, key)).get()).data();
+  if (!keyLive(k, now)) return null;
+  if (k!.fingerprint !== inputDigest) throw new ConflictError("idempotency_key_mismatch", "This idempotency key was used with a different request.");
+  return readServiceJob(k!.jobId);
 }
 
 export async function readServiceJob(jobId: string): Promise<ServiceJobDoc | null> {
@@ -221,21 +262,35 @@ export async function transitionServiceJob(jobId: string, change: (job: ServiceJ
     }
     const c = change(job);
     if (!c) return job;
-    const status: ServiceJobStatus = { ...job.status, ...c.status, revision: job.status.revision + 1, updatedAt: now };
-    const events = [...(c.events ?? [])];
-    if (c.status?.state && c.status.state !== job.status.state) {
-      events.push({ type: "state_changed", data: { from: job.status.state, to: c.status.state, externalOutcome: status.externalOutcome, ...(status.detached ? { detached: status.detached } : {}) } });
+    // A job whose generation step hasn't recorded its generation may still
+    // reserve one: it ends only through the fence that revokes that authority
+    // in the same commit (service-runner.ts endUnreserved), never here.
+    if (c.status?.state && isTerminalJobState(c.status.state) && Object.values(job.steps ?? {}).some(s => s.kind === "generation" && !s.generation)) {
+      throw new ConflictError("terminal_unfenced", "This job has a step that may still reserve; it ends only through endUnreserved.");
     }
-    let seq = job.status.seq;
-    for (const e of events) writeEvent(tx, jobId, ++seq, e.type, e.data ?? {}, now);
-    status.seq = seq;
-    if (isTerminalJobState(status.state)) {
-      status.terminalAt = now;
-      if (job.keyId) tx.update(keyRef(job.keyId), { expiresAt: new Date(now + job.envelope.retryWindowMs) });
-    }
-    tx.update(serviceJobRef(jobId), { status });
-    return { ...job, status };
+    return applyTransition(tx, job, c, now);
   });
+}
+
+// The writes of one transition, inside a caller's transaction after its reads
+// (Firestore: reads before writes). The caller has checked the job isn't
+// terminal.
+export function applyTransition(tx: admin.firestore.Transaction, job: ServiceJobDoc, c: TransitionChange, now: number): ServiceJobDoc {
+  const jobId = job.jobId;
+  const status: ServiceJobStatus = { ...job.status, ...c.status, revision: job.status.revision + 1, updatedAt: now };
+  const events = [...(c.events ?? [])];
+  if (c.status?.state && c.status.state !== job.status.state) {
+    events.push({ type: "state_changed", data: { from: job.status.state, to: c.status.state, externalOutcome: status.externalOutcome, ...(status.detached ? { detached: status.detached } : {}) } });
+  }
+  let seq = job.status.seq;
+  for (const e of events) writeEvent(tx, jobId, ++seq, e.type, e.data ?? {}, now);
+  status.seq = seq;
+  if (isTerminalJobState(status.state)) {
+    status.terminalAt = now;
+    if (job.keyId) tx.update(keyRef(job.keyId), { expiresAt: new Date(now + job.envelope.retryWindowMs) });
+  }
+  tx.update(serviceJobRef(jobId), { status });
+  return { ...job, status };
 }
 
 // A step's backend key: derived from the job and step, never from an attempt
@@ -291,6 +346,29 @@ export async function bindStepExecution(jobId: string, stepId: string, ref: Exec
       "status.updatedAt": now,
     });
     return { ...step, ref };
+  });
+}
+
+// Attaches the generation a step's reservation made. Set once, like an
+// execution reference: a different one later is a conflict.
+export async function bindStepGeneration(jobId: string, stepId: string, generation: GenerationRef, { now = Date.now() } = {}): Promise<ServiceJobStep> {
+  return db().runTransaction(async (tx) => {
+    const job = (await tx.get(serviceJobRef(jobId))).data() as ServiceJobDoc | undefined;
+    const step = job?.steps?.[stepId];
+    if (!job || !step) throw new NotFoundError("Step not found.");
+    if (step.generation) {
+      if (step.generation.generationId !== generation.generationId) throw new ConflictError("step_generation_bound", "This step is already bound to a different generation.");
+      return step;
+    }
+    const seq = job.status.seq + 1;
+    writeEvent(tx, jobId, seq, "step_bound", { stepId, generation }, now);
+    tx.update(serviceJobRef(jobId), {
+      [`steps.${stepId}.generation`]: generation,
+      "status.seq": seq,
+      "status.revision": job.status.revision + 1,
+      "status.updatedAt": now,
+    });
+    return { ...step, generation };
   });
 }
 

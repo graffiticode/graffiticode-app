@@ -214,6 +214,22 @@ export const profileSchema = {
                 deliveryStates: { type: "array", minItems: 1, items: deliveryState },
                 languages: { type: "array", minItems: 1, items: { type: "string", pattern: "^[0-9]{4}$" } },
                 examples: strings,
+                // Which of the capability's operations the skill exposes, and
+                // the tool name for each (default: create, named after the
+                // skill). What an operation does stays in code.
+                tools: {
+                  type: "array",
+                  minItems: 1,
+                  items: {
+                    type: "object",
+                    additionalProperties: false,
+                    required: ["operation", "name"],
+                    properties: {
+                      operation: { enum: ["create", "revise"] },
+                      name: { type: "string", pattern: "^[a-z][a-z0-9_]{1,62}$" },
+                    },
+                  },
+                },
               },
             },
           },
@@ -322,6 +338,7 @@ export type ProfileSkill = {
   deliveryStates: DeliveryStateName[];
   languages: string[];
   examples?: string[];
+  tools?: { operation: "create" | "revise"; name: string }[];
 };
 
 export type ProfileService = {

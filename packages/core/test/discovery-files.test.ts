@@ -62,7 +62,7 @@ test("the example installation's three files agree on its brand, endpoint and to
   assert.ok(receipt.languages.includes("L0180"));
 });
 
-test("a family without handlers in this release is advertised nowhere, and reported", async () => {
+test("a family these files don't describe is advertised nowhere in them, and reported", async () => {
   const dir = variant(p => {
     p.services = [{ serviceId: "authoring", version: 1, name: "Authoring", responsibility: "Author content.",
       limits: { deadlineMs: 60000, retryWindowMs: 0, maxGenerationAttempts: 1 },
@@ -71,7 +71,7 @@ test("a family without handlers in this release is advertised nowhere, and repor
   });
   const o = out();
   const receipt = await discovery(dir, o, {} as any);
-  assert.deepEqual(receipt.omittedFamilies, [{ family: "services", reason: "no handlers in this release" }]);
+  assert.deepEqual(receipt.omittedFamilies, [{ family: "services", reason: "served at /services/mcp; these files describe the item endpoint only" }]);
   assert.deepEqual(JSON.parse(read(o, "app/.well-known/mcp.json")).tools, [...SURFACE_FAMILIES.items.tools]);
   assert.doesNotMatch(read(o, "app/llms.txt") + read(o, "skills/plugin.meta.json"), /services\/mcp|author_content/);
 });

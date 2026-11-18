@@ -1,0 +1,220 @@
+{
+  "profileVersion": 1,
+  "installation": {
+    "id": "services-example",
+    "production": false,
+    "project": "example-installation",
+    "database": "(default)"
+  },
+  "brand": {
+    "name": "Example",
+    "operator": {
+      "name": "Example Inc.",
+      "url": "https://example.test"
+    },
+    "assets": {
+      "logo": "assets/logo.png",
+      "favicon": "assets/favicon.ico",
+      "icon": "assets/icon.png"
+    },
+    "legal": {
+      "privacy": "legal/privacy.html",
+      "terms": "legal/terms.html",
+      "about": "legal/about.html"
+    },
+    "links": {
+      "product": "https://example.test",
+      "forum": "https://forum.example.test",
+      "source": "https://example.test/source",
+      "signup": "https://example.test/signup"
+    }
+  },
+  "hosts": {
+    "console": "https://console.example.test",
+    "app": "https://app.example.test",
+    "api": "https://api.graffiticode.org",
+    "auth": "https://auth.graffiticode.org",
+    "mcp": "https://mcp.example.test",
+    "openapi": "https://api.example.test",
+    "languageServer": "https://l{id}.graffiticode.org"
+  },
+  "auth": {
+    "issuer": "https://mcp.example.test",
+    "firebase": {
+      "apiKey": "example-web-key",
+      "authDomain": "example-auth.firebaseapp.com",
+      "projectId": "example-auth",
+      "appId": "1:1:web:example"
+    },
+    "privyAppId": "cexampleprivyapp000000001",
+    "resources": {
+      "mcp": "https://mcp.example.test/mcp",
+      "openapi": "https://api.example.test/v1"
+    }
+  },
+  "surfaces": {
+    "mcp": [
+      {
+        "path": "/mcp",
+        "families": [
+          "items"
+        ]
+      },
+      {
+        "path": "/learnosity/mcp",
+        "families": [
+          "services"
+        ]
+      }
+    ],
+    "rest": {
+      "enabled": true
+    }
+  },
+  "listing": {
+    "pluginName": "app-example",
+    "displayName": "Example",
+    "shortDescription": "Quizzes and more",
+    "category": "Education",
+    "author": {
+      "name": "Example Inc.",
+      "url": "https://example.test"
+    },
+    "supportUrl": "https://forum.example.test/support"
+  },
+  "copy": {
+    "mcp.robots": "copy/mcp-robots.txt",
+    "mcp.discovery.description": "copy/mcp-discovery-description.txt",
+    "mcp.instructions.lead": "copy/mcp-instructions-lead.txt",
+    "mcp.instructions.body": "copy/mcp-instructions-body.md",
+    "mcp.tool.create_item.description": "copy/mcp-tool-create-item.md",
+    "openapi.info.title": "copy/openapi-info-title.txt",
+    "openapi.info.summary": "copy/openapi-info-summary.txt",
+    "openapi.info.description": "copy/openapi-info-description.md",
+    "openapi.oauth2.description": "copy/openapi-oauth2-description.md",
+    "discovery.llms": "copy/discovery-llms.txt",
+    "discovery.app.description": "copy/discovery-app-description.txt",
+    "listing.longDescription": "copy/listing-long-description.md",
+    "listing.defaultPrompts": "copy/listing-default-prompts.txt"
+  },
+  "freePlan": {
+    "enabled": true,
+    "itemTtlHours": 48
+  },
+  "csp": {
+    "mode": "report-only"
+  },
+  "billing": {
+    "stripePublishableKey": "pk_test_example"
+  },
+  "services": [
+    {
+      "serviceId": "learnosity-assessment-authoring",
+      "version": 1,
+      "name": "Learnosity Assessment Authoring",
+      "responsibility": "Create and revise assessment content, validate it, provide previews, and (when enabled) save an explicitly selected revision through an authorized connection.",
+      "exclusions": [
+        "learner delivery",
+        "reporting",
+        "bulk data operations",
+        "unrestricted item bank administration"
+      ],
+      "limits": {
+        "deadlineMs": 2700000,
+        "retryWindowMs": 2592000000,
+        "maxGenerationAttempts": 3
+      },
+      "skills": [
+        {
+          "skillId": "author_content",
+          "name": "Author assessment content",
+          "description": "Create or revise Learnosity questions, scoring, feedback and activities, validated and previewable. Never writes to an item bank.",
+          "capability": "generate-content",
+          "deliverableKind": "content",
+          "deliveryStates": [
+            "prepared",
+            "previewed"
+          ],
+          "languages": [
+            "0176"
+          ],
+          "examples": [
+            "Five multiple-choice questions on photosynthesis for grade 7, with feedback."
+          ],
+          "tools": [
+            {
+              "operation": "create",
+              "name": "assessment_create_item"
+            },
+            {
+              "operation": "revise",
+              "name": "assessment_update_item"
+            }
+          ]
+        },
+        {
+          "skillId": "plan_authoring_integration",
+          "name": "Plan an authoring integration",
+          "description": "A host-neutral recipe for embedding Learnosity's authoring UI. Requires real deployment facts.",
+          "capability": "generate-content",
+          "deliverableKind": "integration_recipe",
+          "deliveryStates": [
+            "prepared"
+          ],
+          "languages": [
+            "0177"
+          ],
+          "examples": [
+            "How do I embed the item editor restricted to multiple-choice questions?"
+          ],
+          "tools": [
+            {
+              "operation": "create",
+              "name": "authoring_integration_plan"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "serviceId": "learnosity-data-operations",
+      "version": 1,
+      "name": "Learnosity Data Operations",
+      "responsibility": "Plan, and when enabled execute, bounded reads, exports, transformations and migrations of assessment records.",
+      "exclusions": [
+        "content authoring",
+        "learner delivery",
+        "unbounded administration"
+      ],
+      "limits": {
+        "deadlineMs": 2700000,
+        "retryWindowMs": 2592000000,
+        "maxGenerationAttempts": 3
+      },
+      "skills": [
+        {
+          "skillId": "plan_data_job",
+          "name": "Plan a data job",
+          "description": "A plan for a Learnosity Data API job (a read, export or migration): the operation, prerequisites, paging, write semantics, gotchas and verification. No live provider operation occurs.",
+          "capability": "generate-content",
+          "deliverableKind": "data_plan",
+          "deliveryStates": [
+            "planned"
+          ],
+          "languages": [
+            "0178"
+          ],
+          "examples": [
+            "Plan an export of all sessions for activity X, all pages."
+          ],
+          "tools": [
+            {
+              "operation": "create",
+              "name": "data_plan"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

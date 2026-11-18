@@ -28,6 +28,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { handleIntrospect } from "./oauth/introspection.js";
 import { coreReadiness } from "@graffiticode-app/core/readiness";
 import { coreBackendEnabled } from "./core-backend.js";
+import { assertServiceCatalogsWriteFree, handleServiceMcp, serviceSurfaces } from "./service-tools.js";
 import { copy, document, installationHosts, installationSecurityHeaders, loadInstallation, profile } from "./installation.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
@@ -1275,6 +1276,14 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     return;
   }
 
+  // The installation's service surfaces (service-tools.ts): catalogs of
+  // service-job tools generated from its profile, each at its own path.
+  const serviceSurface = serviceSurfaces().find(s => s.path === url.pathname);
+  if (serviceSurface) {
+    await handleServiceMcp(serviceSurface, req, res, extractBearerToken(req), isOAuthAccessToken);
+    return;
+  }
+
   // MCP endpoint (Streamable HTTP)
   if (url.pathname === "/mcp") {
     watchBadRequests(req, res);
@@ -1608,6 +1617,13 @@ const httpServer = createServer((req, res) => {
 // Storage is required in core mode, where this server reads and writes Firestore.
 const installationReceipt = loadInstallation(process.env, { requireStorage: coreBackendEnabled() });
 if (installationReceipt) console.log(`[installation] ${JSON.stringify(installationReceipt)}`);
+
+// Service surfaces run their jobs in-process (core mode), and none may expose
+// a skill that writes before execution is ready: fail at startup, not on a call.
+if (serviceSurfaces().length) {
+  if (!coreBackendEnabled()) throw new Error("The installation serves service tools, which need GRAFFITICODE_BACKEND=core.");
+  assertServiceCatalogsWriteFree();
+}
 
 httpServer.listen(PORT, () => {
   // A parent that started this server with an IPC channel (tests, with PORT=0)

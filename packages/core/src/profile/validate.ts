@@ -8,10 +8,11 @@
 // File checks are injected (`fileExists`) so this module does no I/O itself.
 import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
-import { capability, capabilityRefusal, EXECUTION_READY } from "../capabilities.js";
+import { capability, capabilityRefusal, EXECUTION_READY, operation } from "../capabilities.js";
+import { JOB_TOOL_NAMES } from "../service-catalog.js";
 import { platformLanguageById } from "../lib/languages.js";
 import { COMMERCIAL_TERMS_CONFIGURABLE, PLANS } from "../lib/plans-config.js";
-import { SURFACE_FAMILIES, type SurfaceFamily } from "../surfaces.js";
+import { isReservedMcpPath, SURFACE_FAMILIES, type SurfaceFamily } from "../surfaces.js";
 import { profileSchema, SUPPORTED_PROFILE_VERSIONS, type Profile } from "./schema.js";
 import { checkAsset, type AssetKind } from "./assets.js";
 
@@ -153,8 +154,14 @@ export function validateProfile(raw: unknown, opts: ValidateOptions = {}): { ok:
   p.surfaces.mcp.forEach((m, i) => {
     for (const f of m.families as SurfaceFamily[]) {
       const family = SURFACE_FAMILIES[f];
-      if (family.available && m.path !== family.path) {
+      if (family.available && family.path && m.path !== family.path) {
         problems.push({ path: `/surfaces/mcp/${i}/path`, message: `this release serves the ${f} family only at ${family.path}, not ${m.path}` });
+      }
+      if (f === "services" && isReservedMcpPath(m.path)) {
+        problems.push({ path: `/surfaces/mcp/${i}/path`, message: `${m.path} is one of the server's own routes; serve the service tools at another path` });
+      }
+      if (f === "services" && m.path === items.path) {
+        problems.push({ path: `/surfaces/mcp/${i}/path`, message: `this release serves the service tools at a path of their own, not ${items.path} (one endpoint per OAuth resource until plan P5)` });
       }
     }
   });
@@ -168,6 +175,25 @@ export function validateProfile(raw: unknown, opts: ValidateOptions = {}): { ok:
     if (servesServices && serviceIds.size === 0) problems.push({ path: `${at}/families`, message: "the \"services\" family needs at least one service" });
     for (const sid of m.services ?? []) {
       if (!serviceIds.has(sid)) problems.push({ path: `${at}/services`, message: `unknown service ${sid}` });
+    }
+    // The tools a services surface serves: one name each, never a job tool's.
+    if (servesServices) {
+      const names = new Map<string, string>();
+      for (const s of (p.services ?? []).filter(s => !m.services || m.services.includes(s.serviceId))) {
+        for (const k of s.skills) {
+          const c = capability(k.capability);
+          const tools = k.tools ?? [{ operation: "create" as const, name: k.skillId }];
+          for (const t of tools) {
+            const where = `${s.serviceId}/${k.skillId}`;
+            if (c && !operation(c, t.operation)) problems.push({ path: `${at}/families`, message: `${where}: capability ${c.id} has no ${t.operation} operation` });
+            if ((JOB_TOOL_NAMES as readonly string[]).includes(t.name)) problems.push({ path: `${at}/families`, message: `${where}: tool name ${t.name} is reserved` });
+            const prior = names.get(t.name);
+            if (prior) problems.push({ path: `${at}/families`, message: `tool name ${t.name} is used by both ${prior} and ${where}` });
+            names.set(t.name, where);
+          }
+          if (new Set(tools.map(t => t.operation)).size !== tools.length) problems.push({ path: `${at}/families`, message: `${s.serviceId}/${k.skillId}: an operation is exposed twice` });
+        }
+      }
     }
   });
 

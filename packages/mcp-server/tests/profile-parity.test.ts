@@ -241,3 +241,8 @@ test("the HTML pages carry the installation's security headers; without a profil
     assert.match(reportOnly ?? "", /frame-ancestors 'none'/, p);
   }
 });
+
+test("an installation that serves service tools needs core mode, or the server doesn't start", async () => {
+  const SERVICES = new URL("../../core/test/fixtures/installation-services", import.meta.url).pathname;
+  await assert.rejects(startServer({ PROFILE_DIR: SERVICES, GRAFFITICODE_BACKEND: "graphql" }), /server did not start/);
+});

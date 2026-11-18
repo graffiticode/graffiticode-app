@@ -1,0 +1,4 @@
+# {{brand.name}} MCP server — {{hosts.mcp}}
+
+User-agent: *
+Allow: /

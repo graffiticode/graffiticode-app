@@ -49,9 +49,13 @@ export function generateDiscoveryFiles({ profile: p, installed, copy, readFile }
   };
 
   const selected = [...new Set(p.surfaces.mcp.flatMap(m => m.families))] as SurfaceFamily[];
-  const advertisedFamilies = selected.filter(f => SURFACE_FAMILIES[f].available);
-  const omittedFamilies = selected.filter(f => !SURFACE_FAMILIES[f].available)
-    .map(family => ({ family, reason: "no handlers in this release" }));
+  const advertisedFamilies = selected.filter(f => SURFACE_FAMILIES[f].available && SURFACE_FAMILIES[f].inDiscoveryFiles);
+  const omittedFamilies = selected.filter(f => !advertisedFamilies.includes(f)).map(family => ({
+    family,
+    reason: !SURFACE_FAMILIES[family].available
+      ? "no handlers in this release"
+      : `served at ${p.surfaces.mcp.filter(m => m.families.includes(family)).map(m => m.path).join(", ")}; these files describe the item endpoint only`,
+  }));
   const derived = derivedVariables(p);
   const endpoint = derived["discovery.mcpEndpoint"];
   if (!endpoint) problems.push("no available MCP family is selected; there is no endpoint to advertise");
