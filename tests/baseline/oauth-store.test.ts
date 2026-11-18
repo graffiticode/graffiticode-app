@@ -593,6 +593,44 @@ test("an imported credential keeps the original token, resolves through both loo
   assert.ok(await store.getTokenByAccessToken(rotated.access_token));
 });
 
+test("an access token the source no longer accepts never becomes live: the import carries a fresh one", async () => {
+  const { source, local, store } = setup();
+  const t = entry();
+  source.seedToken(t, { accessUsable: false });
+  assert.equal(await store.getTokenByAccessToken(t.access_token), null, "not usable before");
+  const r = await core.migration.importInventory(store, local, source, "graffiticode");
+  assert.equal(r.imported, 1);
+  assert.equal(await store.getTokenByAccessToken(t.access_token), null, "not usable after");
+  const record = await local.getMigration(core.records.tokenKey(t));
+  assert.notEqual(record!.original!.access_token, t.access_token);
+  assert.ok(record!.original!.access_token.startsWith("gcmcp_at_"));
+  assert.equal(record!.original!.refresh_token, t.refresh_token, "the refresh token, still usable, is imported as it is");
+  assert.equal(await liveTokens(), 1);
+  // A re-run mints nothing new.
+  await core.migration.importInventory(store, local, source, "graffiticode");
+  assert.equal((await local.getMigration(core.records.tokenKey(t)))!.original!.access_token, record!.original!.access_token);
+  // The refresh token works, and yields a new pair; the old access token still doesn't.
+  const next1 = await store.rotateTokens(t.refresh_token, next());
+  assert.ok(await store.getTokenByAccessToken(next1.access_token));
+  assert.equal(await store.getTokenByAccessToken(t.access_token), null);
+  mcp.storeSel.setOAuthStore(store, "migrating");
+  try {
+    assert.equal((await mcp.handlers.resolveOAuthAccessToken(t.access_token)).status, "invalid");
+  } finally {
+    mcp.storeSel.setOAuthStore(null);
+  }
+});
+
+test("refreshing such a record through the fallback activates only the new pair", async () => {
+  const { source, store } = setup();
+  const t = entry();
+  source.seedToken(t, { accessUsable: false });
+  const pair = await store.rotateTokens(t.refresh_token, next());
+  assert.ok(await store.getTokenByAccessToken(pair.access_token));
+  assert.equal(await store.getTokenByAccessToken(t.access_token), null);
+  assert.equal(await liveTokens(), 1);
+});
+
 test("importing a revoked or already-migrated record never produces a live credential", async () => {
   const { source, local, store } = setup();
   source.seedToken(entry(), { revoked: true });

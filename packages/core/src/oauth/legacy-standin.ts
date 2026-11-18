@@ -17,7 +17,7 @@ import {
 import { credentialHash, tokenKey, type AuthorizationCode, type OAuthClient, type PendingAuth, type TokenEntry } from "./records.js";
 
 const LEGACY_INSTALLATION = "graffiticode";
-type TokenRecord = { entry: TokenEntry; revoked: boolean; migration: { mode: MigrationMode; claimId: string } | null };
+type TokenRecord = { entry: TokenEntry; uid?: string; revoked: boolean; migration: { mode: MigrationMode; claimId: string } | null; accessUsable?: boolean };
 type Consumable<T> = { record: T; consumedBy: string | null };
 type Op = "status" | "consume" | "markMigrated" | "revoke" | "inventory" | "read" | "write";
 
@@ -90,7 +90,9 @@ export class LegacyStandIn implements LegacySource {
   }
 
   // Seed a record as the store held it before the change (no fence check).
-  seedToken(entry: TokenEntry, marks: Partial<Pick<TokenRecord, "revoked" | "migration">> = {}) {
+  // `accessUsable: false`: a record whose access token no longer authenticates
+  // there (only its refresh token is reachable).
+  seedToken(entry: TokenEntry, marks: Partial<Pick<TokenRecord, "revoked" | "migration" | "accessUsable">> = {}) {
     this.tokens.set(tokenKey(entry), { entry: clone(entry), revoked: false, migration: null, ...marks });
   }
   seedClient(client: OAuthClient) {
@@ -108,7 +110,7 @@ export class LegacyStandIn implements LegacySource {
     return null;
   }
   private view(r: TokenRecord | null): LegacyToken | null {
-    return r ? { entry: r.entry, revoked: r.revoked, migration: r.migration } : null;
+    return r ? { entry: r.entry, revoked: r.revoked, migration: r.migration, accessUsable: r.accessUsable !== false } : null;
   }
 
   async status(installation: string) {
@@ -131,7 +133,12 @@ export class LegacyStandIn implements LegacySource {
       return c ? { ...c.record, used: c.record.used || !!c.consumedBy } : undefined;
     });
   }
-  getTokenByAccessToken(at: string) { return this.read(() => this.view(this.tokenBy("access_token", at))); }
+  getTokenByAccessToken(at: string) {
+    return this.read(() => {
+      const r = this.tokenBy("access_token", at);
+      return r && r.accessUsable !== false ? this.view(r) : null;
+    });
+  }
   getTokenByRefreshToken(rt: string) { return this.read(() => this.view(this.tokenBy("refresh_token", rt))); }
 
   registerClient(c: OAuthClient) { return this.write(() => void this.clients.set(c.client_id, clone(c))); }
@@ -145,12 +152,18 @@ export class LegacyStandIn implements LegacySource {
     });
   }
   deleteAuthCode(code: string) { return this.write(() => void this.codes.delete(credentialHash(code))); }
-  saveToken(_uid: string, _email: string, entry: TokenEntry) { return this.write(() => void this.seedToken(entry)); }
+  // Like the real store: one token per user and client; saving replaces it.
+  saveToken(uid: string, _email: string, entry: TokenEntry) {
+    return this.write(() => {
+      for (const [key, r] of this.tokens) if (r.uid === uid && r.entry.client_id === entry.client_id) this.tokens.delete(key);
+      this.tokens.set(tokenKey(entry), { entry: clone(entry), uid, revoked: false, migration: null });
+    });
+  }
   rotateTokens(old: string, next: TokenEntry) {
     return this.write(() => {
       const r = this.tokenBy("refresh_token", old);
       if (r) this.tokens.delete(tokenKey(r.entry));
-      this.seedToken(next);
+      this.tokens.set(tokenKey(next), { entry: clone(next), uid: r?.uid, revoked: false, migration: null });
     });
   }
   updateToken(at: string, updates: Partial<TokenEntry>) {
@@ -203,7 +216,8 @@ export class LegacyStandIn implements LegacySource {
   async revoke(installation: string, hash: string): Promise<Outcome> {
     await this.enter("revoke", [installation, hash]);
     let out: Outcome = { outcome: "applied" };
-    if (this.sealed.has(installation)) out = { outcome: "refused", reason: "sealed" };
+    if (!this.fenced.has(installation)) out = { outcome: "refused", reason: "not_fenced" };
+    else if (this.sealed.has(installation)) out = { outcome: "refused", reason: "sealed" };
     else {
       const r = installation === LEGACY_INSTALLATION ? this.tokens.get(hash) : undefined;
       if (r) r.revoked = true;

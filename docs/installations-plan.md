@@ -414,8 +414,10 @@ Commits and merges happen only when you ask.
   - **Activation order (runbook):**
     1. Deploy the auth-service half (backend sequence), and run the contract suite against a disposable instance.
     2. Deploy this release with `OAUTH_STORE=migrating` and `OAUTH_MIGRATION_VERIFIED_CONTRACT=1`. It stays legacy, because nothing is fenced.
-    3. Drain: untag or delete every MCP and REST revision older than this release, then run `npm run check:drained -- --release <this release's MCP receipt id>` until it passes.
-    4. The operator sets the fence. Instances latch: `/health` shows `oauthStore.migrating: true`.
+    3. Drain all three services, then check them; both checks must pass:
+       - MCP and REST: untag or delete every revision older than this release, then run `npm run check:drained -- --release <this release's MCP receipt id>`.
+       - Auth (the backend repo): its fence-aware release is a floor baseline, `P5-fence`, so a rollback below it is refused. Run `npm run deploy -- release-check auth` there; it fails while any auth revision older than the floor is still reachable. Older auth code doesn't know the fence and would still write. See the backend repo's `docs/oauth-store-migration.md`.
+    4. The operator sets the fence. Setting it also repairs auth's token index; if the repair fails, the fence is set but the index isn't ready, and the operator sets the fence again until it succeeds. Until then, auth answers the token operations with 503, which the store retries. Instances latch: `/health` shows `oauthStore.migrating: true`.
     5. Run `import`, then `sweep`, and `report` until only `sealed` is missing.
     6. The operator seals the source.
     7. Run `sweep` once more: it applies every revocation the source holds, and none can arrive after.

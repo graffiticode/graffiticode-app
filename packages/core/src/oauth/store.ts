@@ -82,6 +82,8 @@ const settle = async <T>(p: Promise<T>): Promise<T> => {
   }
 };
 const usable = (t: LegacyToken | null) => (t && !t.revoked && !t.migration ? t : null);
+// Through the fallback by access token: only one that still authenticates there.
+const usableAccess = (t: LegacyToken | null) => (t && t.accessUsable ? t : null);
 // Only an outcome the contract defines decides anything; any other answer is unknown.
 const decided = (x: unknown): Outcome => {
   const out = parseOutcome(x);
@@ -325,7 +327,7 @@ export class MigratingOAuthStore implements OAuthStore {
     return this.either(() => this.legacy.getTokenByAccessToken(at), async () => {
       const local = await this.local.getTokenByAccessToken(at);
       if (local) return local;
-      const t = await settle(this.source.getTokenByAccessToken(at));
+      const t = usableAccess(await settle(this.source.getTokenByAccessToken(at)));
       if (t?.migration && !t.revoked) return this.local.getTokenByAccessToken(at);
       return this.fallback(t);
     });

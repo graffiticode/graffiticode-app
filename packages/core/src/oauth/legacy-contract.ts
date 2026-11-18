@@ -16,7 +16,11 @@
 //     and whether it is sealed.
 //   - Reads keep working, fenced or not. A token read also reports the
 //     record's marks: whether it was revoked, and whether it was marked
-//     migrated (and under which claim).
+//     migrated (and under which claim). It reports each credential as usable
+//     or not: a refresh token that can't be refreshed is absent
+//     (refresh_token null), and an access token that can't authenticate is
+//     flagged (access_usable false). An importer must not make either live:
+//     a token whose access token isn't usable is imported with a fresh one.
 //   - The fence. Once an installation is fenced, the source refuses every
 //     ordinary write for it (LegacyFenced): registering, saving or deleting a
 //     pending authorization or a code, marking a code used, saving, rotating,
@@ -59,8 +63,9 @@
 //   GET  /oauth-migration/v1/inventory?installation=<id>&cursor=<c>  → { records, next }
 //   POST /oauth-migration/v1/fence         { installation }  (operator only)       → { fenced: true }
 //   POST /oauth-migration/v1/seal          { installation }  (operator only, once fenced) → { sealed: true }
-// The existing token reads (/oauth-tokens/lookup) add `revoked` and `migration`
-// ({ mode, claim_id } or null) to the token they return. Every ordinary write
+// The existing token reads (/oauth-tokens/lookup) add `revoked`, `migration`
+// ({ mode, claim_id } or null) and `access_usable` (absent means true) to the
+// token they return; inventory tokens carry the same. Every ordinary write
 // route answers 409 { error: "migration_fenced" } once the installation is
 // fenced. A 5xx or a transport failure is LegacyTransient.
 import type { AuthorizationCode, OAuthClient, PendingAuth, TokenEntry } from "./records.js";
@@ -92,6 +97,9 @@ export type LegacyToken = {
   entry: TokenEntry;
   revoked: boolean;
   migration: { mode: MigrationMode; claimId: string } | null;
+  // Whether entry.access_token still authenticates at the source. When it
+  // doesn't, nothing may make it live: an import gives the token a fresh one.
+  accessUsable: boolean;
 };
 
 export type InventoryRecord =

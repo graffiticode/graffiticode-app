@@ -25,9 +25,10 @@
 // the operator seals the source; sweep once more (it applies every
 // revocation the source holds, and none can arrive after); report says
 // fallbackRetirable; switch to local.
+import { randomBytes } from "node:crypto";
 import type { LegacySource } from "./legacy-contract.js";
 import type { LocalOAuthStore } from "./local-store.js";
-import { CredentialRefused, StoreUnavailable } from "./records.js";
+import { ACCESS_TOKEN_PREFIX, CredentialRefused, StoreUnavailable } from "./records.js";
 import type { MigratingOAuthStore } from "./store.js";
 
 export type ImportReport = {
@@ -71,7 +72,14 @@ export async function importInventory(store: MigratingOAuthStore, local: LocalOA
     }
     if (rec.token.revoked) { r.skippedRevoked++; continue; }
     if (rec.token.migration) { r.skippedMarked++; continue; }
-    const { record, created } = await local.prepareMigration(rec.key, "import", rec.token.entry);
+    // An access token that no longer authenticates at the source is never
+    // made live here: the import carries a fresh one instead, chosen once in
+    // the migration record under its claim (a re-run reuses that record). The
+    // refresh token, still usable, is imported as it is.
+    const entry = rec.token.accessUsable
+      ? rec.token.entry
+      : { ...rec.token.entry, access_token: ACCESS_TOKEN_PREFIX + randomBytes(48).toString("base64url") };
+    const { record, created } = await local.prepareMigration(rec.key, "import", entry);
     // Recorded already: done, or (after a crash) still prepared, completed here
     // under its own claim.
     if (!created && record.state !== "prepared") { r.alreadyRecorded++; continue; }
