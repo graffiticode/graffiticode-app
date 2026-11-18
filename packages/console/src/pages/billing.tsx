@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import Head from 'next/head';
 import { Tab } from '@headlessui/react';
 import {
   CreditCardIcon,
@@ -10,13 +9,13 @@ import {
 } from '@heroicons/react/24/outline';
 import { paymentsPost } from '../utils/payments-client';
 import useGraffiticodeAuth from '@graffiticode/auth-react';
-import { getPageTitle } from '../lib/utils';
 import SignIn from '../components/SignIn';
 import SubscriptionCard from '../components/payments/SubscriptionCard';
 import PricingPlans from '../components/payments/PricingPlans';
 import BillingHistory from '../components/payments/BillingHistory';
 import PaymentMethods from '../components/payments/PaymentMethods';
 import UsageMonitor from '../components/payments/UsageMonitor';
+import { PageTitle } from '../lib/document-metadata';
 
 function classNames(...classes: string[]) {
   return classes.filter(Boolean).join(' ');
@@ -96,9 +95,7 @@ export default function Billing() {
 
   return (
     <>
-      <Head>
-        <title>{getPageTitle('Billing')}</title>
-      </Head>
+      <PageTitle suffix="Billing" />
 
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">

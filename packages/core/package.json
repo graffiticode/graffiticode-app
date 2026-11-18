@@ -30,6 +30,7 @@
     "google-auth-library": "^7.14.1",
     "jose": "^4.11.4",
     "openai": "^5.12.1",
+    "pngjs": "^7.0.0",
     "stripe": "^22.3.2"
   },
   "devDependencies": {

@@ -6,7 +6,7 @@ export default function Document() {
       <Head>
         <link rel="icon" type="image/png" href="/favicon.png" />
         <link rel="apple-touch-icon" href="/logo.png" />
-        <meta name="description" content="Graffiticode - A software studio" />
+        {/* The title and description: lib/document-metadata.tsx, their one owner. */}
       </Head>
       <body className="h-full">
         <Main />

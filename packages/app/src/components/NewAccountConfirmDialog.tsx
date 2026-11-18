@@ -2,6 +2,7 @@
 
 import { Fragment } from "react";
 import { Dialog, Transition } from "@headlessui/react";
+import { usePublicConfig } from "@/lib/public-config";
 
 interface NewAccountConfirmDialogProps {
   isOpen: boolean;
@@ -22,6 +23,7 @@ export default function NewAccountConfirmDialog({
   confirming = false,
   error = null,
 }: NewAccountConfirmDialogProps) {
+  const brandName = usePublicConfig().brand.name;
   const subject = kind === "email" ? "email address" : "wallet";
   const display = kind === "wallet" ? `0x${identifier.replace(/^0x/i, "")}` : identifier;
 
@@ -57,7 +59,7 @@ export default function NewAccountConfirmDialog({
                 </Dialog.Title>
 
                 <div className="mt-4 space-y-3 text-sm text-gray-600">
-                  <p>No Graffiticode account exists for this {subject}:</p>
+                  <p>No {brandName} account exists for this {subject}:</p>
                   <p className="rounded-none bg-gray-50 px-3 py-2 font-mono text-xs break-all text-gray-800">
                     {display}
                   </p>

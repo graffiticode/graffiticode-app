@@ -2,12 +2,14 @@
 
 import { useGraffiticodeAuth } from "@graffiticode/auth-react";
 import { SignIn } from "./SignIn";
+import { usePublicConfig } from "@/lib/public-config";
 
 type Owner = { uid?: string; email?: string } | null;
 
 export function RequestAccess({ owner, signedIn }: { owner: Owner; signedIn: boolean }) {
+  const brandName = usePublicConfig().brand.name;
   const { signOut } = useGraffiticodeAuth();
-  const subject = encodeURIComponent("Access request for a Graffiticode form");
+  const subject = encodeURIComponent(`Access request for a ${brandName} form`);
   const body = encodeURIComponent(
     `Hi,\n\nCould you grant me access to this form?\n\n${typeof window !== "undefined" ? window.location.href : ""}`,
   );

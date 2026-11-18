@@ -1,17 +1,16 @@
 // Server startup (Next runs register() once, before serving any request).
 // Loads and validates the installation profile (PROFILE_DIR) and the
 // installation's storage, so an invalid profile, a host that contradicts it,
-// or a missing project stops the server instead of the first request.
-// Node only: the edge runtime has no file system. Installations plan, P3,
-// slice 1 (part 1b).
+// a missing project or an image that can't be served stops the server instead
+// of the first request; and publishes the security headers the middleware sets
+// (installations plan, P3, slices 1b and 3).
+//
+// The Node-only work lives in instrumentation-node.ts, imported only under
+// NEXT_RUNTIME === "nodejs": Next also compiles this file for the edge runtime
+// (the middleware's), and that branch is removed from the edge build.
 export async function register() {
-  if (process.env.NEXT_RUNTIME !== "nodejs") return;
-  const { ensureInstallation } = await import("@graffiticode-app/core/profile/runtime");
-  try {
-    const receipt = ensureInstallation();
-    if (receipt) console.log(`[installation] ${JSON.stringify(receipt)}`);
-  } catch (err) {
-    console.error(`[installation] ${(err as Error).message}`);
-    process.exit(1);
+  if (process.env.NEXT_RUNTIME === "nodejs") {
+    const { startInstallation } = await import("./instrumentation-node");
+    startInstallation();
   }
 }

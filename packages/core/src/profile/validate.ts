@@ -13,12 +13,15 @@ import { platformLanguageById } from "../lib/languages.js";
 import { COMMERCIAL_TERMS_CONFIGURABLE, PLANS } from "../lib/plans-config.js";
 import { SURFACE_FAMILIES, type SurfaceFamily } from "../surfaces.js";
 import { profileSchema, SUPPORTED_PROFILE_VERSIONS, type Profile } from "./schema.js";
+import { checkAsset, type AssetKind } from "./assets.js";
 
 export type ProfileProblem = { path: string; message: string };
 
 export type ValidateOptions = {
   // Checks that a file named by the profile exists in its directory.
   fileExists?: (relativePath: string) => boolean;
+  // Reads a file's bytes, to check what an asset is (profile/assets.ts).
+  readBytes?: (relativePath: string) => Uint8Array;
   executionReady?: boolean;
 };
 
@@ -172,6 +175,14 @@ export function validateProfile(raw: unknown, opts: ValidateOptions = {}): { ok:
   if (opts.fileExists) {
     for (const r of referencedFiles(p)) {
       if (!opts.fileExists(r.file)) problems.push({ path: r.path, message: `file not found: ${r.file}` });
+    }
+  }
+  // Each brand image must be an image its slot can be served as.
+  if (opts.readBytes) {
+    for (const [kind, file] of Object.entries(p.brand.assets) as [AssetKind, string | undefined][]) {
+      if (!file || (opts.fileExists && !opts.fileExists(file))) continue;
+      const checked = checkAsset(kind, opts.readBytes(file));
+      if ("problem" in checked) problems.push({ path: `/brand/assets/${kind}`, message: `${file} ${checked.problem}` });
     }
   }
 

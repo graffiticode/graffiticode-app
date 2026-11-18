@@ -10,6 +10,17 @@ const nextConfig = {
   // node_modules), so the root node_modules is not involved.
   outputFileTracingRoot: path.join(__dirname, "../.."),
   transpilePackages: ["@graffiticode/auth-react"],
+  // The brand image keeps its fixed URL, so the prerendered HTML is the same
+  // for every installation; the server answers it with the installation's
+  // image, or this build's public/icon.png without a profile
+  // (src/app/api/brand-image/[name]/route.ts). beforeFiles: ahead of public/.
+  async rewrites() {
+    return {
+      beforeFiles: [{ source: "/icon.png", destination: "/api/brand-image/icon.png" }],
+      afterFiles: [],
+      fallback: [],
+    };
+  },
   // auth-react is a file: dependency symlinked into this package's
   // node_modules. Resolve its imports from that symlinked path (this app's
   // install), not from its real location next to the repo root's

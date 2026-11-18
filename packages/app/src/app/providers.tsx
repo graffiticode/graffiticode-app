@@ -2,6 +2,7 @@
 
 import { AuthProviders } from "@graffiticode/auth-react";
 import { ConfigGate, usePublicConfig } from "@/lib/public-config";
+import { DocumentMetadata } from "@/lib/document-metadata";
 
 // Auth (Firebase/Privy/Wagmi) is inherently client-side. ConfigGate renders
 // nothing until the installation's public configuration has loaded and
@@ -19,6 +20,7 @@ function ConfiguredProviders({ children }: { children: React.ReactNode }) {
   const config = usePublicConfig();
   return (
     <AuthProviders config={{ firebase: config.auth.firebase, privyAppId: config.auth.privyAppId, authUrl: config.hosts.auth }}>
+      <DocumentMetadata />
       {children}
     </AuthProviders>
   );

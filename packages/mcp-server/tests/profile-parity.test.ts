@@ -216,3 +216,28 @@ test("the example installation's widget resource carries its name", async () => 
     await stop(child);
   }
 });
+
+test("the HTML pages carry the installation's security headers; without a profile, none, as before", async () => {
+  const csp = async (env: Record<string, string>) => {
+    const { port, child } = await startServer(env);
+    try {
+      const out: Record<string, [string | null, string | null]> = {};
+      for (const p of ["/about", "/privacy", "/terms"]) {
+        const r = await fetch(`http://localhost:${port}${p}`);
+        await r.text();
+        out[p] = [r.headers.get("content-security-policy-report-only"), r.headers.get("content-security-policy")];
+      }
+      return out;
+    } finally {
+      await stop(child);
+    }
+  };
+  const none = await csp({ PROFILE_DIR: "" });
+  for (const [p, [reportOnly, enforced]] of Object.entries(none)) assert.deepEqual([reportOnly, enforced], [null, null], p);
+  const example = await csp({ PROFILE_DIR: EXAMPLE });
+  for (const [p, [reportOnly, enforced]] of Object.entries(example)) {
+    assert.equal(enforced, null, p);
+    assert.match(reportOnly ?? "", /^default-src 'none'; style-src 'unsafe-inline'/, p);
+    assert.match(reportOnly ?? "", /frame-ancestors 'none'/, p);
+  }
+});

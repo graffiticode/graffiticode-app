@@ -8,6 +8,7 @@ import { PrivyProvider } from '@privy-io/react-auth'
 import { GraffiticodeAuthProvider, configureAuth } from "@graffiticode/auth-react";
 import { ConfigGate, usePublicConfig } from '../lib/public-config';
 import { useCatalog, useCatalogDomain } from '../lib/catalog';
+import { PageTitleProvider } from '../lib/document-metadata';
 import "../styles/globals.css";
 import "../styles/prosemirror.css";
 import GraffiticodeFirebaseProvider from '../components/GraffiticodeFirebaseProvider';
@@ -45,9 +46,11 @@ const privyConfig = {
 // until the installation's public configuration has loaded and validated.
 export default function App(props) {
   return (
-    <ConfigGate>
-      <ConfiguredApp {...props} />
-    </ConfigGate>
+    <PageTitleProvider>
+      <ConfigGate>
+        <ConfiguredApp {...props} />
+      </ConfigGate>
+    </PageTitleProvider>
   );
 }
 

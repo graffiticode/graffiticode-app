@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useThumbnailJob } from '../lib/thumbnail-jobs';
+import { usePublicConfig } from '../lib/public-config';
 
-// Thumbnails live alongside L0013's `snap` output, keyed by item id.
-const THUMBS = 'https://storage.googleapis.com/graffiticode.appspot.com/thumbnails';
+// Thumbnails live alongside L0013's `snap` output, keyed by item id, where the
+// installation's configuration says (hosts.thumbnails).
 
 // A single tile: attempts to load thumbnails/<id>.png. It stays hidden until the image loads
 // (so broken images never flash) and removes itself entirely if the image 404s. While a snapshot
 // is generating for this item it shows a spinner placeholder instead, then reloads the (possibly
 // brand-new) PNG once the job completes.
 function Tile({ item, onResolve }: { item: any; onResolve: (id: string, ok: boolean) => void }) {
+  const THUMBS = usePublicConfig().hosts.thumbnails;
   const [state, setState] = useState<'loading' | 'ok' | 'fail'>('loading');
   const [bust, setBust] = useState(0);
   const snapping = useThumbnailJob(item.id);

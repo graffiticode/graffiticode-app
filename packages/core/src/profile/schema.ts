@@ -66,7 +66,10 @@ export const profileSchema = {
         assets: {
           type: "object",
           additionalProperties: false,
-          required: ["logo", "favicon"],
+          // The icon is what the browser surfaces serve at their fixed URLs
+          // (the console's /favicon.png and /logo.png, the app's /icon.png), so
+          // every installation names one: a PNG (profile/assets.ts).
+          required: ["logo", "favicon", "icon"],
           properties: { logo: file, favicon: file, icon: file },
         },
         legal: {
@@ -97,6 +100,9 @@ export const profileSchema = {
         widgetAssets: origin,
         // A language server's origin, with {id} for the four-digit language id.
         languageServer: { type: "string", pattern: "^https?://\\S*\\{id\\}\\S*$" },
+        // Where item thumbnails are published (the platform's snapshot
+        // language writes them there), as a URL the item id is appended to.
+        thumbnails: url,
       },
     },
     auth: {
@@ -335,13 +341,13 @@ export type Profile = {
     name: string;
     tagline?: string;
     operator: { name: string; url: string; supportEmail?: string };
-    assets: { logo: string; favicon: string; icon?: string };
+    assets: { logo: string; favicon: string; icon: string };
     legal: { privacy: string; terms: string; about?: string };
     links?: { product?: string; docs?: string; forum?: string; support?: string; source?: string; signup?: string };
   };
   hosts: {
     console: string; app: string; api: string; auth: string; mcp: string;
-    openapi?: string; widgetAssets?: string; languageServer?: string;
+    openapi?: string; widgetAssets?: string; languageServer?: string; thumbnails?: string;
   };
   auth: {
     issuer: string;

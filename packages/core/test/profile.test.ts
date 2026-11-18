@@ -60,7 +60,7 @@ test("schema violations are reported together", () => {
 test("a missing asset or document is refused", () => {
   const dir = profileDir();
   rmSync(join(dir, "legal/terms.md"));
-  rmSync(join(dir, "assets/logo.svg"));
+  rmSync(join(dir, "assets/logo.png"));
   const problems = problemsOf(dir);
   assert.ok(has(problems, "/brand/legal/terms", /file not found/));
   assert.ok(has(problems, "/brand/assets/logo", /file not found/));

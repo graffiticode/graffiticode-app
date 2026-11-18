@@ -7,6 +7,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { loadPublicConfig, type PublicConfig } from "@graffiticode-app/core/profile/public-config";
 import { configFromPublic, setCoreConfig } from "@graffiticode-app/core/config";
+import { DocumentMetadata } from "./document-metadata";
 
 const PublicConfigContext = createContext<PublicConfig | null>(null);
 
@@ -38,9 +39,12 @@ export function ConfigGate({ children }: { children: ReactNode }) {
     });
     return () => { live = false; };
   }, []);
+  // The document's title and description, in every state (lib/document-metadata).
+  const metadata = <DocumentMetadata config={state.status === "ready" ? state.config : null} />;
   if (state.status === "loading") {
     return (
       <div className="flex min-h-screen items-center justify-center" data-config="loading">
+        {metadata}
         <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-900" />
       </div>
     );
@@ -48,6 +52,7 @@ export function ConfigGate({ children }: { children: ReactNode }) {
   if (state.status === "error") {
     return (
       <div className="flex min-h-screen items-center justify-center p-8" data-config="error" role="alert">
+        {metadata}
         <div className="max-w-md text-center">
           <h1 className="text-lg font-semibold text-gray-900">This site couldn&rsquo;t load its configuration</h1>
           <p className="mt-2 text-sm text-gray-600">Reload the page to try again. If it keeps happening, the site isn&rsquo;t configured correctly.</p>
@@ -56,5 +61,5 @@ export function ConfigGate({ children }: { children: ReactNode }) {
       </div>
     );
   }
-  return <PublicConfigContext.Provider value={state.config}>{children}</PublicConfigContext.Provider>;
+  return <PublicConfigContext.Provider value={state.config}>{metadata}{children}</PublicConfigContext.Provider>;
 }

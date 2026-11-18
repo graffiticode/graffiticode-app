@@ -3,6 +3,7 @@ import { Dialog, Transition } from '@headlessui/react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useVerifyEmail } from '../hooks/use-verify-email';
 import { useLinkedEmails } from '../hooks/use-linked-emails';
+import { usePublicConfig } from '../lib/public-config';
 
 interface AddEmailDialogProps {
   isOpen: boolean;
@@ -14,6 +15,7 @@ type Step = 'email' | 'code' | 'conflict';
 type ConflictReason = 'self' | 'other';
 
 export default function AddEmailDialog({ isOpen, onClose, onAdded }: AddEmailDialogProps) {
+  const brandName = usePublicConfig().brand.name;
   const verify = useVerifyEmail();
   const { checkEmail, addEmail } = useLinkedEmails();
   const [step, setStep] = useState<Step>('email');
@@ -237,7 +239,7 @@ export default function AddEmailDialog({ isOpen, onClose, onAdded }: AddEmailDia
                         <>
                           <p>
                             <span className="font-medium">{conflictEmail}</span> is already
-                            in use on another Graffiticode account.
+                            in use on another {brandName} account.
                           </p>
                           <p>
                             Only one account can use a given email. Sign in to the other

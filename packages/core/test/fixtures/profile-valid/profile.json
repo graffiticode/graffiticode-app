@@ -14,8 +14,9 @@
       "supportEmail": "support@example.test"
     },
     "assets": {
-      "logo": "assets/logo.svg",
-      "favicon": "assets/favicon.ico"
+      "logo": "assets/logo.png",
+      "favicon": "assets/favicon.ico",
+      "icon": "assets/icon.png"
     },
     "legal": {
       "privacy": "legal/privacy.md",

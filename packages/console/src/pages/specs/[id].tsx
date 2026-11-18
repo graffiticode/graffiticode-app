@@ -3,7 +3,6 @@ import { useRouter } from 'next/router';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useToken } from '@graffiticode/auth-react';
-import { getPageTitle } from '../../lib/utils';
 import { getBaseUrlForApi, getLanguageAsset } from '@graffiticode-app/core/lib/api';
 import { useCatalog } from '../../lib/catalog';
 
@@ -48,9 +47,6 @@ export default function SpecDetail({ language, setLanguage }) {
   const [markdown, setMarkdown] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    document.title = getPageTitle();
-  }, []);
 
   // URL → selector: when the user pastes /specs/0166 with a different selector,
   // sync the selector to the URL segment. Only fires when the two disagree.

@@ -15,6 +15,7 @@ import ConnectionSharing from "./ConnectionSharing";
 import CopyableId from "./CopyableId";
 import { CREDENTIAL_BACKENDS, getCredentialBackend } from "../lib/credential-backends";
 import { CONNECTABLE_LANGS } from "@graffiticode-app/core/lib/connectable";
+import { usePublicConfig } from '../lib/public-config';
 
 interface Connection {
   connectionId: string;
@@ -51,6 +52,7 @@ const errorText = (err: any) =>
   String(err?.response?.errors?.[0]?.message || err?.message || err).replace(/^Connection request refused: /, "Refused: ");
 
 export default function ConnectionsCard() {
+  const brandName = usePublicConfig().brand.name;
   const { user } = useGraffiticodeAuth();
   const [connections, setConnections] = useState<Connection[]>([]);
   const [current, setCurrent] = useState<CurrentConnection[]>([]);
@@ -307,7 +309,7 @@ export default function ConnectionsCard() {
               {rowHeading(c)}
               {c.system && (
                 <small className="text-xs text-gray-500 mt-1">
-                  Graffiticode preview account — signs previews only; not used for saves.
+                  {brandName} preview account — signs previews only; not used for saves.
                 </small>
               )}
               {currentRadios(c)}

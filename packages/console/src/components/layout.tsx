@@ -1,7 +1,5 @@
-import Head from 'next/head';
 import Image from 'next/image';
 import { Fragment, useEffect, useState } from 'react';
-import logo from '@/images/logos/logo.png';
 import { Disclosure, Menu, Transition } from '@headlessui/react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -14,16 +12,14 @@ import {
 } from '@heroicons/react/24/outline'
 import { ChevronDownIcon } from '@heroicons/react/20/solid'
 import SignIn from '../components/SignIn'
-import { getPageTitle } from '../lib/utils';
 import { usePublicConfig } from '../lib/public-config';
 import { useCatalogDomain } from '../lib/catalog';
 
-// The image is still the build's (runtime assets: installations plan, P3,
-// slice 3); its name is the installation's.
+// The installation's image at its fixed URL (served by api/brand-image), and its name.
 export function Logo(props) {
   const { brand } = usePublicConfig();
   return (
-    <Image src={logo} alt={`${brand.name} logo`} width={30} height={30} unoptimized />
+    <Image src="/logo.png" alt={`${brand.name} logo`} width={30} height={30} unoptimized />
   );
 }
 
@@ -56,9 +52,6 @@ export default function Layout({ children, language, setLanguage, mark, setMark 
   const pathName = router.pathname.split('/').filter(Boolean)[0] || '';
   // An explicitly chosen domain, else the whole offered catalog (lib/catalog.ts).
   const domain = useCatalogDomain();
-  useEffect(() => {
-    document.title = getPageTitle();
-  }, []);
 
   // Track the last-selected item / task so the top-nav Items + Tasks links
   // jump straight to their detail URLs instead of bouncing through the index.
@@ -113,9 +106,6 @@ export default function Layout({ children, language, setLanguage, mark, setMark 
         <body class="h-full">
         ```
       */}
-      <Head>
-        <title>{getPageTitle()}</title>
-      </Head>
       <div className="min-h-full">
         <Disclosure as="nav" className="bg-gray-800 sticky top-0 z-50 shadow-lg">
           {({ open }) => (

@@ -50,7 +50,7 @@ test("the example installation's three files agree on its brand, endpoint and to
   assert.deepEqual(meta.mcpServers, { example: { type: "streamable-http", url: "https://mcp.example.test/mcp" } });
   assert.deepEqual(meta.interface.defaultPrompt, ["Make a quiz on fractions.", "Make a flashcard deck on planets."]);
   assert.equal(meta.interface.privacyPolicyURL, "https://mcp.example.test/privacy");
-  assert.equal(read(o, "skills/assets/icon.png"), "icon\n");
+  assert.ok(readFileSync(join(o, "skills/assets/icon.png")).equals(readFileSync(join(EXAMPLE, "assets/icon.png"))), "the listing's icon is the installation's");
   // The receipt records the release, the profile and every file.
   assert.equal(receipt.appVersion, "rel-1");
   assert.equal(receipt.profileRef, "v1");
@@ -131,7 +131,7 @@ test("regenerating replaces the whole output: files from an earlier generation d
   const o = out();
   await discovery(EXAMPLE, o, {} as any);
   assert.ok(existsSync(join(o, "skills/plugin.meta.json")));
-  const noListing = variant(p => { delete p.listing; delete p.brand.assets.icon; });
+  const noListing = variant(p => { delete p.listing; });
   const receipt = await discovery(noListing, o, {} as any);
   assert.equal(existsSync(join(o, "skills")), false, "the earlier listing and icon are gone");
   assert.deepEqual(Object.keys(receipt.files).sort(), ["app/.well-known/mcp.json", "app/llms.txt"]);

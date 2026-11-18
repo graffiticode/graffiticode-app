@@ -11,6 +11,8 @@ import type { Profile } from "./schema.js";
 import { resolveHosts, type InstallationHosts } from "./hosts.js";
 import { resolveStorage, type InstallationStorage } from "./storage-config.js";
 import { setCoreConfig } from "../config.js";
+import { checkAsset, type AssetKind, type CheckedAsset } from "./assets.js";
+import { securityHeaders, encodeSecurityHeaders, SECURITY_HEADERS_ENV, type HeaderPair, type Surface } from "./security-headers.js";
 import { resolve as resolvePath } from "node:path";
 
 // Process-wide state (see current.ts): every module instance of core in the
@@ -23,9 +25,12 @@ type RuntimeState = {
   storageMemo: InstallationStorage | null;
   // The directory the profile was loaded from: pinned for the process's life.
   pinnedDir: string | null;
+  // The brand images, read and checked at load (profile/assets.ts).
+  assets: Map<AssetKind, CheckedAsset>;
 };
 const STATE = Symbol.for("graffiticode-app.installation-runtime");
-const state = ((globalThis as any)[STATE] ??= { loaded: null, rendered: new Map(), receipt: null, hostsMemo: null, storageMemo: null, pinnedDir: null }) as RuntimeState;
+const state = ((globalThis as any)[STATE] ??= { loaded: null, rendered: new Map(), receipt: null, hostsMemo: null, storageMemo: null, pinnedDir: null, assets: new Map() }) as RuntimeState;
+state.assets ??= new Map();
 
 // `requireStorage`: whether this process uses application storage, so a
 // missing or contradicting project stops the start (true unless the server
@@ -49,8 +54,17 @@ export function loadInstallation(env: NodeJS.ProcessEnv = process.env, { require
   for (const [key, file] of Object.entries(l.profile.copy ?? {})) {
     copy.set(key, renderTemplate(key, l.readText(file), l.profile));
   }
+  // The brand images: read once and kept, so what is served is what the
+  // digest covered, whatever happens to the files later.
+  const assets = new Map<AssetKind, CheckedAsset>();
+  for (const [kind, file] of Object.entries(l.profile.brand.assets) as [AssetKind, string][]) {
+    const checked = checkAsset(kind, l.readBytes(file));
+    if ("problem" in checked) throw new Error(`Installation profile: brand.assets.${kind}: ${file} ${checked.problem}`);
+    assets.set(kind, checked);
+  }
   state.loaded = l;
   state.rendered = copy;
+  state.assets = assets;
   state.hostsMemo = hosts;
   state.storageMemo = storage;
   setInstalledProfile({ profile: l.profile, digest: l.digest });
@@ -73,6 +87,7 @@ export function resetInstallation() {
   state.hostsMemo = null;
   state.storageMemo = null;
   state.pinnedDir = null;
+  state.assets = new Map();
   setInstalledProfile(null);
   setCoreConfig(null);
 }
@@ -89,6 +104,24 @@ export function copy(key: string): string | null {
 // A profile file's bytes (an asset), or null without a profile.
 export function profileFile(relativePath: string): Uint8Array | null {
   return state.loaded ? state.loaded.readBytes(relativePath) : null;
+}
+
+// The security headers this installation's documents carry on a surface
+// (profile/security-headers.ts), from the pinned profile and its hosts.
+export function installationSecurityHeaders(surface: Surface): HeaderPair[] {
+  return securityHeaders(surface, profile(), installationHosts());
+}
+
+// For a Next server's startup: computes the surface's headers from the pinned
+// installation and hands them to its middleware (edge runtime) through the
+// process environment, always overwriting whatever was there.
+export function publishSecurityHeaders(surface: Surface, env: NodeJS.ProcessEnv = process.env) {
+  env[SECURITY_HEADERS_ENV] = encodeSecurityHeaders(installationSecurityHeaders(surface));
+}
+
+// A brand image as loaded and checked at startup, or null without a profile.
+export function installationAsset(kind: AssetKind): CheckedAsset | null {
+  return state.loaded ? state.assets.get(kind) ?? null : null;
 }
 
 // A legal or about document, verbatim (one trailing newline removed).

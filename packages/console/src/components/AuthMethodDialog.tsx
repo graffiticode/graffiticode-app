@@ -1,6 +1,7 @@
 import { Fragment, useState, useEffect } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { XMarkIcon, EnvelopeIcon } from '@heroicons/react/24/outline';
+import { usePublicConfig } from '../lib/public-config';
 
 interface AuthMethodDialogProps {
   isOpen: boolean;
@@ -42,6 +43,7 @@ export default function AuthMethodDialog({
   variant = 'default',
   allowNewAccount = false,
 }: AuthMethodDialogProps) {
+  const brandName = usePublicConfig().brand.name;
   const [step, setStep] = useState<Step>('method');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -58,7 +60,7 @@ export default function AuthMethodDialog({
 
   const isClaim = variant === 'claim';
   const isConnect = variant === 'connect';
-  const title = isClaim ? 'Save your items' : isConnect ? 'Sign in to connect your agent' : 'Sign in to Graffiticode';
+  const title = isClaim ? 'Save your items' : isConnect ? 'Sign in to connect your agent' : `Sign in to ${brandName}`;
   const leadCopy = isClaim
     ? 'Sign in to keep these items permanently.'
     : isConnect
@@ -67,7 +69,7 @@ export default function AuthMethodDialog({
         : 'Use the email or wallet you signed up with, or used to save your items.'
       : 'New here? Create a free account by signing in. No blockchain fees. No credit card required.';
   const ethereumLabel = isClaim || isConnect ? 'Sign in with Ethereum Wallet' : 'Continue with Ethereum Wallet';
-  const emailCaption = isClaim ? '(creates a new Graffiticode account)' : null;
+  const emailCaption = isClaim ? `(creates a new ${brandName} account)` : null;
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

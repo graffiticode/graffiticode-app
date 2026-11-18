@@ -2,8 +2,14 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { readSsoCookie, bootstrapFirebaseToken } from '@graffiticode/auth-react/server';
 import { createOAuthGrant, customTokenUid } from '@graffiticode-app/core/oauth-grants';
 import { client } from '../../../lib/auth';
+import { oauthCallbackAllowed } from '@graffiticode-app/core/oauth-callbacks';
+import { installationHosts, profile } from '@graffiticode-app/core/profile/runtime';
+import { withInstallation } from '../../../lib/with-installation';
 
-// POST /api/oauth/grant { state } — the consent page's "Allow".
+// POST /api/oauth/grant { state, callbackUrl } — the consent page's "Allow".
+//
+// The callback the page will send the code to must be one the installation
+// allows (core/oauth-callbacks.ts): decided here, not in the browser.
 //
 // Mints a fresh Firebase session for the signed-in account and parks it behind a
 // one-time code (core/oauth-grants.ts) that the MCP server redeems when the agent
@@ -16,7 +22,7 @@ import { client } from '../../../lib/auth';
 //     account, so a stale cookie from another account can't be granted away.
 // A missing or mismatched cookie answers 401 sign_in_required; the page then
 // asks the person to sign in again, which sets it.
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'method_not_allowed' });
@@ -35,6 +41,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const state = req.body?.state;
   if (typeof state !== 'string' || !state || state.length > 512) {
     return res.status(400).json({ error: 'invalid_request' });
+  }
+  if (!oauthCallbackAllowed(req.body?.callbackUrl, profile(), installationHosts())) {
+    console.warn('[oauth] grant refused reason=callback_not_allowed');
+    return res.status(400).json({ error: 'invalid_callback' });
   }
 
   // Which check failed is logged (never the uid, cookie or token) so a pattern of
@@ -62,3 +72,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: 'server_error' });
   }
 }
+
+export default withInstallation(handler);

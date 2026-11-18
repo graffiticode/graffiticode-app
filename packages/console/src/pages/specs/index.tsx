@@ -3,7 +3,6 @@ import { useRouter } from 'next/router';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useToken } from '@graffiticode/auth-react';
-import { getPageTitle } from '../../lib/utils';
 import { getBaseUrlForApi, getLanguageAsset } from "@graffiticode-app/core/lib/api";
 
 /** Fixed per page load: a fresh visit busts the cache, a re-render does not reload the frame. */
@@ -37,9 +36,6 @@ export default function Spec({ language }) {
   const [markdown, setMarkdown] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    document.title = getPageTitle();
-  }, []);
 
   // Canonicalize /specs → /specs/<langId> so subsequent language changes are
   // handled by the bidirectional URL↔selector sync in /specs/[id].

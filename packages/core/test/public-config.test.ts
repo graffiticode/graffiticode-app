@@ -13,7 +13,7 @@ import { join } from "node:path";
 const EXAMPLE = new URL("./fixtures/installation-example", import.meta.url).pathname;
 afterEach(() => resetInstallation());
 
-const TOP_LEVEL = ["auth", "billing", "brand", "catalog", "configVersion", "freePlan", "hosts", "installation", "mcp"];
+const TOP_LEVEL = ["auth", "billing", "brand", "catalog", "configVersion", "copy", "freePlan", "hosts", "installation", "mcp", "metadata"];
 
 test("an installation's configuration is exactly the allowlist, from its profile", () => {
   loadInstallation({ PROFILE_DIR: EXAMPLE, INTERNAL_API_KEY: "secret-key", GOOGLE_CLOUD_PROJECT: "example-installation" } as any);

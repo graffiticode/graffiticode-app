@@ -2,14 +2,15 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { createHash } from 'crypto';
 import { getFirestore } from '@graffiticode-app/core/utils/db/index';
 import { coreConfig } from "@graffiticode-app/core/config";
+import { installationHosts } from "@graffiticode-app/core/profile/runtime";
+import { languageServerOrigin } from "@graffiticode-app/core/profile/hosts";
 
 // The installation's auth host, read at use time (core config).
 const authUrl = () => coreConfig().authUrl;
 
-// Allowed origins for CORS
-const allowedOrigins = [
-  'https://l0166.graffiticode.org',
-];
+// Allowed origins for CORS: the front form's own server (L0166), from the
+// installation's language-server pattern.
+const allowedOrigins = () => [languageServerOrigin(installationHosts(), "0166")];
 
 interface FrontEmailEntry {
   userId: string;
@@ -23,7 +24,7 @@ function hashEmailAuth(authSecret: string, email: string): string {
 
 function setCorsHeaders(req: NextApiRequest, res: NextApiResponse) {
   const origin = req.headers.origin;
-  if (origin && allowedOrigins.includes(origin)) {
+  if (origin && allowedOrigins().includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   }
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');

@@ -1,5 +1,4 @@
 import { useEffect } from 'react';
-import { getPageTitle } from '../lib/utils';
 import CopyButton from '../components/CopyButton';
 import { usePublicConfig } from '../lib/public-config';
 
@@ -12,9 +11,6 @@ export default function Support() {
   const { brand } = usePublicConfig();
   const email = brand.supportEmail;
   const forum = brand.links.support ?? brand.links.forum;
-  useEffect(() => {
-    document.title = getPageTitle();
-  }, []);
   return (
     <div className="flex flex-col text-md leading-7 max-w-2xl font-light mx-auto py-6 px-4 sm:px-6 lg:px-8 gap-4">
       <h2 className="font-semibold">Support</h2>

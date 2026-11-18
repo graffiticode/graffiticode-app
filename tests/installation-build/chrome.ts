@@ -61,8 +61,13 @@ export class Chrome {
   // Opens `url` in a fresh page. `allowOrigin` requests continue; `respond` may
   // answer a request itself; everything else is blocked. Resolves once the
   // page has settled (`until` true, or the timeout), with every requested URL.
-  async visit(url: string, opts: { allowOrigin: string; respond?: Respond; until?: string; timeoutMs?: number }) {
-    const { targetId } = await this.send("Target.createTarget", { url: "about:blank" });
+  // `steps` run in the page after it settles (a client-side navigation, say),
+  // each until its condition holds; the page's state is read after each.
+  async visit(url: string, opts: { allowOrigin: string; respond?: Respond; until?: string; timeoutMs?: number; steps?: { run: string; until: string }[] }) {
+    // Each visit in its own browser context: no storage, cookies or cache
+    // carried over from an earlier visit, so no check depends on the order.
+    const { browserContextId } = await this.send("Target.createBrowserContext", {});
+    const { targetId } = await this.send("Target.createTarget", { url: "about:blank", browserContextId });
     const { sessionId } = await this.send("Target.attachToTarget", { targetId, flatten: true });
     const requested: string[] = [];
     const console: string[] = [];
@@ -104,7 +109,22 @@ export class Chrome {
     }
     // A moment more, for requests a provider makes as it initializes.
     await new Promise(r => setTimeout(r, 2_000));
+    const read = () => evaluate(`({
+      path: location.pathname,
+      title: document.title,
+      descriptions: [...document.querySelectorAll('meta[name="description"]')].map(m => m.getAttribute("content")),
+    })`);
+    const afterSteps: { path: string; title: string; descriptions: string[] }[] = [];
+    for (const step of opts.steps ?? []) {
+      await evaluate(step.run);
+      const until = Date.now() + 10_000;
+      while (Date.now() < until && !(await evaluate(step.until).catch(() => false))) await new Promise(r => setTimeout(r, 200));
+      await new Promise(r => setTimeout(r, 500));
+      afterSteps.push(await read());
+    }
     const state = await evaluate(`({
+      title: document.title,
+      descriptions: [...document.querySelectorAll('meta[name="description"]')].map(m => m.getAttribute("content")),
       installation: document.documentElement.dataset.installation ?? null,
       installationError: document.documentElement.dataset.installationError ?? null,
       authProject: document.documentElement.dataset.authProject ?? null,
@@ -115,7 +135,9 @@ export class Chrome {
     })`);
     this.listeners = this.listeners.filter(l => l !== listener);
     await this.send("Target.closeTarget", { targetId }).catch(() => {});
-    return { requested, console, ...state } as {
+    await this.send("Target.disposeBrowserContext", { browserContextId }).catch(() => {});
+    return { requested, console, afterSteps, ...state } as {
+      afterSteps: { path: string; title: string; descriptions: string[] }[]; title: string; descriptions: string[];
       requested: string[]; console: string[]; installation: string | null; installationError: string | null; authProject: string | null;
       config: string | null; text: string; iframes: string[]; scripts: string[];
     };

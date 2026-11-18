@@ -8,7 +8,10 @@
 // page route (the console's pages and the app's routes, other than API
 // routes), through every value import (relative, "@/", core, auth-react,
 // dynamic import()), into core. A module only API routes or servers reach
-// isn't browser code; one a page reaches is, wherever it lives.
+// isn't browser code; one a page reaches is, wherever it lives. In the app
+// (App Router), a module is browser code from its "use client" boundary on:
+// a server component (a layout without the directive) isn't, but the client
+// modules it imports are.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
@@ -23,10 +26,8 @@ const NOT_BROWSER = /\/pages\/api\/|\/app\/api\/|\/server\/|\.(test|spec)\.|inst
 // What remains, and why each is allowed. Everything else must come from
 // /api/config.
 const ALLOWED: Record<string, { hosts?: string; nextPublic?: string }> = {
-  // Page metadata and images are still built into the bundle until slice 3.
-  'app/src/lib/attribution.ts': { hosts: 'page metadata (slice 3)' },
-  'console/src/components/tools-thumbnail-grid.tsx': { hosts: 'thumbnail images in the storage bucket (slice 3)' },
-  'console/src/pages/about.tsx': { hosts: 'page copy (slice 3)' },
+  // This build's own copy, shown only without a profile (InstallationCopy).
+  'console/src/pages/about.tsx': { hosts: "the built-in about page, shown only without a profile" },
   // The server resolver's built-in hosts, and the server's firebase key. In a
   // browser, configFromEnv refuses before reaching either (config.ts).
   'core/src/profile/hosts.ts': { hosts: 'server resolver defaults; unreachable in a browser' },
@@ -85,18 +86,32 @@ function valueImports(src: string): string[] {
   return out;
 }
 
+const isClientBoundary = (p: string) => /^\s*['"]use client['"]/.test(readFileSync(at(p), 'utf8'));
+// Pages Router pages are all browser code; App Router modules from "use client" on.
+const isBrowserEntry = (p: string) => p.startsWith('console/') || isClientBoundary(p);
+
 const entries = ENTRY_DIRS.flatMap(d => [...files(d)]).filter(p => !NOT_BROWSER.test(`/${p}`));
 const reached = new Set<string>();
+const serverSeen = new Set<string>();
 const importsOf = new Map<string, string[]>();
-const queue = [...entries];
+const queue: [string, boolean][] = entries.map(p => [p, isBrowserEntry(p)]);
 while (queue.length) {
-  const p = queue.pop()!;
-  if (reached.has(p) || NOT_BROWSER.test(`/${p}`)) continue;
-  reached.add(p);
-  const deps = valueImports(stripComments(readFileSync(at(p), 'utf8')))
+  const [p, browser] = queue.pop()!;
+  if (NOT_BROWSER.test(`/${p}`)) continue;
+  const deps = () => valueImports(stripComments(readFileSync(at(p), 'utf8')))
     .map(s => resolve(p, s)).filter((x): x is string => !!x);
-  importsOf.set(p, deps);
-  queue.push(...deps);
+  if (browser) {
+    if (reached.has(p)) continue;
+    reached.add(p);
+    const d = deps();
+    importsOf.set(p, d);
+    queue.push(...d.map(x => [x, true] as [string, boolean]));
+  } else {
+    // A server component: not browser code, but a client module it imports is.
+    if (serverSeen.has(p)) continue;
+    serverSeen.add(p);
+    queue.push(...deps().map(x => [x, isClientBoundary(x)] as [string, boolean]));
+  }
 }
 const browserModules = [...reached].sort();
 const importersOf = (p: string) => [...importsOf].filter(([, d]) => d.includes(p)).map(([f]) => f);
@@ -113,6 +128,9 @@ test("the browser's module graph is found, into core", () => {
   }
   assert.ok(!browserModules.some(p => p.includes('/pages/api/')), 'API routes are not browser code');
   assert.ok(!reached.has('core/src/profile/brand.ts'), "the built-in brand isn't browser code");
+  // App Router server components aren't browser code; the client modules they render are.
+  assert.ok(!reached.has('app/src/app/layout.tsx') && reached.has('app/src/app/providers.tsx'));
+  assert.ok(!reached.has('app/src/app/form/[id]/layout.tsx'), 'the per-item metadata is rendered on the server');
 });
 
 test('browser code imports only the reviewed core modules', () => {
@@ -132,8 +150,9 @@ test('no browser module reads a build-time NEXT_PUBLIC_* value', () => {
 test("no browser module names a built-in installation's host, however it is written", () => {
   // Bare, schemed or interpolated (`https://l${id}.graffiticode.org`), and the
   // built-in storage bucket.
+  // Escaped dots too (a regex: graffiticode\.org).
   const HOST = /graffiticode\.(org|com)\b|graffiticode\.appspot\.com/;
-  const offenders = browserModules.filter(p => !ALLOWED[p]?.hosts && HOST.test(source(p)));
+  const offenders = browserModules.filter(p => !ALLOWED[p]?.hosts && HOST.test(source(p).replace(/\\\./g, '.')));
   assert.deepEqual(offenders, []);
 });
 

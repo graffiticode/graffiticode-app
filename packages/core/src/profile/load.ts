@@ -91,7 +91,11 @@ export function loadProfile(dir: string, opts: { executionReady?: boolean } = {}
   } catch (err) {
     throw new ProfileError(dir, [{ path: "/", message: `can't read ${PROFILE_FILE}: ${(err as Error).message}` }]);
   }
-  const result = validateProfile(raw, { ...opts, fileExists: rel => inside(root, files, rel) !== null });
+  const result = validateProfile(raw, {
+    ...opts,
+    fileExists: rel => inside(root, files, rel) !== null,
+    readBytes: rel => readFileSync(inside(root, files, rel)!),
+  });
   if (!result.ok) throw new ProfileError(dir, result.problems);
   return {
     profile: result.profile!,

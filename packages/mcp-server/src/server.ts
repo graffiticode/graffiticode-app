@@ -28,7 +28,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { handleIntrospect } from "./oauth/introspection.js";
 import { coreReadiness } from "@graffiticode-app/core/readiness";
 import { coreBackendEnabled } from "./core-backend.js";
-import { copy, document, installationHosts, loadInstallation, profile } from "./installation.js";
+import { copy, document, installationHosts, installationSecurityHeaders, loadInstallation, profile } from "./installation.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
   CallToolRequestSchema,
@@ -1176,23 +1176,30 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     return;
   }
 
+  // The HTML pages below carry the installation's security headers (with a
+  // profile; without one, as before): core/src/profile/security-headers.ts.
+  const htmlPageHeaders = () => ({
+    "Content-Type": "text/html; charset=utf-8",
+    ...Object.fromEntries(installationSecurityHeaders("mcp-page")),
+  });
+
   // About
   if (url.pathname === "/about") {
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.writeHead(200, htmlPageHeaders());
     res.end(document("about") ?? ABOUT_HTML);
     return;
   }
 
   // Privacy policy
   if (url.pathname === "/privacy") {
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.writeHead(200, htmlPageHeaders());
     res.end(document("privacy") ?? PRIVACY_HTML);
     return;
   }
 
   // Terms of service
   if (url.pathname === "/terms") {
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.writeHead(200, htmlPageHeaders());
     res.end(document("terms") ?? TERMS_HTML);
     return;
   }

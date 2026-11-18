@@ -5,14 +5,10 @@ import ConnectionsCard from '../components/ConnectionsCard';
 import LinkedEmailsCard from '../components/LinkedEmailsCard';
 import SessionsCard from '../components/SessionsCard';
 import useGraffiticodeAuth from '@graffiticode/auth-react';
-import { getPageTitle } from '../lib/utils';
 
 export default function Settings() {
   const { user } = useGraffiticodeAuth();
 
-  useEffect(() => {
-    document.title = getPageTitle();
-  }, []);
 
   if (!user) {
     return (

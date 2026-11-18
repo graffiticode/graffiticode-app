@@ -69,13 +69,22 @@ export type PublicConfig = {
     supportEmail?: string;
     links: { product?: string; docs?: string; forum?: string; support?: string; source?: string; signup?: string };
   };
-  hosts: { console: string; app: string; api: string; auth: string; mcp: string; languageServer: string };
+  // `thumbnails`: where item thumbnails are published; an item id is appended.
+  hosts: { console: string; app: string; api: string; auth: string; mcp: string; languageServer: string; thumbnails: string };
+  // Each surface's document title and description, which the page applies
+  // once this configuration has loaded (the initial HTML carries the build's).
+  metadata: { console: PageMetadata; app: PageMetadata };
+  // Longer page copy, as Markdown. null means this build's own copy: only
+  // without a profile, where the pages keep today's content.
+  copy: { consoleHome: string | null; consoleAbout: string | null };
   mcp: { endpoint: string };
   auth: { firebase: FirebaseWebConfig; privyAppId: string };
   billing: { stripePublishableKey: string | null; plans: Record<string, PublicPlan> };
   catalog: { languages: PublicLanguage[] };  // every resolvable language
   freePlan: { enabled: boolean; itemTtlHours: number };
 };
+
+export type PageMetadata = { title: string; description: string };
 
 export type PublicConfigResult = { ok: true; config: PublicConfig } | { ok: false; error: string };
 
@@ -129,7 +138,7 @@ const FIREBASE_REQUIRED = ["apiKey", "authDomain", "projectId", "appId"] as cons
 const FIREBASE_OPTIONAL = ["databaseURL", "storageBucket", "messagingSenderId", "measurementId"] as const;
 
 function check(raw: unknown) {
-  const c = fields(raw, "configuration", ["configVersion", "installation", "brand", "hosts", "mcp", "auth", "billing", "catalog", "freePlan"]);
+  const c = fields(raw, "configuration", ["configVersion", "installation", "brand", "hosts", "mcp", "auth", "billing", "catalog", "freePlan", "metadata", "copy"]);
 
   const installation = fields(c.installation, "installation", ["id"]);
   text(installation.id, "installation.id", /^[a-z0-9][a-z0-9-]*$/);
@@ -140,7 +149,8 @@ function check(raw: unknown) {
   const links = fields(brand.links, "brand.links", [], LINKS);
   for (const k of LINKS) optionally(links[k], () => url(links[k], `brand.links.${k}`));
 
-  const hosts = fields(c.hosts, "hosts", ["console", "app", "api", "auth", "mcp", "languageServer"]);
+  const hosts = fields(c.hosts, "hosts", ["console", "app", "api", "auth", "mcp", "languageServer", "thumbnails"]);
+  url(hosts.thumbnails, "hosts.thumbnails");
   for (const h of ["console", "app", "api", "auth", "mcp"]) origin(hosts[h], `hosts.${h}`);
   const ls = text(hosts.languageServer, "hosts.languageServer");
   if (!ls.includes("{id}")) refuse("hosts.languageServer", "has no {id}");
@@ -197,6 +207,15 @@ function check(raw: unknown) {
     optionally(l.sponsor, () => text(l.sponsor, `${at}.sponsor`));
     optionally(l.sponsorUrl, () => url(l.sponsorUrl, `${at}.sponsorUrl`));
   });
+
+  const metadata = fields(c.metadata, "metadata", ["console", "app"]);
+  for (const surface of ["console", "app"]) {
+    const m = fields(metadata[surface], `metadata.${surface}`, ["title", "description"]);
+    text(m.title, `metadata.${surface}.title`);
+    text(m.description, `metadata.${surface}.description`);
+  }
+  const copy = fields(c.copy, "copy", ["consoleHome", "consoleAbout"]);
+  for (const k of ["consoleHome", "consoleAbout"]) if (copy[k] !== null) text(copy[k], `copy.${k}`);
 
   const freePlan = fields(c.freePlan, "freePlan", ["enabled", "itemTtlHours"]);
   bool(freePlan.enabled, "freePlan.enabled");

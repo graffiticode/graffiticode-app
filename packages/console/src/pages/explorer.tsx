@@ -1,11 +1,8 @@
-import Head from 'next/head';
 import Image from 'next/image';
 import { useState, useEffect, Fragment } from 'react';
-import logo from '@/images/logos/logo.png';
 import { Disclosure, Menu, Dialog, Transition } from '@headlessui/react';
 import Link from 'next/link';
 import GraphQLIde from '../components/graphiql';
-import { getPageTitle } from '../lib/utils';
 
 import {
   CalendarIcon,
@@ -19,10 +16,13 @@ import {
   BellIcon,
 } from '@heroicons/react/24/outline'
 import SignIn from '../components/SignIn'
+import { usePublicConfig } from '../lib/public-config';
 
+// The installation's image at its fixed URL (served by api/brand-image), and its name.
 export function Logo(props) {
+  const { brand } = usePublicConfig();
   return (
-    <Image src={logo} alt='Graffiticode logo' width={30} height={30} unoptimized />
+    <Image src="/logo.png" alt={`${brand.name} logo`} width={30} height={30} unoptimized />
   );
 }
 
@@ -40,9 +40,6 @@ function classNames(...classes) {
 
 export default function Compiles() {
   const [userId, setUserId] = useState();
-  useEffect(() => {
-    document.title = getPageTitle();
-  }, []);
   return (
     <div className="w-full h-screen">
       <GraphQLIde />
