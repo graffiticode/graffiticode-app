@@ -17,7 +17,7 @@ For Learnosity, define two services:
 - **Assessment Authoring:** create and revise assessment content, validate it, provide previews, and eventually save an explicitly selected revision through an authorized connection.
 - **Data Operations:** plan and eventually execute bounded reads, exports, transformations, and migrations of assessment records and collections.
 
-Expose two A2A Agent Cards and initially one **Artcompiler for Learnosity** MCP endpoint with two bounded toolsets. Graffiticode's general-purpose MCP interface retains its existing no-external-writes contract.
+Expose two A2A Agent Cards and initially one **Artcompiler for Learnosity** MCP toolset family with two bounded toolsets, served by the Artcompiler installation (§8). Graffiticode's general-purpose MCP interface retains its existing no-external-writes contract.
 
 This document owns Artcompiler's product and service contracts. The [shared service architecture](./graffiticode-a2a-design.md) owns the runtime, authorization, job lifecycle, outcomes, recovery, and A2A/MCP translation rules. The [installations plan](./installations-plan.md) defines deployment and profile boundaries. Their implementation order and gates are referenced in §12.
 
@@ -66,7 +66,7 @@ Use the shared [external-outcome and service-success rules](./graffiticode-a2a-d
 
 ## 7. A2A public identities
 
-Publish **Artcompiler Learnosity Assessment Authoring** and **Artcompiler Learnosity Data Operations** as distinct cards. Proposed application paths are `/agents/learnosity/authoring` and `/agents/learnosity/data`; their exact hosts and supported routing are installation choices.
+Publish **Artcompiler Learnosity Assessment Authoring** and **Artcompiler Learnosity Data Operations** as distinct cards. Proposed application paths are `/agents/learnosity/authoring` and `/agents/learnosity/data`, on the Artcompiler installation's hosts (`*.artcompiler.com`, decided 2026-11-19). Which host serves them, and the routing it supports, are still open.
 
 Generate cards from the same selected service definitions as the MCP catalog. Each identity describes its responsibility, currently available skills, examples, accepted inputs, expected outputs, and connection requirements. A shared host does not widen either service's scope.
 
@@ -74,7 +74,7 @@ Discovery, protocol/SDK version pinning, submission, task retrieval, continuatio
 
 ## 8. MCP product surface
 
-Start with one **Artcompiler for Learnosity** MCP endpoint with two bounded toolsets. Proposed authoring tools are `assessment_create_item`, `assessment_update_item`, and `assessment_preview_item`; add `assessment_save_item` only when provider execution is ready. Proposed data tools are `data_plan`, then `data_query`, `data_export`, and eventually `data_migrate` as their handlers become available.
+Start with the **Artcompiler for Learnosity** service tools: two bounded toolsets on one MCP endpoint of the Artcompiler installation, `mcp.artcompiler.com`. The current release serves the generic item tools at `/mcp` for every installation, and the service tools at a path of their own (for example `/learnosity/mcp`). So the installation has two MCP endpoints on one host until the release can serve both families together. Proposed authoring tools are `assessment_create_item` and `assessment_update_item`; previews come from the shared `render_item`, since the registry has no preview operation. Add `assessment_save_item` only when provider execution is ready. Proposed data tools are `data_plan`, then `data_query`, `data_export`, and eventually `data_migrate` as their handlers become available.
 
 Shared `job_get`, `job_continue`, and `job_cancel` and any negotiated MCP Tasks support follow the [shared MCP interface](./graffiticode-a2a-design.md#8-mcp-interface-and-compatibility). Tool names and descriptions come from the profile's selected skills; annotations and available tools must match implemented behavior and current authorization.
 
@@ -172,7 +172,7 @@ These plans determine when preparation, planning, A2A, and individual execution 
 ## 13. Product decisions still needed
 
 - Which target A2A client and integration scenario should the Artcompiler pilot serve, under the shared protocol compatibility requirements?
-- What public hostnames, card URLs, and MCP distribution channel will Artcompiler use?
+- Which installation host serves the Agent Cards, at which card URLs, and through which MCP distribution channel? The hostnames themselves are decided: one installation on `console.`, `app.`, `mcp.` and `api.artcompiler.com`, with product sites such as assessments.artcompiler.com as marketing funnels.
 - Which Learnosity record families and operations form the first executable Data Operations release, and what live verification is available for each?
 - What customer-specific retention, size, runtime, cost, consistency, and approval requirements apply to stored results and bulk operations?
 - When do customer trust or administration requirements justify separate authoring and data MCP endpoints?

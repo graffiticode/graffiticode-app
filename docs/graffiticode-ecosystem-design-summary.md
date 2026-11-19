@@ -31,7 +31,7 @@ A nonprofit foundation was proposed to steward the service, adjust prices accord
 | Differentiation | Front ends compete on quality of service, broadly understood. | Explicit user direction |
 | Learnosity A2A | Begin with Assessment Authoring and Data Operations as two logical services. | Initial recommendation |
 | Learnosity MCP | Begin with one server exposing two clearly bounded toolsets. | Initial recommendation |
-| Domains | Put Artcompiler product interfaces under artcompiler.com; retain shared infrastructure under graffiticode.org. | Proposed naming arrangement |
+| Domains | Put Artcompiler product interfaces under artcompiler.com; retain shared infrastructure under graffiticode.org. | Decided 2026-11-19 (§6) |
 | Pricing | Use usage charges, with an upfront contribution for newly retained artifacts. | Direction plus pricing recommendation |
 | Preservation | Retain artifacts permanently while allowing access speed and storage tier to change. | Explicit user direction |
 | Foundation and trust | Use nonprofit stewardship and a dedicated preservation funding arrangement. | Favored proposal; legal structure unresolved |
@@ -118,13 +118,13 @@ The discussion includes compilation and interpreter-based execution, including d
 
 The discussion began with the concern that `console.graffiticode.org` exposed Graffiticode branding inside an Artcompiler product.
 
-The proposed arrangement is:
+The arrangement, decided on 2026-11-19, is:
 
-| Interface or service | Proposed domain treatment |
+| Interface or service | Domain treatment |
 | --- | --- |
-| Artcompiler console | `console.artcompiler.com` |
-| Other Artcompiler applications and agent interfaces | Appropriate hosts under `*.artcompiler.com` |
-| Shared Graffiticode services | Appropriate hosts under `*.graffiticode.org` |
+| The Artcompiler installation | `console.artcompiler.com`, `app.artcompiler.com`, `mcp.artcompiler.com` and `api.artcompiler.com`: one installation for every Artcompiler product |
+| Artcompiler product sites | Marketing hosts, such as `assessments.artcompiler.com`, that funnel users and agents to the installation's hosts |
+| Shared Graffiticode services | Appropriate hosts under `*.graffiticode.org` (the API, auth and language servers) |
 | Other vendors' products | Their own product domains |
 
 Repository packaging does not determine public branding. The presence of `api`, `auth`, `policy`, `broker`, `egress`, and language services in the Graffiticode monorepo does not require duplicating them under every vendor's domain. Internal services need only the exposure their operation requires.
@@ -141,10 +141,7 @@ Publishing a card at a well-known path helps a client that already knows the dom
 
 ### Proposed Artcompiler Agent Card URLs
 
-- [Assessment Authoring Agent Card](https://learnosity-assessments.artcompiler.com/.well-known/agent-card.json)
-- [Data Operations Agent Card](https://learnosity-data.artcompiler.com/.well-known/agent-card.json)
-
-The proposed invocation endpoint is `/a2a` on each host. That path is an application choice; clients should use the endpoint and transport declared in the card. These addresses are proposals, not deployment claims.
+Both cards are served by the one Artcompiler installation, on its own hosts (§6), and are told apart by path, as the [Artcompiler design](./artcompiler-a2a-design.md#7-a2a-public-identities) proposes: `/agents/learnosity/authoring` and `/agents/learnosity/data`. There are no per-service hosts. Which installation host serves them, the card URLs and the invocation endpoint are still open. Clients should use the endpoint and transport declared in each card. These are proposals, not deployment claims.
 
 ### Candidate clients discussed
 
