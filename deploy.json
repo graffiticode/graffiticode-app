@@ -187,6 +187,10 @@
         {
           "milestone": "R1",
           "commit": "7b904bb9577b301b3ee35d715bba117dab13be2b"
+        },
+        {
+          "milestone": "P5-oauth-store",
+          "commit": "8c5072a812a1ba49a2fbf6d51de7367c6d61b187"
         }
       ],
       "verify": {
@@ -313,7 +317,13 @@
       "minInstances": 0,
       "verify": {
         "module": "verify/openapi.mjs"
-      }
+      },
+      "baselines": [
+        {
+          "milestone": "P5-oauth-store",
+          "commit": "8c5072a812a1ba49a2fbf6d51de7367c6d61b187"
+        }
+      ]
     }
   }
 }

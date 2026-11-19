@@ -17,6 +17,9 @@ the final MCP release is a separate operator step after that change lands.
 - Both frontend releases were built cleanly from
   `8c5072a812a1ba49a2fbf6d51de7367c6d61b187`. Their candidate checks passed,
   they serve 100% of traffic, and their older revisions' tags were retired.
+- That commit becomes MCP and REST's `P5-oauth-store` baseline. Normal
+  rollbacks must keep the handover-aware lookup code: older code could read
+  legacy credentials without honoring their migration marks.
 - All six generated TTL policies are `ACTIVE` in
   `graffiticode-app/(default)`.
 - Before the fence, auth's `release-check` passed with no stale tags or
