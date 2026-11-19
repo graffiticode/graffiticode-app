@@ -130,7 +130,7 @@ Two surveys this session found:
 - **`deploy.json` gets one gc-deploy environment per installation** (`environments.<id>`, with per-service overrides). The settings applied by hand today (`POLICY_URL`, Stripe prices, sizing) move into it.
 
 ### P4. Capability registry, pinned definitions and the service-tool family (`graffiticode-app`)
-- **Registry in code.** `core/src/capabilities.ts` registers each implementation as `{id, implemented, externalWrites, requiresExecution, authorization, deliverables, handler}`. Examples: `generate-content`, `plan-data-job`, later `save-revision`.
+- **Registry in code.** `core/src/capabilities.ts` registers each implementation as `{id, implemented, externalWrites, requiresExecution, authorization, deliverables, handler}`. Examples: `generate-content` (which also makes data-job plans, as its `data_plan` deliverable), later `save-revision`.
 - **Profiles reference capabilities.** A profile's service definition names skills and points each at a capability id, with its languages and copy. The validator rejects:
   - an unknown or unimplemented capability;
   - a writing capability before execution is ready;
@@ -222,11 +222,13 @@ Two surveys this session found:
   - P5's backend installation context is deployed: enforcement, untagged-record handling, the rollout guard, per-installation item authority and act-as;
   - the OAuth migration has cut over for Graffiticode.
 - Create the profile repo in the Artcompiler GitHub organization, for example `artcompiler/installation-artcompiler`:
-  - Assessments branding, Artcompiler legal content;
-  - the Learnosity services, selecting `generate-content` and `plan-data-job`;
-  - surfaces: service tools on `/mcp`, and generic tools if wanted.
+  - **Artcompiler branding** (decided 2026-11-19): one Artcompiler installation, whose product sites, such as assessments.artcompiler.com, are marketing that funnels users and agents to it;
+  - **hosts** `console.artcompiler.com`, `app.artcompiler.com`, `mcp.artcompiler.com` and `api.artcompiler.com`, with the shared backend left on `*.graffiticode.org`;
+  - Artcompiler legal content;
+  - **the Learnosity services**, every skill selecting `generate-content`: content, integration recipes and data plans are its deliverables. There is no separate `plan-data-job` capability;
+  - **surfaces:** this release serves the item tools at `/mcp`, which every installation selects, and the service tools at a path of their own (for example `/learnosity/mcp`), never at `/mcp`.
 - Bootstrap the GCP project `artcompiler-app` with `bootstrap-installation.sh`, set the profile's `installation.project` to `artcompiler-app`, and deploy the *same release* with `--env artcompiler`. The installation ID and deployment environment remain `artcompiler`.
-- Update the Assessments discovery generator (`artcompiler-assessments/scripts/generate-agent-discovery.mjs`) to consume the profile's discovery output. This also fixes the three mismatches found earlier.
+- Update the Assessments marketing site's discovery generator (`artcompiler-assessments/scripts/generate-agent-discovery.mjs`) to consume the profile's discovery output, so it points users and agents to the installation's hosts (`console.artcompiler.com`, `mcp.artcompiler.com`) rather than advertising an endpoint of its own. This also fixes the three mismatches found earlier.
 
 ## Verification
 
