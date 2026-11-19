@@ -155,7 +155,9 @@
         "GENERATION_QUEUE_NAME": "generation-jobs",
         "CONSOLE_URL": "https://console.graffiticode.org",
         "NEXT_PUBLIC_FIREBASE_API_KEY": "AIzaSyAoVuUNi8ElnS7cn6wc3D8XExML-URLw0I",
-        "WIDGET_ASSET_ORIGIN": "https://mcp.graffiticode.org"
+        "WIDGET_ASSET_ORIGIN": "https://mcp.graffiticode.org",
+        "OAUTH_STORE": "migrating",
+        "OAUTH_MIGRATION_VERIFIED_CONTRACT": "1"
       },
       "secrets": {
         "INTERNAL_JOB_SECRET": "INTERNAL_JOB_SECRET:1",
