@@ -3,10 +3,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { checkDrained, digestFrom, gitAncestry, reachable } from "../../scripts/drained-revisions.mjs";
+import { checkDrained, digestFrom, gitAncestry, loadTargets, reachable } from "../../scripts/drained-revisions.mjs";
 
 // A history: old -> dualread -> later, and a side branch off old.
 function history() {
@@ -39,9 +39,9 @@ const revision = (name, release, commit, over = {}) => ({
 const RECEIPT = { version: 1, id: "rnew", service: "mcp-service", status: "released", dirty: false, commit: H.dualread };
 const TARGETS = [{ name: "mcp", service: "mcp-service", project: "p", region: "r" }, { name: "openapi", service: "openapi-service", project: "p", region: "r" }];
 
-async function check({ services, revisions, receipt = RECEIPT }) {
+async function check({ services, revisions, receipt = RECEIPT, targets = TARGETS }) {
   return checkDrained({
-    receipt, mcpService: "mcp-service", targets: TARGETS, imageDigest, isAncestor,
+    receipt, mcpService: targets.find(t => t.name === "mcp").service, targets, imageDigest, isAncestor,
     describeService: async t => {
       if (!(t.service in services)) throw new Error("PERMISSION_DENIED");
       return { status: { traffic: services[t.service] } };
@@ -58,6 +58,26 @@ const GOOD = {
   services: { "mcp-service": [{ revisionName: "mcp-rnew", percent: 100, tag: "rnew" }], "openapi-service": [{ revisionName: "openapi-rlater", percent: 100 }] },
   revisions: { "mcp-rnew": revision("mcp-rnew", "rnew", H.dualread), "openapi-rlater": revision("openapi-rlater", "rlater", H.later) },
 };
+
+test("CLI targets use resolved Cloud Run settings from the real deploy loader", async t => {
+  const dir = mkdtempSync(join(tmpdir(), "drain-config-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const settings = service => ({
+    service, image: IMAGE, dockerfile: "Dockerfile", port: 3001, access: "public",
+    runtimeServiceAccount: "runtime@p.iam.gserviceaccount.com", steps: [{ name: "node", args: ["test"] }],
+    smoke: [{ path: "/health", status: 200 }],
+  });
+  const config = join(dir, "deploy.json");
+  writeFileSync(config, JSON.stringify({
+    version: 1,
+    environments: { production: { project: "p", region: "r", buildServiceAccount: "build@p.iam.gserviceaccount.com" } },
+    services: { mcp: settings("mcp-service"), openapi: settings("openapi-service") },
+  }));
+  const targets = await loadTargets({ config, env: "production" });
+  assert.deepEqual(targets, TARGETS.map(target => ({ ...target, image: IMAGE })));
+  const report = await check({ ...GOOD, targets });
+  assert.equal(report.ok, true, JSON.stringify(report, null, 2));
+});
 
 test("drained: every reachable revision contains the required release", async () => {
   const r = await check(GOOD);

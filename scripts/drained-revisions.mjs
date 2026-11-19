@@ -140,6 +140,17 @@ async function gcloudJson(args) {
   return JSON.parse(stdout);
 }
 
+// loadConfig returns a context; Cloud Run targets live inside its config.
+export async function loadTargets({ config = "deploy.json", env = "production" } = {}) {
+  const { loadConfig } = await import("@graffiticode/deploy/src/config.js");
+  const targets = [];
+  for (const name of SERVICES) {
+    const { config: resolved } = await loadConfig({ config, env, service: name });
+    targets.push({ name, service: resolved.service, project: resolved.project, region: resolved.region, image: resolved.image });
+  }
+  return targets;
+}
+
 async function main(argv) {
   const opts = { env: "production", config: "deploy.json" };
   for (let i = 0; i < argv.length; i += 2) {
@@ -154,14 +165,9 @@ async function main(argv) {
     console.error("usage: npm run check:drained -- --release <mcp release id> [--env production]");
     process.exit(2);
   }
-  const { loadConfig } = await import("@graffiticode/deploy/src/config.js");
   const { readReceipt } = await import("@graffiticode/deploy/src/release.js");
   const root = path.dirname(path.resolve(opts.config));
-  const targets = [];
-  for (const name of SERVICES) {
-    const c = await loadConfig({ config: opts.config, env: opts.env, service: name });
-    targets.push({ name, service: c.service, project: c.project, region: c.region, image: c.image });
-  }
+  const targets = await loadTargets(opts);
   let receipt = null;
   try {
     receipt = await readReceipt(root, opts.release);
