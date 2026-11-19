@@ -1,0 +1,15 @@
+{
+  "recordedAt": "2026-11-19T18:24:21.189Z",
+  "phase": "report",
+  "result": {
+    "command": "report",
+    "unmigrated": 0,
+    "migrated": 107,
+    "revoked": 0,
+    "unreconciled": 0,
+    "clientsMissing": 0,
+    "prepared": 0,
+    "sealed": true,
+    "fallbackRetirable": true
+  }
+}
