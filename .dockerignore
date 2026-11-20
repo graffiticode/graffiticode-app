@@ -19,3 +19,9 @@
 **/*.tsbuildinfo
 **/.compiled-test
 **/.next
+
+# The release's installation profile: every byte counts in its digest, which
+# the candidate reports and gc-deploy checks (README.md and .env* included), so
+# none of the patterns above may drop any of it. Keep these lines last.
+!.gc-profile
+!.gc-profile/**

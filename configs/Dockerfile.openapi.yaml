@@ -19,6 +19,12 @@ COPY --from=build /usr/src/app/packages/core/dist packages/core/dist
 COPY --from=build /usr/src/app/packages/openapi-server/dist packages/openapi-server/dist
 RUN npm ci --omit=dev -w packages/openapi-server -w packages/core
 
+# The installation profile gc-deploy pinned and bound to this revision
+# (PROFILE_DIR=/gc-profile; @graffiticode/deploy README, "Installation
+# profiles"). Empty without a profile, and in builds that bypass gc-deploy,
+# which create an empty .gc-profile/ first (docs/installations-plan.md).
+COPY .gc-profile/ /gc-profile/
+
 WORKDIR /usr/src/app/packages/openapi-server
 USER node
 EXPOSE 8080

@@ -21,6 +21,12 @@ COPY --from=build --chown=nextjs:nodejs /app/packages/console/.next/standalone .
 COPY --from=build --chown=nextjs:nodejs /app/packages/console/.next/static ./packages/console/.next/static
 COPY --from=build /app/packages/console/public ./packages/console/public
 
+# The installation profile gc-deploy pinned and bound to this revision
+# (PROFILE_DIR=/gc-profile; @graffiticode/deploy README, "Installation
+# profiles"). Empty without a profile, and in builds that bypass gc-deploy,
+# which create an empty .gc-profile/ first (docs/installations-plan.md).
+COPY .gc-profile/ /gc-profile/
+
 USER nextjs
 # Same cwd-relative layout as the pre-monorepo image (cwd held server.js).
 WORKDIR /app/packages/console

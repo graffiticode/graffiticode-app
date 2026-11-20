@@ -1,0 +1,3 @@
+# The digest fixture is compared byte for byte with gc-deploy's (and core's)
+# digest: no line-ending conversion, whatever the checkout settings.
+profile-digest/** -text

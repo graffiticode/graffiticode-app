@@ -1154,8 +1154,9 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       return;
     }
     res.writeHead(200, { "Content-Type": "application/json" });
-    // The installation receipt, when a profile is loaded (until gc-deploy
-    // records it with the release; docs/installations-plan.md).
+    // The installation receipt, when a profile is loaded: this is the MCP
+    // server's profileHealth, which gc-deploy checks against the revision's
+    // profile binding (docs/installations-plan.md).
     // The OAuth store, unless it is today's (so legacy's answer is unchanged).
     const store = oauthStoreStatus();
     res.end(JSON.stringify({ status: "ok", ...(installationReceipt ? { installation: installationReceipt } : {}), ...(store.mode !== "legacy" ? { oauthStore: store } : {}) }));
