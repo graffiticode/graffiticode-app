@@ -5,6 +5,7 @@
       "project": "graffiticode-app",
       "region": "us-central1",
       "buildServiceAccount": "deploy-build@graffiticode-app.iam.gserviceaccount.com",
+      "profileValidate": ["npm", "run", "profile", "--", "validate"],
       "exclude": [
         "docs"
       ]
@@ -87,6 +88,7 @@
       "verify": {
         "module": "verify/console.mjs"
       },
+      "profileHealth": "/api/health",
       "smoke": [
         {
           "path": "/",
@@ -167,6 +169,7 @@
         "ACT_AS_GRANT_SECRET": "ACT_AS_GRANT_SECRET:1",
         "INTERNAL_API_KEY": "INTERNAL_API_KEY:2"
       },
+      "profileHealth": "/health",
       "smoke": [
         {
           "path": "/health",
@@ -248,6 +251,7 @@
         "INTERNAL_API_KEY": "INTERNAL_API_KEY:2",
         "PRIVY_APP_SECRET": "PRIVY_APP_SECRET:1"
       },
+      "profileHealth": "/api/health",
       "smoke": [
         {
           "path": "/",
@@ -316,6 +320,7 @@
         "FREE_PLAN_NAMESPACE_SALT": "FREE_PLAN_NAMESPACE_SALT:2",
         "ACT_AS_GRANT_SECRET": "ACT_AS_GRANT_SECRET:1"
       },
+      "profileHealth": "/health",
       "smoke": [
         {
           "path": "/health",

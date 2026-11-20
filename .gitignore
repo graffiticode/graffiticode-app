@@ -4,5 +4,7 @@ dist/
 .env*
 !.env*.example
 .gc-deploy/
+# Reserved for gc-deploy's release profile; a local or CI docker build creates it empty.
+.gc-profile/
 .DS_Store
 firestore-debug.log

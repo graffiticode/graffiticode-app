@@ -65,7 +65,9 @@ jobs:
 
   # Each image is built from the repo root with the same Dockerfile gc-deploy
   # uses, then started with its real CMD; every path in its deploy.json smoke
-  # list must answer 200 (functional assets, not just a health route).
+  # list must answer 200 (functional assets, not just a health route). Built
+  # without gc-deploy, an image has an empty profile directory and must report
+  # no installation at its profileHealth path.
   images:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -76,19 +78,27 @@ jobs:
           - service: console
             port: 8080
             paths: /
+            health: /api/health
           - service: app
             port: 8080
             paths: / /sign-in
+            health: /api/health
           - service: mcp
             port: 3001
             paths: /health /widget/lang/L0180.mjs /favicon.ico
+            health: /health
           - service: openapi
             port: 8080
             paths: /health /v1/languages /v1/openapi.json /v1/docs
+            health: /health
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - name: Build ${{ matrix.service }} image
-        run: docker build -f configs/Dockerfile.${{ matrix.service }}.yaml -t gc-${{ matrix.service }} .
+        run: scripts/docker-build.sh ${{ matrix.service }}
+      - name: The image's profile directory is empty
+        run: docker run --rm --entrypoint sh gc-${{ matrix.service }} -c 'test -d /gc-profile && [ -z "$(ls -A /gc-profile)" ]'
+      - name: No profile directory is left in the workspace
+        run: test ! -e .gc-profile
       - name: Start ${{ matrix.service }} and check its paths
         run: |
           # The servers refuse to start without an installation project (storage
@@ -106,6 +116,12 @@ jobs:
             echo "$p -> $code"
             [ "$code" = 200 ] || status=1
           done
+          # Its profileHealth (deploy.json): 200, uncached, and no installation.
+          code=$(curl -s -o health.json -D headers.txt -w "%{http_code}" http://localhost:${{ matrix.port }}${{ matrix.health }} || true)
+          echo "${{ matrix.health }} -> $code $(cat health.json)"
+          [ "$code" = 200 ] || status=1
+          jq -e 'type == "object" and (has("installation") | not)' health.json > /dev/null || status=1
+          if [ "${{ matrix.service }}" = app ]; then grep -qi '^cache-control: no-store' headers.txt || { echo "app /api/health is cacheable"; status=1; }; fi
           [ $status = 0 ] || docker logs svc
           docker rm -f svc
           exit $status

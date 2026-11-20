@@ -105,6 +105,39 @@ test("two profiles, one app build: each installation's writes land in its own pr
   assert.equal(await emulatorDoc("graffiticode-app", "users/app-alice"), undefined, "not a built-in project");
 });
 
+// The app's profileHealth (deploy.json): gc-deploy requires a candidate's
+// receipt to match its revision's binding, appVersion included (K_REVISION).
+test("/api/health reports the loaded installation's complete receipt, uncached; none without a profile", async () => {
+  const { profileDigest } = await import("../../packages/core/src/profile/load.ts");
+  const dir = profile("alpha", "alpha-installation");
+  const bound = await startApp({ PROFILE_DIR: dir, K_REVISION: "app-r1", PROFILE_REPO: "git@github.com:example/installation-alpha.git", PROFILE_REF: "1".repeat(40) });
+  try {
+    const res = await fetch(`${bound.base}/api/health`);
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get("cache-control"), "no-store");
+    const body = await res.json();
+    assert.deepEqual(body, {
+      ok: true,
+      installation: {
+        appVersion: "app-r1", installationId: "alpha", profileVersion: 1,
+        profileRepo: "git@github.com:example/installation-alpha.git", profileRef: "1".repeat(40), profileDigest: profileDigest(dir),
+      },
+    });
+    assert.equal(res.headers.get("x-installation"), `alpha; profile=${profileDigest(dir).slice(0, 12)}`);
+  } finally {
+    await stop(bound.child);
+  }
+  const plain = await startApp({ GOOGLE_CLOUD_PROJECT: "demo-installation", K_REVISION: "app-r2" });
+  try {
+    const res = await fetch(`${plain.base}/api/health`);
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get("cache-control"), "no-store");
+    assert.deepEqual(await res.json(), { ok: true });
+  } finally {
+    await stop(plain.child);
+  }
+});
+
 test("a missing or contradicting project stops the app", async () => {
   await assert.rejects(startApp({}), (e: any) => /GOOGLE_CLOUD_PROJECT is required: there is no built-in project/.test(e.output));
   await assert.rejects(startApp({ PROFILE_DIR: profile("alpha", "alpha-installation"), GOOGLE_CLOUD_PROJECT: "graffiticode-app" }),
