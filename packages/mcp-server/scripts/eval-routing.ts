@@ -129,10 +129,12 @@ async function catalogInvariants() {
   } else skip('search:"learnosity" still finds them', "L0176");
 
   // A named brand outranks the item-type word beside it (console `brands`, 2026-09-16).
-  // "mystic wonk quiz" once searched as a quiz: L0180 matched "quiz" and L0182 did not.
+  // FigJam is a brand both FigJam languages carry (L0186 places by coordinates, L0187 lays
+  // out automatically), so either may rank first; "retro" alone would not pick them over
+  // nothing. L0182 carried a brand until 2026-09-22 (87cfc14: generic surveys, no brand), and
+  // its brand searches were removed from this eval with it.
   const brandSearches: Array<[string, string[]]> = [
-    ["mystic wonk quiz", ["L0182"]],
-    ["MysticWonk questionnaire", ["L0182"]],
+    ["figjam retro board", ["L0186", "L0187"]],
     ["learnosity multiple choice", ["L0176", "L0177", "L0178"]],
   ];
   for (const [term, want] of brandSearches) {
@@ -183,6 +185,16 @@ async function catalogInvariants() {
       check("get_language_info(L0176) surfaces not_for (out-of-scope)", true, `${l0176.not_for!.length} entries`);
     }
   } else skip("get_language_info(L0176) states the Learnosity-only gate", "L0176");
+
+  // Every language a case expects must be one discovery advertises, or the case asserts an
+  // outcome the catalog has made impossible (a case expected the deprecated L0173 for months).
+  // Cases the installation doesn't offer are judged "not-offered" instead (planCase).
+  const advertised = new Set(await ids({}));
+  const expected = [...new Set(CASES.filter((c) => planCase(c, surface).kind === "as-written")
+    .map((c) => c.expect ?? c.expectReachable).filter((id): id is string => Boolean(id)))];
+  const stale = expected.filter((id) => !advertised.has(id));
+  check("every language the cases expect is advertised by discovery", stale.length === 0,
+    stale.length ? `not advertised: ${stale.join(", ")}` : `${expected.length} expected languages`);
 
   // With a profile: discovery lists, and the instructions inline, only what the installation
   // offers. A language it doesn't offer must not be advertised in either place.
@@ -267,26 +279,43 @@ const CASES: Case[] = [
     expect: "L0176",
   },
   // A named brand decides the language, even under the wrong noun. The console's scope gate
-  // enforces this server-side (and refuses a brand request for a different kind of artifact —
-  // "Mystic Wonk concept web" — which this eval cannot see, because create_item is stubbed).
-  // These assert the agent gets there on its own, from the catalog line naming the brand.
+  // enforces this server-side (and refuses a brand request for a different kind of artifact,
+  // which this eval cannot see, because create_item is stubbed). These assert the agent gets
+  // there on its own, from the catalog line naming the brand. "quiz" would pull L0180; FigJam
+  // names the board, and automatic layout names L0187 (L0186 is placement by coordinates).
   {
     tag: "brand",
-    prompt: "Make a Mystic Wonk quiz about what our team should prioritize next quarter.",
-    expectReachable: "L0182",
-    why: "brand beats the noun: a Mystic Wonk quiz is a survey",
+    prompt:
+      "Make a FigJam board of quiz ideas for our team retro: sticky notes in three columns " +
+      "(keep, drop, try), laid out automatically.",
+    expectReachable: "L0187",
+    why: "brand beats the noun, and automatic layout is L0187",
   },
   {
     tag: "brand",
-    prompt: "Answer the Mystic Wonk test about office improvements.",
+    prompt:
+      "Make a FigJam board with a sticky note 'Plan' at x=100, y=200 and a sticky note 'Ship' " +
+      "at x=400, y=200, joined by an arrow.",
+    expectReachable: "L0186",
+    why: "explicit coordinates are L0186",
+  },
+  // L0182 takes an existing survey and records a response; it doesn't author questionnaires.
+  // Until 2026-09-22 these were Mystic Wonk brand cases (87cfc14 removed the brand).
+  {
+    tag: "survey",
+    prompt:
+      "Take our office-improvements survey and record my response: standing desks first, then " +
+      "a quiet room, then better coffee.",
     expectReachable: "L0182",
-    why: "brand beats the noun",
+    why: "answering an existing ranked-choice survey",
   },
   {
-    tag: "brand",
-    prompt: "Fill in the Mystic Wonk questionnaire on remote work.",
+    tag: "survey",
+    prompt:
+      "Fill in the remote-work survey you were sent for me: rate flexible hours 5 out of 5 and " +
+      "the commute 2 out of 5.",
     expectReachable: "L0182",
-    why: "brand beats the noun",
+    why: "answering an existing rating-scale survey",
   },
   {
     tag: "brand",
@@ -309,7 +338,13 @@ const CASES: Case[] = [
   // that routing must IGNORE a deprecation notice we deliberately publish.
   { prompt: "A spreadsheet problem where students compute column totals with SUM.", expect: "L0179" },
   { prompt: "A concept web where students link the causes of the Great Depression.", expect: "L0183" },
-  { prompt: "A bar chart of quarterly revenue for four regions.", expect: "L0173" },
+  // L0184, not L0173: L0173 is Deprecated, and the catalog drops deprecated languages, so it
+  // is no longer advertised and this case asserted an outcome the catalog had made impossible. The values are given, so
+  // creating is the right response rather than asking for them.
+  {
+    prompt: "A bar chart of Q3 revenue by region: North $120k, South $95k, East $140k, West $80k.",
+    expect: "L0184",
+  },
   // The three ChatGPT directory starter prompts, VERBATIM. They belong here because a
   // storefront prompt has to route on its own words: the person typing it copied it off a
   // card and knows nothing about the catalog, so a prompt that only works when an operator
