@@ -3,14 +3,15 @@
 // or, when the configuration carries none (only without a profile), this
 // build's own content, unchanged. Markdown only: raw HTML isn't rendered, and
 // react-markdown's URL transform drops javascript: links.
+//
+// The Markdown is rendered with the page's own element mapping (`components`)
+// and no wrapper element: react-markdown renders a fragment, so its blocks
+// land in the page's own container, with the same layout, typography and
+// spacing as the built-in content (HomeCopy.tsx, AboutCopy.tsx).
 import type { ReactNode } from 'react';
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { type Components } from 'react-markdown';
 
-export default function InstallationCopy({ markdown, className, children }: { markdown: string | null; className?: string; children: ReactNode }) {
+export default function InstallationCopy({ markdown, components, children }: { markdown: string | null; components: Components; children?: ReactNode }) {
   if (markdown === null) return <>{children}</>;
-  return (
-    <div className={`prose prose-sm prose-blue max-w-none ${className ?? ''}`} data-installation-copy="">
-      <ReactMarkdown>{markdown}</ReactMarkdown>
-    </div>
-  );
+  return <ReactMarkdown components={components}>{markdown}</ReactMarkdown>;
 }

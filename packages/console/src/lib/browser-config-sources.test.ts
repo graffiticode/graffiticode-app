@@ -27,7 +27,7 @@ const NOT_BROWSER = /\/pages\/api\/|\/app\/api\/|\/server\/|\.(test|spec)\.|inst
 // /api/config.
 const ALLOWED: Record<string, { hosts?: string; nextPublic?: string }> = {
   // This build's own copy, shown only without a profile (InstallationCopy).
-  'console/src/pages/about.tsx': { hosts: "the built-in about page, shown only without a profile" },
+  'console/src/components/AboutCopy.tsx': { hosts: "the built-in about page, shown only without a profile" },
   // The server resolver's built-in hosts, and the server's firebase key. In a
   // browser, configFromEnv refuses before reaching either (config.ts).
   'core/src/profile/hosts.ts': { hosts: 'server resolver defaults; unreachable in a browser' },
