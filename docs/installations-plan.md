@@ -95,7 +95,7 @@ Two surveys this session found:
   - the HTML pages and discovery JSON;
   - the OpenAPI document.
 
-  `eval:routing` must also be unchanged. **Pending gate:** it makes paid model calls and hasn't been run for P2. Its script (`packages/mcp-server/scripts/eval-routing.ts`) must also load the selected profile (`PROFILE_DIR`) before it can check profile-specific routing; until then it measures the built-in installation only.
+  `eval:routing` must also be unchanged. **Passed for the Graffiticode profile on 2026-11-21** (see "Routing eval" under Tracked items). The script loads the selected profile (`PROFILE_DIR`) before it reads anything profile-specific.
 
 ### P3. Installation isolation (`graffiticode-app`)
 - **All Firestore access goes through `core/src/db.ts`.**
@@ -237,7 +237,7 @@ Two surveys this session found:
   - references an unknown capability;
   - marks an unfinished capability implemented;
   - selects a writing capability early.
-- **P2:** the parity snapshots match; the full baseline, `core`, `mcp-server` and `openapi-server` suites pass unchanged. `eval:routing` is a pending gate (see P2): run it, with the eval script loading the selected profile, before the first production profile deployment.
+- **P2:** the parity snapshots match; the full baseline, `core`, `mcp-server` and `openapi-server` suites pass unchanged. `eval:routing` passed for the Graffiticode profile, with the eval loading it (see "Routing eval" under Tracked items).
 - **P3:**
   - a test (or lint rule) that only `core/src/db.ts` creates a Firestore handle;
   - startup fails without a project;
@@ -336,7 +336,25 @@ Commits and merges happen only when you ask.
   - `artcompiler/installation-artcompiler` holds the reviewed Artcompiler draft.
   - gc-deploy fetches a profile from its repo over SSH, at the commit `deploy.json` pins.
 - **Before deploying the hosts slice, check each live service's environment.** Host resolution (`packages/core/src/profile/hosts.ts`) now treats two variables naming the same host differently as a startup error, even without a profile (for example `CONSOLE_URL` and `GRAFFITICODE_CONSOLE_BASE_URL`, or `MCP_SERVER_URL` and `MCP_OAUTH_URL`). `deploy.json` is consistent, but variables set out of band on the Cloud Run services aren't visible from the repo: compare `gcloud run services describe <svc> --format='value(spec.template.spec.containers[0].env)'` for mcp, openapi and console against those pairs first.
-- **Routing eval (pending gate).** `npm run eval:routing` makes paid model calls and hasn't been run for P2. Before the first production profile deployment: teach `packages/mcp-server/scripts/eval-routing.ts` to load the selected profile (`PROFILE_DIR`, through `loadInstallation`), then run it for the Graffiticode profile, and for any installation that restricts its catalog.
+- **Routing eval (passed for the Graffiticode profile, 2026-11-21).**
+  - **The eval** (`packages/mcp-server/scripts/eval-routing.ts`, `routing-surface.ts`):
+    - It loads the installation `PROFILE_DIR` selects before reading the catalog, instructions or tool descriptions.
+    - It offers the model the served tools.
+    - It judges new-item cases against what the installation offers. Existing items stay revisable whatever the installation offers.
+    - A small model classifies each text reply from its whole text. Content written into the chat fails any case.
+    - Each outcome keeps its replies and any continued clarification as evidence.
+  - **Gate run** (accepted): eval `67feb25`, Graffiticode profile `352309a4` (digest `11988558…`), `claude-opus-4-8` routing, `claude-haiku-5-5` classifying.
+    - The console was a staged candidate, `console-rmwr1ig2k-6c6490` (commit `3f9023a`, the L0186/L0187 wording). It took no traffic and was not promoted.
+    - Results: 19 cases × 3 runs, 57/57 decisions, and every catalog invariant passed.
+    - One reply was mislabelled, an L0178 preamble classified `clarify` rather than `other`. It changes no result, since only `content` fails a case.
+  - **The run before it** (run 1, eval `260665c`, the production catalog): 14 of 19 cases passed.
+    - Its failures are kept as evidence under their original case definitions.
+    - Four of them were clarifications the cases couldn't express: a vague quiz, the invoice starter, and two surveys with no reference. Those cases were then corrected.
+    - One was a real routing miss: explicit coordinates went to L0187. The catalog descriptions fixed it.
+  - **Evidence** is preserved outside the repository, in `eval-evidence/routing-paid-2026-11-21-run1` and `…-run2`. Each holds the metadata, raw output, the case definitions as run, a README, and `SHA256SUMS`.
+    - run 1: `run.json` `0e3faae0…`, `output.txt` `fdbb6d4d…`.
+    - run 2: `run.json` `d19c1e21…`, `output.txt` `70ff42b7…`.
+  - **Still to run:** an installation that restricts its catalog, when one is prepared for production.
 - **Free-plan scope in REST `/me` (done in the billing and free-plan slice).** `free_plan.languages_restricted` says whether `languages` is the whole allowlist (true, possibly empty) or unrestricted (false, with `languages` empty).
 - **Billing and free-plan settings (P2).** Read through accessors at use time (`plans()`, `getPlan()`, `freePlanItemTtlMs()`, `freePlanEnabled()`); no caller captures them at import. A profile may state each plan's commercial terms (`billing.plans`), but tiers, hard caps and Stripe wiring stay code, and `COMMERCIAL_TERMS_CONFIGURABLE` (false) makes the validator refuse terms that differ from the code's until P3's pricing display and a check against Stripe's configured prices land. `freePlan.enabled` must be true for anonymous use; a profile without a `freePlan` section has none, and anonymous requests are refused (`free_plan_disabled`). `freePlan.itemTtlHours` sets the item lifetime; free-plan session tokens still expire at 48 hours.
 - **Discovery files: recorded correction (P2, discovery).** The committed `packages/app/public/llms.txt` and `.well-known/mcp.json` listed five MCP tools (`create_item`, `update_item`, `get_item`, `list_languages`, `get_language_info`). The server serves seven: `render_item` and `get_spec` were missing. They are now generated (`npm run profile -- discovery`) from the Graffiticode profile, with the endpoint and tools taken from the release's surface registry (`packages/core/src/surfaces.ts`), so both list all seven. `packages/skills/plugin.meta.json` was already consistent and is byte-identical to the generated file. A test fails if the committed files drift from the runtime catalog again.
