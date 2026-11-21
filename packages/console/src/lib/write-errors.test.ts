@@ -146,3 +146,30 @@ test("an item's lastWrite reaches GraphQL with what the check needs: its key, co
   const { idempotencyKey: _k, ...legacy } = stored;
   assert.equal(reconcileTarget(itemWriteFields(legacy)), null);
 });
+
+// C5d (graffiticode docs/c5d-refusal-and-hold-plan.md decision 5): Broker
+// answers a definitively refused capture `refused`, final. At release 18e9b7ba
+// the formatter read that as unresolved, "0 of 0 records … To save again,
+// recompile."
+test("a refused capture reads as refused, never as an unconfirmed save", () => {
+  const refused = describeReconcile({ operations: [{ verdict: "refused", final: true }] });
+  assert.deepEqual(refused, { verdict: "refused", text: "This capture wasn't published because its image was unavailable. Try capturing again." });
+  assert.doesNotMatch(refused.text, /0 of 0|recompile/);
+  assert.equal(describeReconcile({ operations: [{ verdict: "refused", final: true }, { verdict: "refused", final: true }] }).verdict, "refused");
+
+  // Mixed: some refused, the rest published.
+  const partial = describeReconcile({ operations: [{ verdict: "refused", final: true }, { verdict: "applied", final: true, records: [{ landed: true }] }] });
+  assert.equal(partial.verdict, "partial");
+  assert.equal(partial.text, "1 of 2 images in this capture weren't published because they were unavailable; the others were published. Try capturing again.");
+
+  // Mixed with an unconfirmed operation: unresolved, the refusal stated, its records not counted.
+  const mixed = describeReconcile({ operations: [{ verdict: "refused", final: true }, { verdict: "unresolved", final: false, records: [{ landed: false, found: false }] }] });
+  assert.equal(mixed.verdict, "unresolved");
+  assert.match(mixed.text, /^1 of 2 images in this capture weren't published because they were unavailable\. Couldn't confirm this save: 0 of 1 records/);
+  const early = describeReconcile({ operations: [{ verdict: "refused", final: true }, { verdict: "too-early", retryAfter: "2026-11-22T18:00:00.000Z" }] });
+  assert.equal(early.verdict, "too-early");
+  assert.match(early.text, /^1 of 2 images .* unavailable\. It's too soon/);
+
+  // A refusal that isn't final is never taken as one.
+  assert.equal(describeReconcile({ operations: [{ verdict: "refused", final: false }] }).verdict, "unresolved");
+});
