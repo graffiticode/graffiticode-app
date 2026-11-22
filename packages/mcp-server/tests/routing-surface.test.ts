@@ -24,10 +24,10 @@ const EXAMPLE = new URL("../../core/test/fixtures/installation-example", import.
 const GRAFFITICODE = process.env.GRAFFITICODE_PROFILE_DIR ? resolve(process.env.GRAFFITICODE_PROFILE_DIR) : null;
 
 // A catalog as the console serves it (raw ids), wider than any restriction.
-const IDS = ["0159", "0166", "0171", "0173", "0175", "0176", "0177", "0178", "0179", "0180", "0181", "0182", "0183", "0184"];
+const IDS = ["0159", "0166", "0171", "0173", "0175", "0176", "0177", "0178", "0179", "0180", "0181", "0182", "0183", "0184", "0186", "0187"];
 const CATALOG = IDS.map((id) => ({ id, name: `L${id}`, description: `Language ${id}`, domains: [] })) as any[];
 // The languages the eval's cases expect (scripts/eval-routing.ts, CASES).
-const CASE_LANGUAGES = ["L0173", "L0175", "L0176", "L0178", "L0179", "L0180", "L0181", "L0182", "L0183"];
+const CASE_LANGUAGES = ["L0175", "L0176", "L0178", "L0179", "L0180", "L0181", "L0182", "L0183", "L0184", "L0186", "L0187"];
 
 afterEach(() => resetInstallation());
 
