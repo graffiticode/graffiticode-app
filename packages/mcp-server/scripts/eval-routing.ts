@@ -22,22 +22,24 @@
 // `expectReachable` (see Case) asserts the positive outcome, so a silent no-call now fails.
 //
 // Routing is stochastic, so each case runs N times; a 1-of-N regression is still a regression.
+//
+// The installation: PROFILE_DIR selects it, as it does for the servers, and it is loaded before
+// anything reads the catalog, the instructions or the tool descriptions (routing-surface.ts).
+// Without PROFILE_DIR the eval measures the built-in Graffiticode surface, unchanged. With a
+// profile, the instructions, the discovery tools' descriptions, the create_item description and
+// the inlined catalog are the profile's, and a case whose language the profile doesn't offer is
+// judged "not-offered" (planCase): asking or declining passes, creating anywhere fails.
+//
+//   PROFILE_DIR=<profile checkout> ANTHROPIC_API_KEY=… GRAFFITICODE_API_KEY=… npx tsx scripts/eval-routing.ts
 
 import Anthropic from "@anthropic-ai/sdk";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import {
-  SERVER_INSTRUCTIONS,
-  buildServerInstructions,
-  listLanguagesTool,
-  getLanguageInfoTool,
-  handleListLanguages,
-  handleGetLanguageInfo,
-  type ToolContext,
-} from "../src/tools.js";
-// The RAW catalog (unprefixed ids), because buildServerInstructions formats the
-// "L####" itself — handleListLanguages already prefixes and would double it.
-import { listLanguages as apiListLanguages, type AuthContext } from "../src/api.js";
+// Types only: the modules themselves are imported by loadRoutingSurface, after the installation
+// is loaded.
+import type { ToolContext } from "../src/tools.js";
+import type { AuthContext } from "../src/api.js";
+import { inlinedCatalogIds, judge, loadRoutingSurface, planCase, routeOnce, type Outcome, type RoutingSurface } from "./routing-surface.js";
 
 const MODEL = "claude-opus-4-8";
 const RUNS_PER_CASE = Number(process.env.EVAL_RUNS ?? 3);
@@ -45,6 +47,9 @@ const RUNS_PER_CASE = Number(process.env.EVAL_RUNS ?? 3);
 const SKILLS_REPO = process.env.GRAFFITICODE_SKILLS_PATH ?? "../skills";
 
 const catalogOnly = process.argv.includes("--catalog-only");
+// create_item is offered to the model as the installation serves it. `--legacy-create-stub`
+// restores the short stub text earlier runs used, only to compare against them.
+const legacyCreateStub = process.argv.includes("--legacy-create-stub");
 
 // `--only <substr>` runs just the cases whose tag, `why`, or prompt contains <substr>.
 // `--only starter` is the pre-resubmission check: the three ChatGPT storefront prompts,
@@ -61,6 +66,9 @@ if (!gcKey) {
 }
 const auth: AuthContext = { type: "firebase", token: gcKey, source: "raw" };
 const ctx: ToolContext = { auth };
+
+// Set in main(), before anything below runs.
+let surface: RoutingSurface;
 
 let failures = 0;
 const check = (name: string, ok: boolean, detail = "") => {
@@ -79,7 +87,7 @@ async function catalogInvariants() {
   console.log("\n=== Catalog invariants (live console) ===");
 
   const ids = async (args: { domain?: string; search?: string }) => {
-    const res = (await handleListLanguages(ctx, args)) as { languages: any[] };
+    const res = (await surface.handleListLanguages(ctx, args)) as { languages: any[] };
     return res.languages.map((l) => norm(l.id));
   };
 
@@ -90,12 +98,16 @@ async function catalogInvariants() {
     `got ${assessments.join(", ")}`,
   );
 
+  // Checks that name a language only apply where the installation offers it.
+  const skip = (name: string, id: string) => console.log(`SKIP  ${name} — the installation doesn't offer ${id}`);
   const learnosity = await ids({ domain: "learnosity" });
-  check(
-    "domain:learnosity contains L0176 (item content), and no longer the retired L0158",
-    learnosity.includes("L0176") && !learnosity.includes("L0158"),
-    `got ${learnosity.join(", ")}`,
-  );
+  if (surface.offered("L0176")) {
+    check(
+      "domain:learnosity contains L0176 (item content), and no longer the retired L0158",
+      learnosity.includes("L0176") && !learnosity.includes("L0158"),
+      `got ${learnosity.join(", ")}`,
+    );
+  } else skip("domain:learnosity contains L0176", "L0176");
 
   for (const term of ["quiz", "multiple choice", "assessment", "test"]) {
     const hits = await ids({ search: term });
@@ -108,11 +120,13 @@ async function catalogInvariants() {
 
   // The gate must not make them undiscoverable to someone who actually wants Learnosity.
   const branded = await ids({ search: "learnosity" });
-  check(
-    'search:"learnosity" still finds them',
-    branded.includes("L0176"),
-    `got ${branded.join(", ") || "(none)"}`,
-  );
+  if (surface.offered("L0176")) {
+    check(
+      'search:"learnosity" still finds them',
+      branded.includes("L0176"),
+      `got ${branded.join(", ") || "(none)"}`,
+    );
+  } else skip('search:"learnosity" still finds them', "L0176");
 
   // A named brand outranks the item-type word beside it (console `brands`, 2026-09-16).
   // "mystic wonk quiz" once searched as a quiz: L0180 matched "quiz" and L0182 did not.
@@ -122,6 +136,10 @@ async function catalogInvariants() {
     ["learnosity multiple choice", ["L0176", "L0177", "L0178"]],
   ];
   for (const [term, want] of brandSearches) {
+    if (!want.some((id) => surface.offered(id))) {
+      skip(`search:"${term}" ranks the brand's language first`, want.join("/"));
+      continue;
+    }
     const hits = await ids({ search: term });
     check(
       `search:"${term}" ranks the brand's language first`,
@@ -130,7 +148,7 @@ async function catalogInvariants() {
     );
   }
 
-  const withHints = (await handleListLanguages(ctx, { domain: "assessments" })) as {
+  const withHints = (await surface.handleListLanguages(ctx, { domain: "assessments" })) as {
     languages: Array<{ id: string; when_to_use?: string }>;
   };
   const missing = withHints.languages.filter((l) => !l.when_to_use).map((l) => norm(l.id));
@@ -140,28 +158,41 @@ async function catalogInvariants() {
     missing.length ? `missing on ${missing.join(", ")}` : "",
   );
 
-  const l0176 = (await handleGetLanguageInfo(ctx, { language: "L0176" })) as {
-    description: string;
-    when_to_use?: string;
-    not_for?: string[];
-  };
-  const gateText = `${l0176.description} ${l0176.when_to_use ?? ""}`.toLowerCase();
-  check(
-    "get_language_info(L0176) states the Learnosity-only gate",
-    gateText.includes("only when") && gateText.includes("learnosity"),
-    l0176.description,
-  );
-  // not_for comes from the language server's scope.json, fetched through the API gateway. In local
-  // dev that gateway is often unreachable (.env.local points NEXT_PUBLIC_GC_API_URL at
-  // localhost:3100), and every language's scope comes back null. Report that as "could not run"
-  // rather than failing — a silent null here is an environment problem, not a catalog regression.
-  if ((l0176.not_for?.length ?? 0) === 0) {
-    console.log(
-      "SKIP  get_language_info(L0176) surfaces not_for — no scope from the language server " +
-        "(unreachable lang-server assets; point NEXT_PUBLIC_GC_API_URL at a live API gateway)",
+  if (surface.offered("L0176")) {
+    const l0176 = (await surface.handleGetLanguageInfo(ctx, { language: "L0176" })) as {
+      description: string;
+      when_to_use?: string;
+      not_for?: string[];
+    };
+    const gateText = `${l0176.description} ${l0176.when_to_use ?? ""}`.toLowerCase();
+    check(
+      "get_language_info(L0176) states the Learnosity-only gate",
+      gateText.includes("only when") && gateText.includes("learnosity"),
+      l0176.description,
     );
-  } else {
-    check("get_language_info(L0176) surfaces not_for (out-of-scope)", true, `${l0176.not_for!.length} entries`);
+    // not_for comes from the language server's scope.json, fetched through the API gateway. In local
+    // dev that gateway is often unreachable (.env.local points NEXT_PUBLIC_GC_API_URL at
+    // localhost:3100), and every language's scope comes back null. Report that as "could not run"
+    // rather than failing — a silent null here is an environment problem, not a catalog regression.
+    if ((l0176.not_for?.length ?? 0) === 0) {
+      console.log(
+        "SKIP  get_language_info(L0176) surfaces not_for — no scope from the language server " +
+          "(unreachable lang-server assets; point NEXT_PUBLIC_GC_API_URL at a live API gateway)",
+      );
+    } else {
+      check("get_language_info(L0176) surfaces not_for (out-of-scope)", true, `${l0176.not_for!.length} entries`);
+    }
+  } else skip("get_language_info(L0176) states the Learnosity-only gate", "L0176");
+
+  // With a profile: discovery lists, and the instructions inline, only what the installation
+  // offers. A language it doesn't offer must not be advertised in either place.
+  if (surface.receipt) {
+    const listed = await ids({});
+    const unoffered = listed.filter((id) => !surface.offered(id));
+    check("list_languages returns only languages the installation offers", unoffered.length === 0, unoffered.length ? `also ${unoffered.join(", ")}` : `${listed.length} listed`);
+    const inlined = inlinedCatalogIds(surface.instructions(await surface.listCatalog({ auth })));
+    const extra = inlined.filter((id) => !surface.offered(id));
+    check("the instructions inline only languages the installation offers", extra.length === 0, extra.length ? `also ${extra.join(", ")}` : `${inlined.length} inlined`);
   }
 }
 
@@ -326,104 +357,6 @@ function loadSkill(name: string): string {
   }
 }
 
-// Stub create_item: record the routing decision and stop. Nothing is generated.
-const createItemStub = {
-  name: "create_item",
-  description:
-    "Create interactive content in a Graffiticode language. Call list_languages() first to " +
-    "discover available languages, then pass the language ID here.",
-  input_schema: {
-    type: "object" as const,
-    properties: {
-      language: { type: "string", description: "Language ID (e.g., 'L0166')" },
-      description: { type: "string", description: "Natural language description of what to create" },
-    },
-    required: ["language", "description"],
-  },
-};
-
-// The escape hatch: an agent with no good match should ASK, not force the closest language.
-const askUserStub = {
-  name: "ask_user",
-  description:
-    "Ask the user a clarifying question. Use this when no available Graffiticode language fits " +
-    "the request, instead of forcing the closest match.",
-  input_schema: {
-    type: "object" as const,
-    properties: { question: { type: "string" } },
-    required: ["question"],
-  },
-};
-
-type Outcome =
-| { kind: "create"; language: string; discovery?: number }
-  | { kind: "ask"; question: string; discovery?: number }
-  | { kind: "none"; text: string; discovery?: number };
-
-async function routeOnce(client: Anthropic, prompt: string, system: string): Promise<Outcome> {
-  const messages: Anthropic.MessageParam[] = [{ role: "user", content: prompt }];
-  // How many list_languages/get_language_info calls the model made before deciding.
-  // This is the latency metric the inlined catalog exists to move: each one costs
-  // its own round-trip PLUS a model turnaround (measured 2.7s and 7.2s in a real
-  // session), so a routing decision reached with 0 discovery calls is ~14s faster
-  // than the same decision reached with 2.
-  let discovery = 0;
-  const tools = [
-    { name: listLanguagesTool.name, description: listLanguagesTool.description, input_schema: listLanguagesTool.inputSchema },
-    { name: getLanguageInfoTool.name, description: getLanguageInfoTool.description, input_schema: getLanguageInfoTool.inputSchema },
-    createItemStub,
-    askUserStub,
-  ] as Anthropic.Tool[];
-
-  for (let turn = 0; turn < 8; turn++) {
-    const res = await client.messages.create({
-      model: MODEL,
-      max_tokens: 8000,
-      thinking: { type: "adaptive" },
-      system,
-      tools,
-      messages,
-    });
-
-    const sayText = () =>
-      res.content
-        .filter((b): b is Anthropic.TextBlock => b.type === "text")
-        .map((b) => b.text)
-        .join(" ")
-        .trim();
-
-    const calls = res.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
-    if (calls.length === 0) return { kind: "none", text: sayText(), discovery };
-
-    // A routing decision ends the run.
-    for (const call of calls) {
-      if (call.name === "create_item") {
-        return { kind: "create", language: norm(String((call.input as any).language ?? "")), discovery };
-      }
-      if (call.name === "ask_user") {
-        return { kind: "ask", question: String((call.input as any).question ?? ""), discovery };
-      }
-    }
-
-    messages.push({ role: "assistant", content: res.content });
-    const results: Anthropic.ToolResultBlockParam[] = [];
-    for (const call of calls) {
-      let out: unknown;
-      try {
-        out =
-          call.name === "list_languages"
-            ? ((discovery += 1), await handleListLanguages(ctx, call.input as any))
-            : ((discovery += 1), await handleGetLanguageInfo(ctx, call.input as any));
-      } catch (err) {
-        out = { error: String(err) };
-      }
-      results.push({ type: "tool_result", tool_use_id: call.id, content: JSON.stringify(out) });
-    }
-    messages.push({ role: "user", content: results });
-  }
-  return { kind: "none", text: "(tool-loop exhausted)", discovery };
-}
-
 async function routingEval() {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) {
@@ -441,16 +374,21 @@ async function routingEval() {
   // whole point of inlining the catalog is that the model can now route WITHOUT
   // calling list_languages first. If the catalog fetch fails we fall back to the
   // bare text, exactly as the server does.
-  let catalogForInstructions: Awaited<ReturnType<typeof apiListLanguages>> | null = null;
+  let catalogForInstructions: Awaited<ReturnType<RoutingSurface["listCatalog"]>> | null = null;
   try {
-    catalogForInstructions = await apiListLanguages({ auth });
+    catalogForInstructions = await surface.listCatalog({ auth });
   } catch {
     catalogForInstructions = null;
   }
-  const instructions = buildServerInstructions(catalogForInstructions);
+  const instructions = surface.instructions(catalogForInstructions);
   console.log(
     `instructions: ${instructions.length} chars` +
       (catalogForInstructions ? ` (catalog inlined: ${catalogForInstructions.length} languages)` : " (no catalog — bare)")
+  );
+  console.log(
+    legacyCreateStub
+      ? "create_item: the legacy stub text (--legacy-create-stub; no client is sent it)"
+      : `create_item: as served (${surface.createItemTool.description.length} chars)`,
   );
 
   const system = [
@@ -479,11 +417,12 @@ async function routingEval() {
 
   for (const c of cases) {
     const outcomes = await Promise.all(
-      Array.from({ length: RUNS_PER_CASE }, () => routeOnce(client, c.prompt, system)),
+      Array.from({ length: RUNS_PER_CASE }, () =>
+        routeOnce(client, { prompt: c.prompt, system, model: MODEL, surface, ctx, legacyCreateStub })),
     );
 
     const summarize = (o: Outcome) =>
-      o.kind === "create" ? o.language : o.kind === "ask" ? "ASKED" : "no-call";
+      o.kind === "create" ? o.language : o.kind === "ask" ? "ASKED" : o.kind === "exhausted" ? "EXHAUSTED" : "no-call";
     // Discovery calls per run, appended to the detail. This is the latency metric:
     // "disc 0,0,0" means every run routed straight to create_item, skipping the two
     // pre-flight calls that used to cost ~14s before generation even started.
@@ -500,33 +439,18 @@ async function routingEval() {
       }
     }
 
-    if (c.expect) {
-      const ok = outcomes.every((o) => o.kind === "create" && o.language === c.expect);
-      check(`${c.expect}  "${c.prompt}"`, ok, detail);
-    } else if (c.expectReachable) {
-      // Creating in the named language passes; asking a clarifying question passes, since that
-      // is a legitimate response to an underspecified request. A no-call FAILS — that is the
-      // whole point of this mode, and the outcome `expectNot` silently rewarded.
-      const ok = outcomes.every(
-        (o) => (o.kind === "create" && o.language === c.expectReachable) || o.kind === "ask",
-      );
-      check(
-        `${c.expectReachable}  "${c.prompt}"${c.why ? ` (${c.why})` : ""}`,
-        ok,
-        detail,
-      );
-    } else {
-      // Must not land on a gated language. Asking the user is a pass — that's the intended
-      // behavior when no specialist fits.
-      const ok = outcomes.every(
-        (o) => !(o.kind === "create" && c.expectNot!.includes(o.language)),
-      );
-      check(`not-Learnosity  "${c.prompt}"${c.why ? ` (${c.why})` : ""}`, ok, detail);
-    }
+    const { ok, label } = judge(c, planCase(c, surface), outcomes);
+    check(label, ok, detail);
   }
 }
 
 async function main() {
+  // The installation first: everything below reads it.
+  surface = await loadRoutingSurface(process.env);
+  const r = surface.receipt;
+  console.log(r
+    ? `installation: ${r.installationId} (profile ${r.profileDigest.slice(0, 12)}${r.profileRef ? ` at ${r.profileRef.slice(0, 12)}` : ""})`
+    : "installation: built-in Graffiticode (no PROFILE_DIR)");
   await catalogInvariants();
   if (!catalogOnly) await routingEval();
 
