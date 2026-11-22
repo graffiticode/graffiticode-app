@@ -39,7 +39,11 @@ import { resolve } from "node:path";
 // is loaded.
 import type { ToolContext } from "../src/tools.js";
 import type { AuthContext } from "../src/api.js";
-import { inlinedCatalogIds, judge, loadRoutingSurface, planCase, routeOnce, type Outcome, type RoutingSurface } from "./routing-surface.js";
+import {
+  evidenceLines, inlinedCatalogIds, judge, loadRoutingSurface, planCase, replyClassifier, routeOnce,
+  type ExpectUpdate, type FixtureItem, type Outcome, type RoutingSurface,
+} from "./routing-surface.js";
+import { surveyFixture } from "./routing-fixtures.js";
 
 const MODEL = "claude-opus-4-8";
 const RUNS_PER_CASE = Number(process.env.EVAL_RUNS ?? 3);
@@ -191,6 +195,7 @@ async function catalogInvariants() {
   // Cases the installation doesn't offer are judged "not-offered" instead (planCase).
   const advertised = new Set(await ids({}));
   const expected = [...new Set(CASES.filter((c) => planCase(c, surface).kind === "as-written")
+    // New items only: an existing item (expectUpdate) needn't be in what discovery advertises.
     .map((c) => c.expect ?? c.expectReachable).filter((id): id is string => Boolean(id)))];
   const stale = expected.filter((id) => !advertised.has(id));
   check("every language the cases expect is advertised by discovery", stale.length === 0,
@@ -231,10 +236,32 @@ interface Case {
    * eval exists to catch.
    */
   expectNot?: string[];
+  /**
+   * A survey the user already has: the run must render this item (served from SURVEYS) and
+   * then call update_item on it, naming each of these ideas in its modification.
+   */
+  expectUpdate?: ExpectUpdate;
+  /**
+   * The user's fixed answer to a clarifying question. With `expect`, the run must clarify first
+   * (ask_user, or a text reply the classifier calls `clarify`), then create from this reply.
+   */
+  followUp?: string;
   why?: string;
   /** Free-form label for `--only`. */
   tag?: string;
 }
+
+// The surveys the survey cases answer, as render_item would return them.
+const SURVEYS: Record<string, FixtureItem> = {
+  "svy-office-2026": surveyFixture("svy-office-2026", {
+    name: "office-improvements", title: "Office improvements",
+    ideas: ["standing desks", "quiet room", "better coffee", "more plants"], minChoices: 1, maxChoices: 3,
+  }),
+  "svy-remote-2026": surveyFixture("svy-remote-2026", {
+    name: "remote-work", title: "Remote work",
+    ideas: ["flexible hours", "no-meeting Fridays", "home office stipend"], minChoices: 1, maxChoices: 2,
+  }),
+};
 
 const CASES: Case[] = [
   // Generic assessment requests. These must reach L0180 — the ungated general assessment
@@ -247,7 +274,10 @@ const CASES: Case[] = [
     why: "generic quiz",
   },
   {
-    prompt: "Create a short quiz to test my students on photosynthesis.",
+    // Concrete, so creating is the right response. Its vague predecessor ("Create a short quiz
+    // to test my students on photosynthesis.") drew clarifying questions, which the server
+    // instructions ask for ("Make a quiz on fractions" -> ask how many questions).
+    prompt: "Create a 4-question multiple-choice quiz on photosynthesis for grade 7 students, one correct answer per question.",
     expectReachable: "L0180",
     why: "generic quiz",
   },
@@ -300,22 +330,22 @@ const CASES: Case[] = [
     why: "explicit coordinates are L0186",
   },
   // L0182 takes an existing survey and records a response; it doesn't author questionnaires.
-  // Until 2026-09-22 these were Mystic Wonk brand cases (87cfc14 removed the brand).
+  // Answering one is render_item then update_item on the survey's id, so these cases name a
+  // survey the eval serves (SURVEYS) and the run must record a response naming the ideas
+  // chosen. Until 2026-09-22 these were Mystic Wonk brand cases (87cfc14 removed the brand).
   {
     tag: "survey",
     prompt:
-      "Take our office-improvements survey and record my response: standing desks first, then " +
-      "a quiet room, then better coffee.",
-    expectReachable: "L0182",
+      "Take our office-improvements survey (item svy-office-2026) and record my response: " +
+      "standing desks first, then a quiet room.",
+    expectUpdate: { itemId: "svy-office-2026", mentions: ["standing desks", "quiet room"] },
     why: "answering an existing ranked-choice survey",
   },
   {
     tag: "survey",
-    prompt:
-      "Fill in the remote-work survey you were sent for me: rate flexible hours 5 out of 5 and " +
-      "the commute 2 out of 5.",
-    expectReachable: "L0182",
-    why: "answering an existing rating-scale survey",
+    prompt: "Answer the remote-work survey svy-remote-2026 for me: I'd choose flexible hours, then no-meeting Fridays.",
+    expectUpdate: { itemId: "svy-remote-2026", mentions: ["flexible hours", "no-meeting Fridays"] },
+    why: "answering an existing ranked-choice survey",
   },
   {
     tag: "brand",
@@ -370,6 +400,11 @@ const CASES: Case[] = [
     prompt:
       "Create an invoice with line items, quantity, unit price, a line total per row, " +
       "and a grand total, formatted as currency.",
+    // The server instructions give "Create an invoice" as THE example of a request to clarify
+    // (ask "What line items and amounts?"), and the 2026-11-21 run did exactly that, 3 of 3. So
+    // this case clarifies first, gets these line items, and must then create in L0179.
+    followUp:
+      "Line items: website design, 12 hours at $95; logo design, 1 at $450; hosting setup, 1 at $120.",
     expect: "L0179",
   },
   { tag: "starter", prompt: "Create a concept web on how rain forms that students complete by dragging terms into place.", expect: "L0183" },
@@ -399,6 +434,8 @@ async function routingEval() {
     process.exit(2);
   }
   const client = new Anthropic({ apiKey: anthropicKey });
+  // Text-only replies are judged from the whole reply, by a small model (routing-surface.ts).
+  const classifyReply = replyClassifier(client);
 
   // The real agent-facing surface: server instructions + the two skills that teach
   // discovery.
@@ -416,9 +453,12 @@ async function routingEval() {
     catalogForInstructions = null;
   }
   const instructions = surface.instructions(catalogForInstructions);
+  // Counted from the instructions themselves: the catalog fetched is filtered before it is
+  // inlined (discovery and the installation's offer), so its length overstates what is shown.
+  const inlined = inlinedCatalogIds(instructions).length;
   console.log(
     `instructions: ${instructions.length} chars` +
-      (catalogForInstructions ? ` (catalog inlined: ${catalogForInstructions.length} languages)` : " (no catalog — bare)")
+      (catalogForInstructions ? ` (catalog inlined: ${inlined} languages, of ${catalogForInstructions.length} fetched)` : " (no catalog — bare)")
   );
   console.log(
     legacyCreateStub
@@ -453,26 +493,32 @@ async function routingEval() {
   for (const c of cases) {
     const outcomes = await Promise.all(
       Array.from({ length: RUNS_PER_CASE }, () =>
-        routeOnce(client, { prompt: c.prompt, system, model: MODEL, surface, ctx, legacyCreateStub })),
+        routeOnce(client, {
+          prompt: c.prompt, system, model: MODEL, surface, ctx, legacyCreateStub,
+          items: SURVEYS, followUp: c.followUp, classifyReply,
+        })),
     );
 
     const summarize = (o: Outcome) =>
-      o.kind === "create" ? o.language : o.kind === "ask" ? "ASKED" : o.kind === "exhausted" ? "EXHAUSTED" : "no-call";
+      o.kind === "create" ? `${o.language}${o.afterClarification ? " (after clarifying)" : ""}`
+        : o.kind === "update" ? `update ${o.itemId}`
+          : o.kind === "ask" ? "ASKED"
+            : o.kind === "exhausted" ? "EXHAUSTED"
+              : `text: ${o.reply ?? "unclassified"}`;
+    // A run that wrote content into the chat fails whatever else it did; flag it in the summary.
+    const flagged = (o: Outcome) => `${summarize(o)}${o.replies.some((r) => r.reply === "content") ? " +content" : ""}`;
     // Discovery calls per run, appended to the detail. This is the latency metric:
     // "disc 0,0,0" means every run routed straight to create_item, skipping the two
     // pre-flight calls that used to cost ~14s before generation even started.
     const disc = outcomes.map((o) => o.discovery ?? 0);
     const detail =
-      outcomes.map(summarize).join(", ") + `  [disc ${disc.join(",")}]`;
+      outcomes.map(flagged).join(", ") + `  [disc ${disc.join(",")}]`;
 
     // A non-routing outcome is only meaningful if you can read what it said — print it so a
     // "no-call" that quietly authored a quiz in chat can't hide behind a green check.
-    if (process.env.EVAL_VERBOSE) {
-      for (const o of outcomes) {
-        if (o.kind === "ask") console.log(`        ASKED: ${o.question.slice(0, 220)}`);
-        if (o.kind === "none") console.log(`        SAID:  ${o.text.slice(0, 220)}`);
-      }
-    }
+    // Full replies, so a reader can check each classification against the text it judged.
+    // Every reply each run wrote (a clarification it continued past included), with its verdict.
+    if (process.env.EVAL_VERBOSE) for (const line of evidenceLines(outcomes)) console.log(line);
 
     const { ok, label } = judge(c, planCase(c, surface), outcomes);
     check(label, ok, detail);
