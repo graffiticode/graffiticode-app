@@ -200,7 +200,8 @@ const typeDefs = `
   }
 
   type ItemWriteCheck {
-    # "applied" (confirmed), "unresolved" or "too-early"
+    # "applied" (confirmed), "unresolved", "too-early", "refused" (a capture
+    # refused because its image was unavailable) or "partial" (some refused)
     verdict: String!
     text: String!
     at: String!

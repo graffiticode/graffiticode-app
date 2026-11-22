@@ -136,34 +136,58 @@ type ReconcileRecord = { landed?: boolean; matches?: boolean; found?: boolean };
 type ReconcileOperation = { verdict?: string; final?: boolean; reason?: string; retryAfter?: string; records?: ReconcileRecord[] };
 
 export type ReconcileSummary = {
-  // applied: confirmed in the item bank. Anything else leaves the save unconfirmed.
-  verdict: "applied" | "unresolved" | "too-early";
+  // applied: confirmed in the item bank. refused: a capture Broker refused
+  // definitively because its staged image was unavailable (C5d,
+  // docs/c5d-refusal-and-hold-plan.md decision 5), so nothing of it was
+  // published; partial: some of a capture's operations refused, the rest
+  // published. Anything else leaves the save unconfirmed.
+  verdict: "applied" | "unresolved" | "too-early" | "refused" | "partial";
   text: string;
   retryAfter?: string;
 };
 
+// A refusal is final only as Broker answers it: verdict refused, final true.
+const isRefused = (o: ReconcileOperation) => o.verdict === "refused" && o.final === true;
+const isApplied = (o: ReconcileOperation) => o.verdict === "applied" && o.final === true;
+
 export function describeReconcile(result: { operations?: ReconcileOperation[] } | null | undefined): ReconcileSummary {
-  const ops = Array.isArray(result?.operations) ? result.operations : [];
-  if (ops.length > 0 && ops.every(o => o.verdict === "applied" && o.final === true)) {
+  const all = Array.isArray(result?.operations) ? result.operations : [];
+  if (all.length > 0 && all.every(isApplied)) {
     return { verdict: "applied", text: "Confirmed: this save is in the item bank." };
   }
+  // C5d: a capture Broker refused, wholly or in part. Its refused operations
+  // published nothing and never will; they aren't records to count below.
+  const refused = all.filter(isRefused).length;
+  if (refused > 0 && refused === all.length) {
+    return { verdict: "refused", text: "This capture wasn't published because its image was unavailable. Try capturing again." };
+  }
+  if (refused > 0 && all.every(o => isRefused(o) || isApplied(o))) {
+    return {
+      verdict: "partial",
+      text: `${refused} of ${all.length} images in this capture weren't published because they were unavailable; the others were published. Try capturing again.`,
+    };
+  }
+  const refusedNote = refused > 0
+    ? `${refused} of ${all.length} images in this capture weren't published because they were unavailable. `
+    : "";
+  const ops = all.filter(o => !isRefused(o));
   const early = ops.filter(o => o.verdict === "too-early" && o.retryAfter);
   if (early.length) {
     const retryAfter = early.map(o => o.retryAfter as string).sort().at(-1) as string;
-    return { verdict: "too-early", text: "It's too soon to check this save; the item bank may still be applying it. Try again in a minute.", retryAfter };
+    return { verdict: "too-early", text: `${refusedNote}It's too soon to check this save; the item bank may still be applying it. Try again in a minute.`, retryAfter };
   }
   if (ops.some(o => o.reason === "no-evidence" || o.reason === "evidence-format-unknown")) {
-    return { verdict: "unresolved", text: "This save was made before saves could be checked, so it can't be confirmed from the item bank. Look for the item in Learnosity; to save again, recompile the item (the write may repeat)." };
+    return { verdict: "unresolved", text: `${refusedNote}This save was made before saves could be checked, so it can't be confirmed from the item bank. Look for the item in Learnosity; to save again, recompile the item (the write may repeat).` };
   }
   if (ops.some(o => o.reason === "read-failed")) {
-    return { verdict: "unresolved", text: "The item bank couldn't be read just now. Try the check again in a moment." };
+    return { verdict: "unresolved", text: `${refusedNote}The item bank couldn't be read just now. Try the check again in a moment.` };
   }
   const records = ops.flatMap(o => o.records ?? []);
   const landed = records.filter(r => r.landed).length;
   const differs = records.some(r => r.found && !r.matches);
   return {
     verdict: "unresolved",
-    text: `Couldn't confirm this save: ${landed} of ${records.length} records in the item bank carry its mark` +
+    text: `${refusedNote}Couldn't confirm this save: ${landed} of ${records.length} records in the item bank carry its mark` +
       `${differs ? ", and the item bank now holds different content" : ""}. ` +
       "To save again, recompile the item (the write may repeat).",
   };

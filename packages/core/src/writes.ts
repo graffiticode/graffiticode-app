@@ -23,7 +23,7 @@ export type LastWrite = {
   // checks exactly this save, never one found by deriving a key again.
   idempotencyKey?: string;
   // The latest check of an uncertain or partial save against the item bank.
-  reconcile?: { verdict: "applied" | "unresolved" | "too-early"; text: string; at: number };
+  reconcile?: { verdict: "applied" | "unresolved" | "too-early" | "refused" | "partial"; text: string; at: number };
   // Set when a check confirmed the save, which turned it into a success.
   confirmed?: boolean;
 };
