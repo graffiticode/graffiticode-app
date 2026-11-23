@@ -20,6 +20,12 @@ export function firestoreAt(s: InstallationStorage): FirebaseFirestore.Firestore
   const appName = `installation:${s.projectId}`;
   const app = admin.apps.find(a => a?.name === appName) ?? admin.initializeApp({ projectId: s.projectId }, appName);
   const firestore = firestoreFor(app, s.databaseId);
+  // Writers across the console and core build documents with optional fields
+  // left `undefined` (e.g. `x || undefined`) and rely on them being dropped.
+  // Before P3 1a this was set on the default app as a side effect of the RAG
+  // analytics constructor; losing it broke the 2026-11-23 corpus sweep's write.
+  // Set it here, on the only handle there is, before any use.
+  firestore.settings({ ignoreUndefinedProperties: true });
   handles.set(key, firestore);
   return firestore;
 }

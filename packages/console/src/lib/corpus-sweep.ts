@@ -210,7 +210,7 @@ async function sweepOne(
     const elapsed = () => Date.now() - started;
     if (replay.failure) {
       const { stage, message } = replay.failure;
-      return { ...base, verdict: "failed", stage, error: message, freshModel: gen?.model || undefined, latencyMs: elapsed() };
+      return { ...base, verdict: "failed", stage, error: message, ...(gen?.model ? { freshModel: gen.model } : {}), latencyMs: elapsed() };
     }
 
     // Compare unparsed ASTs when both sides have one; otherwise both fall back to raw source.
@@ -229,9 +229,10 @@ async function sweepOne(
     return {
       ...base,
       verdict,
-      freshModel: gen.model || undefined,
+      // Optional fields only when set: Firestore rejects `undefined` values.
+      ...(gen.model ? { freshModel: gen.model } : {}),
       shapeLevel: diff.level,
-      degraded: diff.degraded || !unparsed || undefined,
+      ...(diff.degraded || !unparsed ? { degraded: true } : {}),
       ...(verdict === "structure" ? { onlyInBaseline: diff.onlyInA.slice(0, 12), onlyInFresh: diff.onlyInB.slice(0, 12) } : {}),
       latencyMs: elapsed(),
     };

@@ -57,6 +57,12 @@ test("only core/src/storage.ts creates a Firebase Admin app or a Firestore handl
   assert.deepEqual(offenders, []);
 });
 
+test("installation handles drop undefined fields instead of rejecting the write", async () => {
+  const { firestoreAt } = await import("../src/storage.js");
+  const db = firestoreAt({ projectId: "storage-test-undefined", databaseId: "(default)" });
+  assert.equal((db as any)._settings?.ignoreUndefinedProperties, true);
+});
+
 test("deploy.json states every service's project", () => {
   const deploy = JSON.parse(readFileSync(join(REPO, "deploy.json"), "utf8"));
   const project = deploy.environments.production.project;
