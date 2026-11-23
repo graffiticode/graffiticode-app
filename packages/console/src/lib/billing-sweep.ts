@@ -38,9 +38,15 @@ export async function sweepCustomer(
   return outcome.result;
 }
 
+/**
+ * A document id that is never a customer's (Stripe ids start "cus_") and is
+ * not one Firestore reserves (ids matching __.*__ are refused).
+ */
+export const SWEEP_PROBE_ID = 'sweep-probe';
+
 /** Refuse to sweep unless the shared coordination state can be read. */
 export async function assertCoordinationReadable(db: Db): Promise<void> {
   await db.runTransaction(async (tx: any) => {
-    await tx.get(db.collection('stripe_customer_locks').doc('__sweep_probe__'));
+    await tx.get(db.collection('stripe_customer_locks').doc(SWEEP_PROBE_ID));
   });
 }
