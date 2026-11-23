@@ -5,6 +5,7 @@ import { getFirestore } from '@graffiticode-app/core/utils/db/index';
 import { requireUser } from '../../../lib/api-auth';
 import { normalizeName } from '../../../lib/account-lookup';
 import { withInstallation } from "../../../lib/with-installation";
+import { firestoreCustomerLock, withCustomerLease } from '../../../lib/billing-customer-lock';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
   apiVersion: STRIPE_API_VERSION,
@@ -143,102 +144,108 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           }, { merge: true });
         }
 
-        // Attach the payment method to the customer
-        try {
-          await stripe.paymentMethods.attach(paymentMethodId, {
+        // Under the customer's billing lease, so reconciliation never acts across this change.
+        return withCustomerLease(firestoreCustomerLock(db), stripeCustomerId, res, async (lease) => {
+          // Attach the payment method to the customer
+          try {
+            await stripe.paymentMethods.attach(paymentMethodId, {
+              customer: stripeCustomerId,
+            });
+          } catch (attachError: any) {
+            // If the payment method is already attached, continue
+            if (attachError.code !== 'resource_missing' && !attachError.message?.includes('already been attached')) {
+              console.error('Error attaching payment method:', attachError);
+              return res.status(400).json({
+                error: 'Failed to attach payment method',
+                details: attachError.message || 'Payment method may already be attached or invalid'
+              });
+            }
+          }
+
+          // Check if this is the first payment method
+          const existingPaymentMethods = await stripe.paymentMethods.list({
             customer: stripeCustomerId,
+            type: 'card',
           });
-        } catch (attachError: any) {
-          // If the payment method is already attached, continue
-          if (attachError.code !== 'resource_missing' && !attachError.message?.includes('already been attached')) {
-            console.error('Error attaching payment method:', attachError);
-            return res.status(400).json({
-              error: 'Failed to attach payment method',
-              details: attachError.message || 'Payment method may already be attached or invalid'
+
+          // Set as default if requested OR if this is the only payment method
+          const shouldSetAsDefault = setAsDefault || existingPaymentMethods.data.length === 1;
+
+          if (shouldSetAsDefault) {
+            await stripe.customers.update(stripeCustomerId, {
+              invoice_settings: {
+                default_payment_method: paymentMethodId,
+              },
             });
           }
-        }
 
-        // Check if this is the first payment method
-        const existingPaymentMethods = await stripe.paymentMethods.list({
-          customer: stripeCustomerId,
-          type: 'card',
-        });
+          // Retrieve the payment method details
+          const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
+          if (shouldSetAsDefault) {
+            await lease.recordDefaultChoice({ paymentMethodId, fingerprint: paymentMethod.card?.fingerprint ?? null, subscriptions: false });
+          }
 
-        // Set as default if requested OR if this is the only payment method
-        const shouldSetAsDefault = setAsDefault || existingPaymentMethods.data.length === 1;
+          // Get the updated list of payment methods to return
+          const updatedPaymentMethods = await stripe.paymentMethods.list({
+            customer: stripeCustomerId,
+            type: 'card',
+          });
 
-        if (shouldSetAsDefault) {
-          await stripe.customers.update(stripeCustomerId, {
-            invoice_settings: {
-              default_payment_method: paymentMethodId,
+          // Get the default payment method and customer info
+          const customer = await stripe.customers.retrieve(stripeCustomerId) as Stripe.Customer;
+          const defaultPaymentMethodId = customer.invoice_settings?.default_payment_method;
+
+          // Update user profile with billing details from payment method and Stripe customer
+          const billingDetails = paymentMethod.billing_details;
+          const profileUpdate: Record<string, any> = {
+            updated: new Date().toISOString(),
+          };
+
+          // Get info from billing details (from the payment method)
+          if (billingDetails?.name) {
+            profileUpdate.name = billingDetails.name;
+            profileUpdate.nameLower = normalizeName(billingDetails.name);
+          }
+          if (billingDetails?.email) {
+            profileUpdate.email = billingDetails.email;
+          }
+          if (billingDetails?.phone) {
+            profileUpdate.phone = billingDetails.phone;
+          }
+
+          // Get Stripe customer created date
+          if (customer.created) {
+            profileUpdate.stripeCreated = new Date(customer.created * 1000).toISOString();
+          }
+
+          // Update user profile if we have any new info
+          if (Object.keys(profileUpdate).length > 1) {
+            await db.collection('users').doc(userId).set(profileUpdate, { merge: true });
+          }
+
+          const formattedMethods: PaymentMethod[] = updatedPaymentMethods.data.map(pm => ({
+            id: pm.id,
+            brand: pm.card?.brand || 'unknown',
+            last4: pm.card?.last4 || '****',
+            expMonth: pm.card?.exp_month || 0,
+            expYear: pm.card?.exp_year || 0,
+            isDefault: pm.id === defaultPaymentMethodId,
+            created: new Date(pm.created * 1000).toISOString(),
+          }));
+
+          return res.status(201).json({
+            success: true,
+            paymentMethods: formattedMethods,
+            newPaymentMethod: {
+              id: paymentMethod.id,
+              brand: paymentMethod.card?.brand || 'unknown',
+              last4: paymentMethod.card?.last4 || '****',
+              expMonth: paymentMethod.card?.exp_month || 0,
+              expYear: paymentMethod.card?.exp_year || 0,
+              isDefault: shouldSetAsDefault || paymentMethod.id === defaultPaymentMethodId,
+              created: new Date(paymentMethod.created * 1000).toISOString(),
             },
           });
-        }
-
-        // Retrieve the payment method details
-        const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
-
-        // Get the updated list of payment methods to return
-        const updatedPaymentMethods = await stripe.paymentMethods.list({
-          customer: stripeCustomerId,
-          type: 'card',
-        });
-
-        // Get the default payment method and customer info
-        const customer = await stripe.customers.retrieve(stripeCustomerId) as Stripe.Customer;
-        const defaultPaymentMethodId = customer.invoice_settings?.default_payment_method;
-
-        // Update user profile with billing details from payment method and Stripe customer
-        const billingDetails = paymentMethod.billing_details;
-        const profileUpdate: Record<string, any> = {
-          updated: new Date().toISOString(),
-        };
-
-        // Get info from billing details (from the payment method)
-        if (billingDetails?.name) {
-          profileUpdate.name = billingDetails.name;
-          profileUpdate.nameLower = normalizeName(billingDetails.name);
-        }
-        if (billingDetails?.email) {
-          profileUpdate.email = billingDetails.email;
-        }
-        if (billingDetails?.phone) {
-          profileUpdate.phone = billingDetails.phone;
-        }
-
-        // Get Stripe customer created date
-        if (customer.created) {
-          profileUpdate.stripeCreated = new Date(customer.created * 1000).toISOString();
-        }
-
-        // Update user profile if we have any new info
-        if (Object.keys(profileUpdate).length > 1) {
-          await db.collection('users').doc(userId).set(profileUpdate, { merge: true });
-        }
-
-        const formattedMethods: PaymentMethod[] = updatedPaymentMethods.data.map(pm => ({
-          id: pm.id,
-          brand: pm.card?.brand || 'unknown',
-          last4: pm.card?.last4 || '****',
-          expMonth: pm.card?.exp_month || 0,
-          expYear: pm.card?.exp_year || 0,
-          isDefault: pm.id === defaultPaymentMethodId,
-          created: new Date(pm.created * 1000).toISOString(),
-        }));
-
-        return res.status(201).json({
-          success: true,
-          paymentMethods: formattedMethods,
-          newPaymentMethod: {
-            id: paymentMethod.id,
-            brand: paymentMethod.card?.brand || 'unknown',
-            last4: paymentMethod.card?.last4 || '****',
-            expMonth: paymentMethod.card?.exp_month || 0,
-            expYear: paymentMethod.card?.exp_year || 0,
-            isDefault: shouldSetAsDefault || paymentMethod.id === defaultPaymentMethodId,
-            created: new Date(paymentMethod.created * 1000).toISOString(),
-          },
         });
       }
 
@@ -255,17 +262,22 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           return res.status(400).json({ error: 'No payment methods found' });
         }
 
-        if (setAsDefault) {
-          await stripe.customers.update(stripeCustomerId, {
-            invoice_settings: {
-              default_payment_method: methodId,
-            },
-          });
-        }
+        // Under the customer's billing lease, so reconciliation never acts across this change.
+        return withCustomerLease(firestoreCustomerLock(db), stripeCustomerId, res, async (lease) => {
+          if (setAsDefault) {
+            await stripe.customers.update(stripeCustomerId, {
+              invoice_settings: {
+                default_payment_method: methodId,
+              },
+            });
+            const chosen = await stripe.paymentMethods.retrieve(methodId);
+            await lease.recordDefaultChoice({ paymentMethodId: methodId, fingerprint: chosen.card?.fingerprint ?? null, subscriptions: false });
+          }
 
-        return res.status(200).json({
-          success: true,
-          message: 'Payment method updated',
+          return res.status(200).json({
+            success: true,
+            message: 'Payment method updated',
+          });
         });
       }
 
@@ -277,17 +289,27 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           return res.status(400).json({ error: 'Method ID is required' });
         }
 
-        // Check if this is the only payment method
-        if (stripeCustomerId) {
+        if (!stripeCustomerId) {
+          return res.status(200).json({
+            success: true,
+            message: 'Payment method removed',
+          });
+        }
+        const customerId: string = stripeCustomerId;
+        const removeId: string = methodId;
+
+        // Under the customer's billing lease, so reconciliation never acts across this change.
+        return withCustomerLease(firestoreCustomerLock(db), customerId, res, async (lease) => {
+          // Check if this is the only payment method
           const paymentMethods = await stripe.paymentMethods.list({
-            customer: stripeCustomerId,
+            customer: customerId,
             type: 'card',
           });
 
           if (paymentMethods.data.length === 1) {
             // Check if user has active subscription
             const subscriptions = await stripe.subscriptions.list({
-              customer: stripeCustomerId,
+              customer: customerId,
               status: 'active',
               limit: 1,
             });
@@ -301,30 +323,31 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           }
 
           // Detach the payment method
-          await stripe.paymentMethods.detach(methodId);
+          await stripe.paymentMethods.detach(removeId);
 
           // If this was the default method, set another as default
-          const customer = await stripe.customers.retrieve(stripeCustomerId) as Stripe.Customer;
-          if (customer.invoice_settings?.default_payment_method === methodId) {
+          const customer = await stripe.customers.retrieve(customerId) as Stripe.Customer;
+          if (customer.invoice_settings?.default_payment_method === removeId) {
             const remainingMethods = await stripe.paymentMethods.list({
-              customer: stripeCustomerId,
+              customer: customerId,
               type: 'card',
               limit: 1,
             });
 
             if (remainingMethods.data.length > 0) {
-              await stripe.customers.update(stripeCustomerId, {
+              await stripe.customers.update(customerId, {
                 invoice_settings: {
                   default_payment_method: remainingMethods.data[0].id,
                 },
               });
+              await lease.recordDefaultChoice({ paymentMethodId: remainingMethods.data[0].id, fingerprint: remainingMethods.data[0].card?.fingerprint ?? null, subscriptions: false });
             }
           }
-        }
 
-        return res.status(200).json({
-          success: true,
-          message: 'Payment method removed',
+          return res.status(200).json({
+            success: true,
+            message: 'Payment method removed',
+          });
         });
       }
 

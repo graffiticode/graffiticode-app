@@ -4,6 +4,7 @@ import { STRIPE_API_VERSION } from '@graffiticode-app/core/lib/plans-config';
 import { getFirestore } from '@graffiticode-app/core/utils/db/index';
 import { requireUser } from '../../../../lib/api-auth';
 import { withInstallation } from "../../../../lib/with-installation";
+import { firestoreCustomerLock, withCustomerLease } from '../../../../lib/billing-customer-lock';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
   apiVersion: STRIPE_API_VERSION,
@@ -41,29 +42,37 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(400).json({ error: 'No Stripe customer found' });
     }
 
-    // Set the payment method as the default for the customer
-    await stripe.customers.update(stripeCustomerId, {
-      invoice_settings: {
-        default_payment_method: methodId,
-      },
-    });
-
-    // Also update for subscriptions
-    const subscriptions = await stripe.subscriptions.list({
-      customer: stripeCustomerId,
-      status: 'active',
-    });
-
-    // Update the default payment method for all active subscriptions
-    for (const subscription of subscriptions.data) {
-      await stripe.subscriptions.update(subscription.id, {
-        default_payment_method: methodId,
+    // Under the customer's billing lease, so reconciliation never re-points
+    // the default across this change (billing-customer-lock.ts).
+    return withCustomerLease(firestoreCustomerLock(db), stripeCustomerId, res, async (lease) => {
+      // Set the payment method as the default for the customer
+      await stripe.customers.update(stripeCustomerId, {
+        invoice_settings: {
+          default_payment_method: methodId,
+        },
       });
-    }
 
-    return res.status(200).json({
-      success: true,
-      message: 'Default payment method updated',
+      // Also update for subscriptions
+      const subscriptions = await stripe.subscriptions.list({
+        customer: stripeCustomerId,
+        status: 'active',
+      });
+
+      // Update the default payment method for all active subscriptions
+      for (const subscription of subscriptions.data) {
+        await stripe.subscriptions.update(subscription.id, {
+          default_payment_method: methodId,
+        });
+      }
+
+      // Recorded so a reconciliation that lost its lease mid-write restores it.
+      const chosen = await stripe.paymentMethods.retrieve(methodId);
+      await lease.recordDefaultChoice({ paymentMethodId: methodId, fingerprint: chosen.card?.fingerprint ?? null, subscriptions: true });
+
+      return res.status(200).json({
+        success: true,
+        message: 'Default payment method updated',
+      });
     });
   } catch (error) {
     console.error('Error setting default payment method:', error);
