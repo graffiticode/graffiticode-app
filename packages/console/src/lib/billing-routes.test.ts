@@ -653,3 +653,11 @@ test('a dry-run sweep never creates queued work, whether it runs or finds the cu
   assert.equal(await queue.get(w.cus), null, 'no apply-capable work left behind');
   assert.equal(w.s.attached(w.cus).length, 2, 'nothing detached');
 });
+
+test('the sweep probe reads a document id Firestore accepts', async () => {
+  const { SWEEP_PROBE_ID, assertCoordinationReadable } = await import('./billing-sweep');
+  assert.doesNotMatch(SWEEP_PROBE_ID, /^__.*__$/, 'Firestore reserves ids of the form __name__');
+  assert.doesNotMatch(SWEEP_PROBE_ID, /^cus_/);
+  assert.match(SWEEP_PROBE_ID as string, /^[A-Za-z0-9-]+$/, 'no slashes, no dot-only ids');
+  await assertCoordinationReadable(fakeFirestore() as any);
+});
