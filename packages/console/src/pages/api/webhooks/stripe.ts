@@ -7,6 +7,9 @@ import { STRIPE_API_VERSION, priceIdToPlan, includedItemsFor, getPlan, overageDo
 import { emitPlanChanged, emitEvent, actor } from '@graffiticode-app/core/lib/funnel-events';
 import { verifyStripeEvent } from '../../../lib/stripe-webhook-verify';
 import { withInstallation } from "../../../lib/with-installation";
+import { reconcileModeFromEnv } from '../../../lib/billing-payment-methods';
+import { firestoreCustomerLock } from '../../../lib/billing-customer-lock';
+import { RECONCILE_ON, eventCustomerId, firestoreReconcileQueue, runReconcileWork } from '../../../lib/billing-reconcile-queue';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
   apiVersion: STRIPE_API_VERSION,
@@ -18,56 +21,6 @@ export const config = {
     bodyParser: false,
   },
 };
-
-// Detach duplicate cards (same fingerprint) for a customer, keeping exactly one.
-// Runs on payment_method.attached, so it covers every entry point: Checkout,
-// SetupIntent, and the manual add endpoint. Exported for the one-off cleanup
-// script (scripts/dedupe-payment-methods.ts).
-export async function dedupePaymentMethods(
-  stripeClient: Stripe,
-  customerId: string,
-  attachedPmId: string,
-): Promise<{ keepId: string; detached: string[] } | undefined> {
-  const attached = await stripeClient.paymentMethods.retrieve(attachedPmId);
-  const fingerprint = attached.card?.fingerprint;
-  if (!fingerprint) return;
-
-  // All card PMs sharing this fingerprint = the same physical card.
-  const all = await stripeClient.paymentMethods.list({ customer: customerId, type: 'card' });
-  const dupes = all.data.filter((pm) => pm.card?.fingerprint === fingerprint);
-  if (dupes.length < 2) return; // nothing to collapse
-
-  const customer = (await stripeClient.customers.retrieve(customerId)) as Stripe.Customer;
-  const customerDefault = customer.invoice_settings?.default_payment_method as string | undefined;
-
-  // Protect any PM an in-use subscription points at (covers the Checkout race
-  // where the new card was just wired up as the subscription's default).
-  const subs = await stripeClient.subscriptions.list({ customer: customerId, status: 'all', limit: 100 });
-  const protectedIds = new Set<string>(
-    subs.data
-      .filter((s) => ['active', 'trialing', 'past_due', 'incomplete'].includes(s.status))
-      .map((s) => s.default_payment_method as string)
-      .filter(Boolean),
-  );
-
-  // Keep the customer's current default if it's one of the dupes; otherwise keep
-  // the newest (the just-attached card) and promote it to default.
-  let keepId = dupes.find((pm) => pm.id === customerDefault)?.id;
-  if (!keepId) {
-    keepId = dupes.reduce((a, b) => (a.created > b.created ? a : b)).id;
-    await stripeClient.customers.update(customerId, {
-      invoice_settings: { default_payment_method: keepId },
-    });
-  }
-
-  const detached: string[] = [];
-  for (const pm of dupes) {
-    if (pm.id === keepId || protectedIds.has(pm.id)) continue;
-    await stripeClient.paymentMethods.detach(pm.id);
-    detached.push(pm.id);
-  }
-  return { keepId, detached };
-}
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -94,6 +47,23 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   const db = getFirestore();
+
+  // Duplicate-card reconciliation is durable work (billing-reconcile-queue.ts),
+  // recorded here, before any handler below runs, so every acknowledgement
+  // (including the 200 the catch-all returns after a handler fails) follows a
+  // durable record. Failing to record answers 500, so Stripe redelivers.
+  // STRIPE_PM_RECONCILE: dry-run (default) logs the plan, apply makes it, off skips it.
+  const reconcileCustomer = RECONCILE_ON.has(event.type) ? eventCustomerId(event) : null;
+  const reconcileMode = reconcileModeFromEnv(process.env.STRIPE_PM_RECONCILE);
+  const reconcileQueue = firestoreReconcileQueue(db as any);
+  if (reconcileCustomer && reconcileMode !== 'off') {
+    try {
+      await reconcileQueue.enqueue(reconcileCustomer, event.type);
+    } catch (e) {
+      console.error('[pm-reconcile] could not record work; asking Stripe to redeliver', e);
+      return res.status(500).json({ error: 'reconcile work not recorded' });
+    }
+  }
 
   try {
     switch (event.type) {
@@ -496,17 +466,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           });
         }
 
-        // Collapse duplicate cards (same fingerprint). Isolated so a failure
-        // here never fails the webhook (which would trigger Stripe retries).
-        try {
-          const result = await dedupePaymentMethods(stripe, customerId, paymentMethod.id);
-          if (result?.detached.length) {
-            console.log('Deduped payment methods', { customerId, ...result });
-          }
-        } catch (e) {
-          console.error('Payment method dedup failed:', e);
-        }
-
         break;
       }
 
@@ -542,6 +501,28 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       default:
         // Unhandled event type
+    }
+
+    // The work recorded above, tried once now. A busy or failed run stays
+    // queued with backoff, and the scheduled drain (api/internal/billing-reconcile)
+    // runs it, along with customers whose earlier reconciliation writes are
+    // still pending or watched.
+    if (reconcileCustomer && reconcileMode !== 'off') {
+      try {
+        const outcome = await runReconcileWork(stripe, firestoreCustomerLock(db), reconcileQueue, reconcileCustomer, reconcileMode);
+        const r = outcome.kind === 'done' ? outcome.result : null;
+        if (outcome.kind === 'again') {
+          console.log('[pm-reconcile] queued', JSON.stringify({ event: event.type, customerId: reconcileCustomer, dueAt: outcome.dueAt, why: outcome.why }));
+        } else if (r && (r.plan.detach.length || r.plan.setDefault || r.skipped.length || r.repairedChoice)) {
+          console.log('[pm-reconcile]', JSON.stringify({
+            event: event.type, customerId: reconcileCustomer, mode: r.mode, setDefault: r.plan.setDefault,
+            detach: r.plan.detach, detached: r.detached, skipped: r.skipped, repairedChoice: r.repairedChoice,
+          }));
+        }
+      } catch (e) {
+        // The work is recorded; the drain retries it.
+        console.error('[pm-reconcile] failed; left queued', e);
+      }
     }
 
     // Log all webhook events for debugging

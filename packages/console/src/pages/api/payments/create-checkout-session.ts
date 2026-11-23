@@ -5,6 +5,8 @@ import { STRIPE_API_VERSION, stripeBasePriceId, stripeMeterPriceId, getPlan, def
 import { emitEvent, actor } from '@graffiticode-app/core/lib/funnel-events';
 import { requireUser } from '../../../lib/api-auth';
 import { withInstallation } from "../../../lib/with-installation";
+import { CustomerLockBusy, LeaseLost, firestoreCustomerLock } from '../../../lib/billing-customer-lock';
+import { createReservedCheckoutSession } from '../../../lib/billing-purchase';
 
 // Initialize Stripe only if secret key is available
 let stripe: Stripe | null = null;
@@ -137,25 +139,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       });
     }
 
-    // Check for existing active or trialing subscription
-    const [activeSubs, trialingSubs] = await Promise.all([
-      stripe.subscriptions.list({ customer: stripeCustomerId, status: 'active', limit: 1 }),
-      stripe.subscriptions.list({ customer: stripeCustomerId, status: 'trialing', limit: 1 }),
-    ]);
-    const existingSubscriptions = {
-      data: [...activeSubs.data, ...trialingSubs.data],
-    };
-
-    // If user has an existing subscription, they should use quick-subscribe (Payment Methods tab)
-    // Stripe Checkout cannot properly handle subscription upgrades/downgrades with prorations
-    if (existingSubscriptions.data.length > 0) {
-      return res.status(400).json({
-        error: 'Cannot change subscription through checkout',
-        message: 'To upgrade or downgrade your plan, please add a payment method in the Payment Methods tab first.',
-        requiresPaymentMethod: true,
-      });
-    }
-
     // Get customer's default payment method if exists
     let defaultPaymentMethod = null;
     if (stripeCustomerId) {
@@ -226,7 +209,34 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       };
     }
 
-    const session = await stripe.checkout.sessions.create(sessionConfig);
+    // One purchase in flight per customer: the session is created as the
+    // customer's reservation, after any earlier session or saved-card attempt
+    // is recovered (billing-purchase.ts). A live subscription is refused here,
+    // under the same lease, rather than from a read made before it.
+    let outcome;
+    try {
+      outcome = await createReservedCheckoutSession(stripe, firestoreCustomerLock(db), stripeCustomerId, () => sessionConfig);
+    } catch (e) {
+      if (e instanceof CustomerLockBusy || e instanceof LeaseLost) {
+        return res.status(409).json({ busy: true, error: 'Another billing change is in progress. Please try again in a moment.' });
+      }
+      throw e;
+    }
+    if (outcome.kind === 'has_subscription') {
+      // Stripe Checkout cannot properly handle subscription upgrades/downgrades with prorations
+      return res.status(400).json({
+        error: 'Cannot change subscription through checkout',
+        message: 'To upgrade or downgrade your plan, please add a payment method in the Payment Methods tab first.',
+        requiresPaymentMethod: true,
+      });
+    }
+    if (outcome.kind === 'processing') {
+      return res.status(409).json({
+        pendingSubscription: true,
+        error: 'A payment for your subscription is still being processed. Please refresh in a moment.',
+      });
+    }
+    const session = outcome.session;
 
     // Intent, not a plan change — a session that's never completed is an
     // abandoned checkout, which is why the digest reports this separately from

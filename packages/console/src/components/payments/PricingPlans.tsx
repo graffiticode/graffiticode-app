@@ -1,8 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import useGraffiticodeAuth from '@graffiticode/auth-react';
 import { paymentsGet, paymentsPost } from '../../utils/payments-client';
 import { PlanId, BillingInterval, usePlanDisplay } from '@/utils/plans';
 import PlanCard from './PlanCard';
+import { useStripePromise } from '../../lib/stripe';
+import { runSavedCardPurchase } from '../../lib/saved-card-client';
+
+// One attempt key per confirmed purchase (plan, interval and card). Kept across
+// retries of that attempt so the server can recognize them; dropped once the
+// attempt ends.
+function newAttemptKey(): string {
+  return `att_${crypto.randomUUID().replace(/-/g, '')}`;
+}
 
 interface PricingPlansProps {
   onSubscriptionChange?: () => void;
@@ -36,6 +45,8 @@ export default function PricingPlans({ onSubscriptionChange }: PricingPlansProps
   const [pendingCancelPlan, setPendingCancelPlan] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sub, setSub] = useState<SubscriptionState>(defaultSubState);
+  const stripePromise = useStripePromise();
+  const attempt = useRef<{ key: string; planId: string; interval: string; cardId: string } | null>(null);
 
   useEffect(() => {
     if (user) fetchUserData();
@@ -168,6 +179,66 @@ export default function PricingPlans({ onSubscriptionChange }: PricingPlansProps
     }
   };
 
+  // Returning customer (no live subscription) with a card on file: charge that
+  // card after the user confirms it, instead of collecting it again through
+  // Checkout. Returns false only when the server says there's no usable card,
+  // in which case nothing was created and Checkout is the right path.
+  const subscribeWithSavedCard = async (planId: string): Promise<boolean> => {
+    const preview = await paymentsPost(user, 'quick-subscribe', { planId, interval: billingInterval, preview: true })
+      .catch((e: any) => {
+        if (e.response?.data?.requiresCheckout) return null;
+        throw e;
+      });
+    const card = preview?.data?.savedCard;
+    if (!card) return false;
+
+    const plan = plans.find((p) => p.id === planId);
+    const amount = plan ? (billingInterval === 'annual' ? plan.annualPrice : plan.monthlyPrice) : null;
+    const price = amount != null ? ` for $${amount}/${billingInterval === 'annual' ? 'year' : 'month'}` : '';
+    const brand = card.brand.charAt(0).toUpperCase() + card.brand.slice(1);
+    if (!confirm(`Subscribe to ${plan?.name ?? planId}${price}? Your ${brand} ending ${card.last4} will be charged now.`)) {
+      return true; // handled: the user said no
+    }
+
+    const same = attempt.current;
+    if (!same || same.planId !== planId || same.interval !== billingInterval || same.cardId !== card.id) {
+      attempt.current = { key: newAttemptKey(), planId, interval: billingInterval, cardId: card.id };
+    }
+    const body = { planId, interval: billingInterval, paymentMethodId: card.id, attemptKey: attempt.current!.key, confirmed: true };
+    const stripe = stripePromise ? await stripePromise : null;
+
+    await runSavedCardPurchase({
+      // Every HTTP answer is data here; only a missing response rejects (and
+      // keeps the attempt key, so a retry resumes the same attempt).
+      post: (b) => paymentsPost(user, 'quick-subscribe', b).then(
+        (r) => ({ status: r.status, data: r.data }),
+        (e: any) => {
+          if (e?.response) return { status: e.response.status, data: e.response.data };
+          throw e;
+        },
+      ),
+      confirmCardPayment: stripe ? (secret) => stripe.confirmCardPayment(secret) : null,
+      confirm: (m) => window.confirm(m),
+      alert: (m) => window.alert(m),
+      startCheckout: () => startCheckout(planId),
+      sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+    }, body, () => { attempt.current = null; });
+    await fetchUserData();
+    onSubscriptionChange?.();
+    return true;
+  };
+
+  const startCheckout = async (planId: string) => {
+    console.log('Falling back to Stripe Checkout:', { planId, interval: billingInterval });
+    const response = await paymentsPost(user, 'create-checkout-session', {
+      planId,
+      interval: billingInterval
+    });
+    if (response.data.checkoutUrl) {
+      window.location.href = response.data.checkoutUrl;
+    }
+  };
+
   const handleError = (error: any) => {
     console.error('Error creating subscription:', error);
     console.error('Error details:', error.response?.data);
@@ -218,17 +289,21 @@ export default function PricingPlans({ onSubscriptionChange }: PricingPlansProps
         console.log('Attempting quick subscribe:', { isChangingInterval, wouldBeUpgrade, planId, interval: billingInterval });
         const handled = await quickSubscribe(planId, wouldBeUpgrade);
         if (handled) return;
+        // Checkout refuses customers who already have a subscription, so it
+        // can't complete an in-place change; don't send them there.
+        alert('This change couldn’t be completed. Please refresh the page and try again.');
+        setProcessing(false);
+        setSelectedPlan(null);
+        return;
       }
 
-      console.log('Falling back to Stripe Checkout:', { planId, interval: billingInterval });
-      const response = await paymentsPost(user, 'create-checkout-session', {
-        planId,
-        interval: billingInterval
-      });
-
-      if (response.data.checkoutUrl) {
-        window.location.href = response.data.checkoutUrl;
+      if (sub.hasPaymentMethod && await subscribeWithSavedCard(planId)) {
+        setProcessing(false);
+        setSelectedPlan(null);
+        return;
       }
+
+      await startCheckout(planId);
     } catch (error: any) {
       handleError(error);
     }
