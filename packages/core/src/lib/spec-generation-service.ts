@@ -280,9 +280,10 @@ export class SpecDataUnavailableError extends Error {
 }
 
 /**
- * The compile behind a directive's blocks FAILED: the gateway answered, but with an error envelope
- * (`{ data: null, errors: [...] }`, which getApiData passes through as non-null). Nothing was
- * generated or cached. Its diagnostics are kept: retrying is useful only if they were transient.
+ * The compile behind a directive's blocks FAILED: the gateway answered with errors in its
+ * envelope — `{ data: null, errors }`, or `{ data: {...}, errors }` (schema-validation errors on a
+ * result). Nothing was generated or cached. Its diagnostics are kept: retrying is useful only if
+ * they were transient.
  */
 export class SpecCompileFailedError extends Error {
   readonly code = "SPEC_COMPILE_FAILED";
@@ -297,14 +298,13 @@ export class SpecCompileFailedError extends Error {
 }
 
 /**
- * The diagnostics of a failed compile envelope, or null when `compiled` is not one. getApiData
- * unwraps `{ data }` with `?.data ?? data`, so an envelope whose `data` is null comes back WHOLE —
- * non-null, with its `errors` — and would otherwise read as a design with no picker and no holes.
+ * The diagnostics of a failed compile, or null when it succeeded. Takes getApiData's normalized
+ * `{ data, errors }`: any envelope error fails it, whether or not `data` came back too — a result
+ * carrying errors is not one a recipe may be written from — and so does an answer with no data.
  */
-export function compiledFailure(compiled: any): any[] | null {
-  if (!compiled || typeof compiled !== "object") return null;
-  if (Array.isArray(compiled.errors) && compiled.errors.length > 0) return compiled.errors;
-  if ("data" in compiled && compiled.data === null) return ["the compile returned no data"];
+export function compiledFailure(result: { data: any; errors: any[] }): any[] | null {
+  if (result.errors.length > 0) return result.errors;
+  if (result.data === null || result.data === undefined) return ["the compile returned no data"];
   return null;
 }
 
@@ -338,7 +338,7 @@ export async function generateSpec(
   const task = taskList[0] || apiTask;
   const lang = task.lang;
 
-  const [lexicon, hints, instructions, specDirective, compiled] = await Promise.all([
+  const [lexicon, hints, instructions, specDirective, result] = await Promise.all([
     getLanguageLexicon(lang, auth?.token),
     getLanguageHints(lang, auth?.token),
     readDialectInstructions(lang, auth?.token),
@@ -347,14 +347,17 @@ export async function generateSpec(
     getApiData({ id: taskId, auth }),
   ]);
 
-  // getApiData returns null on any failure. For a dialect whose directive reads compiled blocks
-  // that null would silently produce a recipe missing them (an UNRESTRICTED picker, for L0177),
-  // which the caller would then cache. Fail retryably instead.
+  // getApiData returns null when the request fails, and the envelope's errors beside its data.
+  // For a dialect whose directive reads compiled blocks, either would silently produce a recipe
+  // missing them (an UNRESTRICTED picker, for L0177), which the caller would then cache.
   if (directiveNeedsCompiledData(specDirective)) {
-    if (compiled === null || compiled === undefined) throw new SpecDataUnavailableError(lang, taskId);
-    const failed = compiledFailure(compiled);
+    if (result === null || result === undefined) throw new SpecDataUnavailableError(lang, taskId);
+    const failed = compiledFailure(result);
     if (failed) throw new SpecCompileFailedError(lang, taskId, failed);
   }
+  // Every other dialect reads the data as enrichment, exactly as before the envelope's errors
+  // were kept: whatever data came back, errors or not.
+  const compiled = result?.data ?? null;
 
   const annSrc = unparse(task.code, lexicon || {}, { hints });
 
