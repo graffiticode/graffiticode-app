@@ -263,6 +263,11 @@
         "INTERNAL_API_KEY": "INTERNAL_API_KEY:2",
         "PRIVY_APP_SECRET": "PRIVY_APP_SECRET:1"
       },
+      "profile": {
+        "repo": "git@github.com:graffiticode/installation-graffiticode.git",
+        "ref": "352309a4b4efb0da5180caeb054848a03dda7a28",
+        "digest": "11988558ccb622f587ae59012a5fa36ea84a82485c83cc687ee6bdb2b47d96db"
+      },
       "profileHealth": "/api/health",
       "smoke": [
         {
