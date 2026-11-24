@@ -63,7 +63,11 @@ export async function cacheSpec({ auth, id, taskId, spec, lang, coverage, model 
 // an agent's hot path, while the result is a pure function of the (content-addressed) taskId
 // plus the dialect's prompt assets and model. The cache rides along on share/claim copies,
 // which spread the whole doc and re-derive the same taskId.
-export async function getSpec({ auth, id }) {
+/** What getSpec calls out to; a test supplies its own. */
+export const GET_SPEC_DEPS = { getItem: getItem as (args: any) => Promise<any>, generateSpec, cacheSpec };
+
+export async function getSpec({ auth, id }, deps = GET_SPEC_DEPS) {
+  const { getItem, generateSpec, cacheSpec } = deps;
   const rid = generateRequestId();
   const item = await getItem({ auth, id, includeSpec: true });
   if (!item) {

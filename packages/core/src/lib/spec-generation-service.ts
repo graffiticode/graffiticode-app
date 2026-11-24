@@ -280,6 +280,35 @@ export class SpecDataUnavailableError extends Error {
 }
 
 /**
+ * The compile behind a directive's blocks FAILED: the gateway answered, but with an error envelope
+ * (`{ data: null, errors: [...] }`, which getApiData passes through as non-null). Nothing was
+ * generated or cached. Its diagnostics are kept: retrying is useful only if they were transient.
+ */
+export class SpecCompileFailedError extends Error {
+  readonly code = "SPEC_COMPILE_FAILED";
+  readonly retryable = false;
+  readonly diagnostics: any[];
+  constructor(lang: string, taskId: string, diagnostics: any[]) {
+    const said = diagnostics.map((d) => (typeof d === "string" ? d : d?.message ?? JSON.stringify(d))).join("; ");
+    super(`get_spec: the design for this L${lang} item failed to compile, and its recipe cannot be written without the compiled result. Nothing was generated or cached. Compiler: ${said} (task ${taskId})`);
+    this.name = "SpecCompileFailedError";
+    this.diagnostics = diagnostics;
+  }
+}
+
+/**
+ * The diagnostics of a failed compile envelope, or null when `compiled` is not one. getApiData
+ * unwraps `{ data }` with `?.data ?? data`, so an envelope whose `data` is null comes back WHOLE —
+ * non-null, with its `errors` — and would otherwise read as a design with no picker and no holes.
+ */
+export function compiledFailure(compiled: any): any[] | null {
+  if (!compiled || typeof compiled !== "object") return null;
+  if (Array.isArray(compiled.errors) && compiled.errors.length > 0) return compiled.errors;
+  if ("data" in compiled && compiled.data === null) return ["the compile returned no data"];
+  return null;
+}
+
+/**
  * Whether a directive reads blocks that only compiled data supplies (`<COMPILED_PATHS>`,
  * `<COMPILED_PICKER>`, `<COMPILED_HOLES>`). For such a dialect a missing block is meaningful —
  * L0177 reads no `<COMPILED_PICKER>` as "write no restriction" — so data that failed to load must
@@ -293,7 +322,17 @@ export function directiveNeedsCompiledData(directive: string | null | undefined)
  * Generate an English spec for a task. `taskId` may be a composition chain (`head+up1+...`);
  * we describe the head (the authored item).
  */
-export async function generateSpec({ auth, taskId, rid, itemId }: { auth: any; taskId: string; rid?: string; itemId?: string | null }): Promise<SpecResult> {
+/** What generateSpec calls out to; a test supplies its own. */
+export const SPEC_DEPS = {
+  getApiTask, getApiData, getLanguageLexicon, getLanguageHints, readDialectInstructions, getLanguageSpecDirective,
+  callClaudeForSpec, anthropicCredentialsConfigured,
+};
+
+export async function generateSpec(
+  { auth, taskId, rid, itemId }: { auth: any; taskId: string; rid?: string; itemId?: string | null },
+  deps: typeof SPEC_DEPS = SPEC_DEPS,
+): Promise<SpecResult> {
+  const { getApiTask, getApiData, getLanguageLexicon, getLanguageHints, readDialectInstructions, getLanguageSpecDirective, callClaudeForSpec, anthropicCredentialsConfigured } = deps;
   const apiTask = await getApiTask({ id: taskId, auth });
   const taskList = Array.isArray(apiTask) ? apiTask : [apiTask];
   const task = taskList[0] || apiTask;
@@ -311,8 +350,10 @@ export async function generateSpec({ auth, taskId, rid, itemId }: { auth: any; t
   // getApiData returns null on any failure. For a dialect whose directive reads compiled blocks
   // that null would silently produce a recipe missing them (an UNRESTRICTED picker, for L0177),
   // which the caller would then cache. Fail retryably instead.
-  if (directiveNeedsCompiledData(specDirective) && (compiled === null || compiled === undefined)) {
-    throw new SpecDataUnavailableError(lang, taskId);
+  if (directiveNeedsCompiledData(specDirective)) {
+    if (compiled === null || compiled === undefined) throw new SpecDataUnavailableError(lang, taskId);
+    const failed = compiledFailure(compiled);
+    if (failed) throw new SpecCompileFailedError(lang, taskId, failed);
   }
 
   const annSrc = unparse(task.code, lexicon || {}, { hints });
