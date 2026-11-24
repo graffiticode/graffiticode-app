@@ -66,7 +66,12 @@ const SPEC_THINKING = { type: "disabled" } as const;
 // `readyListener`. None of that moves a taskId, a lang, or the resolved model, so 14 cached specs
 // across two accounts would have kept serving instructions that cannot work. This is the case the
 // version stamp exists for.
-export const SPEC_CACHE_VERSION = 2;
+// 3 (2026-11-24): L0177's picker restriction changed (group_defaults false plus explicit template
+// references; the old ten-group override was bypassed by search), and the prompt now carries the
+// compiler's resolved picker and the design's holes (withCompiledData). Every cached L0177 recipe
+// prescribes the old, bypassable restriction, and its taskId does not move. The bump is global
+// because the holes block also reaches any other dialect that reports an incomplete design.
+export const SPEC_CACHE_VERSION = 3;
 
 /** SPEC_MODEL still wins outright — an operator hatch that needs no deploy and no table edit. */
 export function specModelFor(lang: string | null | undefined): string {
@@ -222,40 +227,118 @@ export function assertCoverage(spec: string, ast: any): CoverageReport {
 }
 
 /**
- * Append the compiler's `paths` map to the prompt, when the dialect computes one.
+ * Append what the compiler DERIVED to the prompt: values the source alone cannot carry.
  *
- * Source alone cannot carry it. `paths` maps each config key the design set to the exact
- * destination path in the target platform, and the mapping is the COMPILER's — irrecoverable from
- * the source text, because the flattening is ambiguous (L0177: `title-show` → `title.show`, but
- * `enable-selection` → `enable_selection`).
+ * `<COMPILED_PATHS>`: each config key the design set, mapped to its exact destination path. The
+ * mapping is the COMPILER's — irrecoverable from the source text, because the flattening is
+ * ambiguous (L0177: `title-show` → `title.show`, but `enable-selection` → `enable_selection`).
+ * L0177's directive tells the recipe to transcribe paths verbatim; while the prompt carried only
+ * the unparsed AST, an implementer had to reconstruct them from Learnosity's docs, and under
+ * fail-open semantics a derived path is worse than an acknowledged unknown.
  *
- * L0177's directive tells the recipe four separate times to transcribe paths verbatim and forbids
- * hand-expanding kebab names — while the prompt carried only the unparsed AST, so there was nothing
- * to transcribe FROM. An implementer reported reconstructing all six paths out of Learnosity's
- * reference docs and SDK examples: the one operation the directive most wanted done by copying was
- * the only one it forced them to derive. Under fail-open semantics a derived path is worse than an
- * acknowledged unknown, since a wrong one enforces nothing and looks correct.
+ * `<COMPILED_PICKER>`: L0177's resolved question-picker restriction — `group_defaults`, the groups
+ * with their template references, and the templates they offer by name. The design names tags
+ * (`allow-templates [BAR-CHART]`); the references are looked up by the compiler, so a recipe told
+ * to copy them had nothing to copy until they were passed here.
  *
- * Gated on the data actually having `paths`, so every dialect that computes none gets a
- * byte-identical prompt and is unaffected.
+ * `<COMPILED_HOLES>`: the warnings of a design the compiler reports incomplete (`complete:
+ * false`). Holes are what the recipe must tell the reader they still have to supply — including
+ * an unsatisfiable picker restriction, for which the compiler deliberately emits no config.
+ *
+ * Each block is gated on its data being present, so a dialect that computes none of it gets a
+ * byte-identical prompt.
  */
-function withCompiledPaths(annSrc: string, compiled: any): string {
+const PICKER_KEYS = ["group_defaults", "question_type_groups", "picker_templates"] as const;
+export function withCompiledData(annSrc: string, compiled: any): string {
+  let out = annSrc;
   const paths = compiled?.paths;
-  if (!paths || typeof paths !== "object" || !Object.keys(paths).length) return annSrc;
-  return `${annSrc}\n\n<COMPILED_PATHS>\nThe compiler resolved each config key this design sets to its exact destination path. These are authoritative — reproduce them verbatim and never derive a path from a property name.\n${JSON.stringify(paths, null, 2)}\n`;
+  if (paths && typeof paths === "object" && Object.keys(paths).length) {
+    out += `\n\n<COMPILED_PATHS>\nThe compiler resolved each config key this design sets to its exact destination path. These are authoritative — reproduce them verbatim and never derive a path from a property name.\n${JSON.stringify(paths, null, 2)}\n`;
+  }
+  const picker = Object.fromEntries(PICKER_KEYS.filter((k) => compiled?.[k] !== undefined).map((k) => [k, compiled[k]]));
+  if (Object.keys(picker).length) {
+    out += `\n<COMPILED_PICKER>\nThe question-picker restriction the compiler resolved for this design. These values are authoritative — reproduce group_defaults and question_type_groups verbatim (every template reference exactly as given) and name the offered templates from picker_templates; never derive or retype a reference.\n${JSON.stringify(picker, null, 2)}\n`;
+  }
+  const holes = compiled?.complete === false && Array.isArray(compiled?.warnings) ? compiled.warnings : [];
+  if (holes.length) {
+    out += `\n<COMPILED_HOLES>\nThe compiler reports this design INCOMPLETE. Its warnings, holes first — the recipe must state each hole as something the reader must still provide, and must not present config the compiler did not emit:\n${JSON.stringify(holes, null, 2)}\n`;
+  }
+  return out;
+}
+
+/**
+ * The compiled data a directive depends on could not be fetched. Retryable: nothing was generated
+ * or cached, and the same request can succeed once the gateway answers.
+ */
+export class SpecDataUnavailableError extends Error {
+  readonly code = "SPEC_DATA_UNAVAILABLE";
+  readonly retryable = true;
+  constructor(lang: string, taskId: string) {
+    super(`get_spec: the compiled design for this L${lang} item is temporarily unavailable, and its recipe cannot be written without it. Nothing was generated or cached; retry get_spec. (task ${taskId})`);
+    this.name = "SpecDataUnavailableError";
+  }
+}
+
+/**
+ * The compile behind a directive's blocks FAILED: the gateway answered with errors in its
+ * envelope — `{ data: null, errors }`, or `{ data: {...}, errors }` (schema-validation errors on a
+ * result). Nothing was generated or cached. Its diagnostics are kept: retrying is useful only if
+ * they were transient.
+ */
+export class SpecCompileFailedError extends Error {
+  readonly code = "SPEC_COMPILE_FAILED";
+  readonly retryable = false;
+  readonly diagnostics: any[];
+  constructor(lang: string, taskId: string, diagnostics: any[]) {
+    const said = diagnostics.map((d) => (typeof d === "string" ? d : d?.message ?? JSON.stringify(d))).join("; ");
+    super(`get_spec: the design for this L${lang} item failed to compile, and its recipe cannot be written without the compiled result. Nothing was generated or cached. Compiler: ${said} (task ${taskId})`);
+    this.name = "SpecCompileFailedError";
+    this.diagnostics = diagnostics;
+  }
+}
+
+/**
+ * The diagnostics of a failed compile, or null when it succeeded. Takes getApiData's normalized
+ * `{ data, errors }`: any envelope error fails it, whether or not `data` came back too — a result
+ * carrying errors is not one a recipe may be written from — and so does an answer with no data.
+ */
+export function compiledFailure(result: { data: any; errors: any[] }): any[] | null {
+  if (result.errors.length > 0) return result.errors;
+  if (result.data === null || result.data === undefined) return ["the compile returned no data"];
+  return null;
+}
+
+/**
+ * Whether a directive reads blocks that only compiled data supplies (`<COMPILED_PATHS>`,
+ * `<COMPILED_PICKER>`, `<COMPILED_HOLES>`). For such a dialect a missing block is meaningful —
+ * L0177 reads no `<COMPILED_PICKER>` as "write no restriction" — so data that failed to load must
+ * stop generation rather than be mistaken for data that has none.
+ */
+export function directiveNeedsCompiledData(directive: string | null | undefined): boolean {
+  return typeof directive === "string" && directive.includes("<COMPILED_");
 }
 
 /**
  * Generate an English spec for a task. `taskId` may be a composition chain (`head+up1+...`);
  * we describe the head (the authored item).
  */
-export async function generateSpec({ auth, taskId, rid, itemId }: { auth: any; taskId: string; rid?: string; itemId?: string | null }): Promise<SpecResult> {
+/** What generateSpec calls out to; a test supplies its own. */
+export const SPEC_DEPS = {
+  getApiTask, getApiData, getLanguageLexicon, getLanguageHints, readDialectInstructions, getLanguageSpecDirective,
+  callClaudeForSpec, anthropicCredentialsConfigured,
+};
+
+export async function generateSpec(
+  { auth, taskId, rid, itemId }: { auth: any; taskId: string; rid?: string; itemId?: string | null },
+  deps: typeof SPEC_DEPS = SPEC_DEPS,
+): Promise<SpecResult> {
+  const { getApiTask, getApiData, getLanguageLexicon, getLanguageHints, readDialectInstructions, getLanguageSpecDirective, callClaudeForSpec, anthropicCredentialsConfigured } = deps;
   const apiTask = await getApiTask({ id: taskId, auth });
   const taskList = Array.isArray(apiTask) ? apiTask : [apiTask];
   const task = taskList[0] || apiTask;
   const lang = task.lang;
 
-  const [lexicon, hints, instructions, specDirective, compiled] = await Promise.all([
+  const [lexicon, hints, instructions, specDirective, result] = await Promise.all([
     getLanguageLexicon(lang, auth?.token),
     getLanguageHints(lang, auth?.token),
     readDialectInstructions(lang, auth?.token),
@@ -263,6 +346,18 @@ export async function generateSpec({ auth, taskId, rid, itemId }: { auth: any; t
     // The COMPILED data, for the one thing source cannot carry: values the compiler DERIVED.
     getApiData({ id: taskId, auth }),
   ]);
+
+  // getApiData returns null when the request fails, and the envelope's errors beside its data.
+  // For a dialect whose directive reads compiled blocks, either would silently produce a recipe
+  // missing them (an UNRESTRICTED picker, for L0177), which the caller would then cache.
+  if (directiveNeedsCompiledData(specDirective)) {
+    if (result === null || result === undefined) throw new SpecDataUnavailableError(lang, taskId);
+    const failed = compiledFailure(result);
+    if (failed) throw new SpecCompileFailedError(lang, taskId, failed);
+  }
+  // Every other dialect reads the data as enrichment, exactly as before the envelope's errors
+  // were kept: whatever data came back, errors or not.
+  const compiled = result?.data ?? null;
 
   const annSrc = unparse(task.code, lexicon || {}, { hints });
 
@@ -276,7 +371,7 @@ export async function generateSpec({ auth, taskId, rid, itemId }: { auth: any; t
   const directive = specDirective?.trim() || SPEC_DIRECTIVE;
   const system = `${instructions}\n\n${directive}`;
   const model = specModelFor(lang);
-  const { content: spec } = await callClaudeForSpec({ system, user: withCompiledPaths(annSrc, compiled), model, rid, itemId, auth });
+  const { content: spec } = await callClaudeForSpec({ system, user: withCompiledData(annSrc, compiled), model, rid, itemId, auth });
   const coverage = assertCoverage(spec, task.code);
 
   return { spec: spec.trim(), lang, itemId: taskId, coverage, model };

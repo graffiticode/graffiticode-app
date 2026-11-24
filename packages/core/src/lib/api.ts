@@ -210,20 +210,35 @@ export const getApiTask = async ({ auth, id }) => {
 };
 
 /**
- * A task's COMPILED data — what the dialect's compiler produced, as opposed to `/task`, which
- * returns only `{ lang, code }` (the AST).
+ * A `/data` response body, normalized to `{ data, errors }` with the envelope's errors KEPT.
  *
- * Same header auth as getApiTask. Returns null rather than throwing on any failure: the only
- * caller is spec generation, where this is enrichment — a spec must still be produced when the
- * data is unavailable, just without whatever the compiler computed.
+ * The compile envelope nests the dialect's own data one level down: `{ data, errors? }`. Its
+ * errors must be read before unwrapping, whatever `data` is — the gateway answers
+ * `{ data: null, errors }` for a failed compile and `{ data: {...}, errors }` when it attaches
+ * schema-validation errors to a result. A body that is not an envelope is the data itself.
  */
-export const getApiData = async ({ auth, id }) => {
+export function normalizeDataResponse(body: any): { data: any; errors: any[] } {
+  const isEnvelope = body !== null && typeof body === "object" && !Array.isArray(body)
+    && ("data" in body || "errors" in body);
+  if (!isEnvelope) return { data: body ?? null, errors: [] };
+  const errors = Array.isArray(body.errors) ? body.errors.filter((e: any) => e != null) : [];
+  return { data: body.data ?? null, errors };
+}
+
+/**
+ * A task's COMPILED data — what the dialect's compiler produced, as opposed to `/task`, which
+ * returns only `{ lang, code }` (the AST) — as `{ data, errors }` (normalizeDataResponse).
+ *
+ * Same header auth as getApiTask. Returns null rather than throwing when the request itself
+ * fails. The only caller is spec generation: for most dialects the data is enrichment, and a spec
+ * is still produced without it; a dialect whose directive reads compiled blocks refuses instead.
+ */
+export const getApiData = async ({ auth, id }): Promise<{ data: any; errors: any[] } | null> => {
   try {
     const headers = { "Authorization": auth.token };
     const { status, data } = await getApiJSON(`/data?id=${id}`, null, headers);
     if (status !== "success") return null;
-    // The compile envelope nests the dialect's own data one level down.
-    return (data as any)?.data ?? data ?? null;
+    return normalizeDataResponse(data);
   } catch (err) {
     console.warn(`getApiData: could not fetch data for ${id}:`, (err as Error)?.message);
     return null;
