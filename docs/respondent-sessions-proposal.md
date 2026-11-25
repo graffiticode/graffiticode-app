@@ -1,6 +1,6 @@
 # Respondent sessions: a console proposal
 
-**Status:** proposal, docs only, revised after the owner's second review (2026-11-25). Nothing here is implemented or approved for implementation. It changes no stored item, task or session, and historical sessions are never rewritten.
+**Status:** proposal, docs only, revised after review (2026-11-25). Nothing here is implemented or approved for implementation. It changes no stored item, task or session, and historical sessions are never rewritten.
 
 **Why now.** C4 in the backend (`graffiticode` `docs/c4-l0182-assignment-plan.md`) gives each L0182 respondent a durable survey assignment keyed by `(survey, session)`, where the session is the console item id folded into the program. On submission, C4 freezes the **assignment and the survey model** the answers were given against. It does not freeze the answer text, which stays in the program. The slice 0 inventory (`graffiticode` `docs/evidence/interpreter-c4-l0182/slice0-inventory.md`) showed that a copied literal session is **not** reliable evidence of who the respondent is or who owns the response: copies carry their source's session. The owner's direction (2026-11-25):
 - a new respondent's copy gets a fresh session;
@@ -107,10 +107,10 @@ The console never edits a folded AST. A fresh copy is **reconstructed** from a c
   - eval scripts.
 
 - **An item without the field (every item today) gets one only when its session is demonstrated,** on the first generation, parse or save that touches it, in the same transaction:
-  - the item's current program carries `session-id` equal to the item's own id, or carries no program or no `session-id` → `respondentSession` = the item's id;
-  - the program carries a **different** literal session S (a historical copy) → **the revision is refused**, with a message, and nothing is stored. The item is resolved explicitly first:
+  - a new item with no current program, or an existing program with exactly one demonstrated literal `session-id` equal to the item's own id → `respondentSession` = the item's id;
+  - an existing program with no `session-id`, a computed or ambiguous session, or a **different** literal session S (a historical copy) → **the revision is refused**, with a message, and nothing is stored. An existing sessionless program has no demonstrated durable identity; adding one could redraw a version under existing answers. The item is resolved explicitly first:
     - **continue S**, only through a rebinding that proves authority over S (§4.4);
-    - or **start a new response**, a fresh reconstruction under its own id (§4.1).
+    - or **start a new response**, an explicit fresh copy with its own new item id (§4.1), leaving the source unchanged. A sessionless program has no S to continue under this proposal; its revision remains blocked until C4's sessionless decision or an explicit new response.
 
     The fallback never silently switches a respondent from S to the item's id.
 - **Every program stored for a respondent-bound item is validated after parsing,** whatever produced it: the console chat, MCP, the editor, the eval scripts. Supplying `publicValues.itemId` doesn't affect a literal, so the check is on the parsed result:
@@ -131,6 +131,8 @@ The console never edits a folded AST. A fresh copy is **reconstructed** from a c
   A principal is either:
   - `{ kind: "user", uid }`;
   - `{ kind: "freePlan", uid, workspace }`, where `workspace` is the item's or binding's recorded `sessionNamespace`. All free-plan workspaces share one backend uid, so the uid alone never identifies a free-plan respondent.
+
+  Principal kind and workspace come from trusted server records. A free-plan item with a missing or invalid workspace answers unknown; it is never downgraded to a user principal containing the shared uid.
 - **How a verified workspace reaches C4.** At submission C4 compares the respondent principal with the **caller's** principal.
   - For a free-plan caller, the workspace is established only by the frontend server (console or MCP server). It verifies the caller's signed workspace token (`mintSessionToken` / its verifier in `packages/core/src/lib/free-plan-session-token.ts`) and passes the workspace to the backend as an **attested field** on its own service-authenticated call. This is the same pattern as the installation plan's I-2.
   - The backend accepts that field only from a registered frontend identity, never from a request body, a user token, the shared uid or the program. With no attested workspace, a free-plan caller can't submit (a temporary refusal), and is never matched by uid.
@@ -149,21 +151,24 @@ The console never edits a folded AST. A fresh copy is **reconstructed** from a c
 
 Owning an item doesn't establish ownership of the session embedded in it: a claim of an item carrying someone else's session would otherwise seize that response. A rebinding of session S therefore requires, all checked in **one transaction** with the binding and item writes:
 1. **Current authority over S, verified:**
-   - with a binding record, the caller (or, for a claim, the free-plan workspace being claimed) is its `ownerUid`;
-   - without one, S equals the id of a source item in the workspace being claimed, held only there (no other holder anywhere, and not ambiguous);
-   - a source item whose program carries a session that is **not** its own id (a historical copy) can't prove authority over S. Its continuation is **refused**, and **nothing is created for that item**. The claim result lists it as "can't continue this response", and offers one explicit action, "Start a new response", which makes a fresh unanswered reconstruction (§4.1) only when chosen. Its answers are never discarded silently. The source item stays as it is, with its history.
-2. **Claim-workspace proof:** the claim token verifies, the workspace (`sessionNamespace`) matches, and the source item belongs to it, as today.
+   - with a binding record, its full `principal` equals the verified source principal, including the workspace for a free-plan principal, and its `itemId` names the source item carrying S. A previously continued item T may legitimately carry S different from T's id when that binding proves it;
+   - without one, S equals the id of the source item, held uniquely by the verified source principal (no other holder anywhere, and not ambiguous). For a claim, that principal includes the workspace being claimed;
+   - a source item whose program carries a session different from its own id **without a matching current binding** can't prove authority over S. Its continuation is **refused**, and **nothing is created for that item**. The claim result lists it as "can't continue this response", and offers one explicit action, "Start a new response", which makes a fresh unanswered reconstruction (§4.1) only when chosen. Its answers are never discarded silently. The source item stays as it is, with its history.
+2. **Action proof:** for a claim, the claim token verifies, the workspace (`sessionNamespace`) matches, and the source item belongs to it, as today. For a future transfer, the authenticated caller must be the current respondent principal and the request must name the destination principal explicitly. The claim caller's user principal and the free-plan source principal are distinct, and both are checked in their roles.
 3. **The revision is unchanged:** the binding's `revision` (or its absence) equals what was read at the start, so the transaction fails if anyone rebound S meanwhile.
 
 **Retry, replay and concurrency:**
-- **Idempotent by operation, through immutable records.** Each claim or transfer carries an `opId` (the claim id, or the transfer's request id).
-  - In the same transaction as the rebinding, it writes a create-only `respondent-operations/<opId>` = `{ caller principal, request digest (session, source item, target item, via), result (binding revision written, target item, outcome), at }`.
+- **Idempotent per item, through immutable records.** Each item continuation has an `opId`. A workspace claim can contain several items, so its claim id identifies the parent request; stable child operation ids identify each source item. Two items never compete for the same operation-record key.
+  - In the same transaction as the rebinding, it writes a create-only `respondent-operations/<opId>` = `{ caller principal, request digest (session, source principal and item, destination principal, expected binding revision, via), result (binding revision written, destination item id, outcome), at }`.
   - A replay of `opId` reads **that record**, never the current binding. If the caller principal and request digest match, it returns the recorded result and writes nothing. Otherwise it is refused (`operation-mismatch`).
+  - Authentication and the replay check come before checking current binding ownership. The original request and expected revision are retained for retry, never reconstructed from a later binding. Replaying a completed operation grants no new authority.
+  - The parent claim records its original source-item set and stable child ids once. A retry resumes that same set, reuses completed child results, and processes only unfinished children. It does not discover newly added source items or mint different child ids on replay. Refused items remain refused; choosing "Start a new response" is a new request.
+  - Server-generated destination item ids are allocated once and retained for the operation. They are results, not freshly generated inputs to the replay digest. A changed destination principal or other caller-selected input is an operation mismatch.
   - So a replay still answers correctly after a later rebinding has replaced the binding's `opId`.
 - **Concurrent claims of one session:** both read revision n. One commits n+1; the other's transaction fails its revision check, re-reads, finds a binding it doesn't own, and is refused (`respondent-already-bound`), with no partial write.
 - **A transaction that fails for a transient reason** is retried with the same `opId`. Because the operation record is written only with the rebinding, a retry either finds it (replay) or performs the rebinding once.
 - **A refused rebinding** creates nothing for that item; "Start a new response" is a separate, explicit request with its own `opId`.
-- **After a successful claim:** the source item under the trial account is marked **read-only**. It stays, with its history, until it expires, and can't be answered or regenerated further.
+- **After a successful continuation:** the source item is marked **read-only**. A claimed trial item stays, with its history, until it expires, and can't be answered or regenerated further.
 
 ### 4.5 Path by path, after the change
 
@@ -188,18 +193,22 @@ Owning an item doesn't establish ownership of the session embedded in it: a clai
 - **Revisions:**
   - stable session for an ordinary item, and for a claimed item: claim → console regenerate → MCP `update_item` keeps S;
   - a historical copy (program session S ≠ item id, no `respondentSession`) has its revision refused until resolved, and its session is never switched to the item id;
+  - an existing sessionless program gets no implicit session or fresh draw under its answers; its revision is refused until an explicit decision, while its saved program and history stay unchanged;
   - a generated or edited program with a literal session different from the item's, no `session-id`, or two of them, is refused and not stored.
 - **Authority separation:** item authority and C5 capture decisions are byte-identical before and after. Respondent authority answers from the binding when one exists.
 - **Free-plan workspaces:**
   - workspace A cannot submit for workspace B's session, though both share one uid;
   - a free-plan call with no attested workspace can't submit;
+  - a free-plan authority record with no valid workspace never falls back to user authority;
   - a workspace in a request body, a user token or a program is ignored.
 - **Route authentication:** right audience with an unlisted caller → refused; listed caller with the wrong audience → refused.
 - **Rebinding:**
   - refused for a session the caller has no verified authority over, including a claimed item carrying another item's session;
+  - a continued item T with a matching binding for S can be transferred again, keeping S; an unrelated copy cannot use that binding;
   - concurrent claims of one session: exactly one wins and the other is refused;
   - a replayed `opId` is a no-op that returns the first result;
   - **claim A → transfer B → replay A** returns A's recorded result and leaves B's binding and authority unchanged; a replay with a different caller or request is refused `operation-mismatch`;
+  - a claim containing two source items writes separate child operation records; retrying after one item commits resumes the other without duplicate items, bindings or history. Its source set and destination ids remain stable on replay;
   - an unprovable claim creates nothing for that item, and only an explicit "Start a new response" creates the fresh copy;
   - a revision change between read and write fails the transaction;
   - the source becomes read-only after the claim.
@@ -210,6 +219,8 @@ Owning an item doesn't establish ownership of the session embedded in it: a clai
 ## 6. Rollout
 
 Console only, behind a flag per path (session field and folding, Copy, Share, claim rebinding, eval). Each ships and is verified on its own, and the session field and folding ship first. No backfill, and no rewriting of history. The respondent-authority lookup is inert until C4's identity decision adopts it.
+
+The validation rules would newly refuse revisions of historical copies, sessionless programs and programs with several sessions. That compatibility cost must be considered with C4's open decisions before implementation is approved. This proposal does not change the kernel's support for such programs or decide C4's sessionless and input-dependent identity policies. Adopting the respondent principal and frontend attestation in C4's backend plan remains a separate docs change before its API slice.
 
 ## 7. Choices (decided by the owner, 2026-11-25)
 
